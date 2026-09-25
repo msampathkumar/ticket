@@ -1669,7 +1669,7 @@ cmd_help() {
     local cmd
     cmd=$(basename "$0")
     cat << EOF
-$cmd - minimal ticket system with dependency tracking
+$cmd (v0.2.0) — Minimal, offline task tracker with dependency intelligence.
 
 Usage: $cmd <command> [args]
 
@@ -1712,6 +1712,8 @@ Commands:
   show <id>                Display ticket
   update <id> [options]    Update ticket fields (title, desc, priority, tags, etc.)
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
+  version, --version, -v   Display version and project information
+  help, --help, -h         Display this help message
   super <cmd> [args]       Bypass plugins, run built-in command directly
 EOF
 
@@ -1738,6 +1740,19 @@ Supports partial ID matching (e.g., '$cmd show 5c4' matches 'nw-5c46')
 EOF
 }
 
+cmd_version() {
+    cat << 'EOF'
+tk version 0.2.0
+
+Minimal, offline task tracker with dependency intelligence.
+Created by Sampath Kumar & wedow contributors
+GitHub: https://github.com/msampathkumar/ticket
+License: MIT
+
+Thank you for using tk! If you find it helpful, please star the repo or contribute on GitHub.
+EOF
+}
+
 # Main dispatch
 
 # Handle 'super' to bypass plugins
@@ -1749,7 +1764,7 @@ fi
 
 # Check for plugin commands first (unless super mode)
 # Plugins are responsible for their own TICKETS_DIR handling
-if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" && "${1:-}" != "version" && "${1:-}" != "--version" && "${1:-}" != "-v" ]]; then
     for _prefix in tk ticket; do
         _plugin="${_prefix}-$1"
         if _plugin_exec=$(_find_plugin "$_plugin" "$1" 2>/dev/null); then
@@ -1801,12 +1816,14 @@ case "${1:-help}" in
     update) shift; cmd_update "$@" ;;
     add-note) shift; cmd_add_note "$@" ;;
     version|--version|-v)
-        echo "tk version 0.2.0"
+        cmd_version
         ;;
     help|--help|-h) cmd_help ;;
     *)
-        echo "Unknown command: $1" >&2
-        cmd_help >&2
+        cmd=$(basename "$0")
+        echo "Error: unknown command '$1'" >&2
+        echo "" >&2
+        echo "Run '$cmd help' to see available commands." >&2
         exit 1
         ;;
 esac

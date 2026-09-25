@@ -75,4 +75,4 @@ Feature: Ticket Directory Resolution
     Given the tickets directory does not exist
     When I run "ticket help"
     Then the command should succeed
-    And the output should contain "minimal ticket system"
+    And the output should contain "Minimal, offline task tracker"

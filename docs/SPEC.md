@@ -7,7 +7,7 @@
 
 ## 1. System Goals & Philosophy
 
-`tk` is a minimal, file-based issue tracking system designed for both human software engineers and autonomous AI coding agents.
+`tk` is a **minimal, offline task tracker with dependency intelligence** designed for both human software engineers and autonomous AI coding agents.
 
 ### Core Principles
 1. **Zero Global Database**: All state is stored locally within the repository in `.tickets/`.

@@ -6,7 +6,7 @@ Welcome to the **`ticket` (`tk`)** repository. This document provides autonomous
 
 ## 🎯 1. Project Goals & Philosophy
 
-`tk` is a git-backed, plain-text issue tracker designed for frictionless collaboration between developers and AI coding assistants.
+`tk` is a **minimal, offline task tracker with dependency intelligence**, designed for frictionless collaboration between developers and AI coding assistants.
 
 - **Zero Database / Pure Plain Text**: State resides inside `.tickets/*.md` files with YAML frontmatter. Fully versioned by Git.
 - **DAG-Driven Dependency Tracking**: Native support for parent-child hierarchies, blockers, and cycle detection. Agents compute actionable next steps deterministically via topological order.

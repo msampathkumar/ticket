@@ -1,8 +1,8 @@
 # ticket (tk)
 
-The git-backed issue tracker for AI agents and developers, featuring an ultra-fast CLI and an optional modern Kanban & review dashboard.
+Minimal, offline task tracker with dependency intelligence. Features an ultra-fast CLI and an optional modern Kanban & review dashboard.
 
-Rooted in the Unix Philosophy, `tk` is inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html) with quality-of-life features for managing and querying complex issue dependency graphs.
+Rooted in the Unix Philosophy, `tk` is inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html) with quality-of-life features for managing and querying complex task dependency graphs.
 
 ---
 
@@ -71,7 +71,7 @@ tk webui server restart                        # Restart background daemon
 ## 📖 CLI Usage
 
 ```bash
-tk - minimal ticket system with dependency tracking
+tk (v0.2.0) — Minimal, offline task tracker with dependency intelligence.
 
 Usage: tk <command> [args]
 

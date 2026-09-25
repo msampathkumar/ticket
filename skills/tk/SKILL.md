@@ -1,11 +1,11 @@
 ---
 name: tk
-description: Manage local tickets, tasks, bugs, dependencies, and project planning using the tk minimal ticket system and tk-webui. Use when creating, updating, resolving, linking, checking blocked/ready tasks, or managing DAG dependency trees in projects with a .tickets repository.
+description: Manage local tickets, tasks, bugs, dependencies, and project planning using the tk minimal, offline task tracker with dependency intelligence and tk-webui.
 ---
 
 # tk - Agent Skill Guide
 
-This skill equips agents to interact with **`tk`**, a fast, git-backed ticket tracking system designed for AI agents and human developers.
+This skill equips agents to interact with **`tk`**, a **minimal, offline task tracker with dependency intelligence** designed for AI agents and human developers.
 
 ## Overview
 
@@ -52,6 +52,22 @@ Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` dire
   tk add-note <ticket-id> "Review feedback or progress update"
   ```
 
+- **List & Filter Tickets**:
+  ```bash
+  tk ls                          # List tickets (hides closed, limit 10 by default)
+  tk ls --full                   # List all open tickets without limit
+  tk ls --status=closed          # List closed tickets
+  tk ls -a "Developer" --type bug # Filter by assignee and type
+  ```
+
+- **Search & Query**:
+  ```bash
+  tk find "search query"         # Search text across title, desc, notes
+  tk query                       # Stream tickets as JSON lines
+  tk query '.priority == "0"'    # Query with jq filter
+  tk edit <ticket-id>            # Open in $EDITOR
+  ```
+
 ### 2. Dependency Management & DAG Queries
 - **Add dependency**:
   ```bash
@@ -77,12 +93,31 @@ Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` dire
   ```bash
   tk blocked     # Lists tickets waiting on unresolved dependencies
   ```
+- **Recently closed tasks**:
+  ```bash
+  tk closed      # Lists recently closed tickets
+  ```
 
-### 3. Launching the Web UI
+### 3. Interactive Web UI & Background Server
 ```bash
+# Foreground server on port 8475 (ASCII: T=84, K=75)
 tk webui [optional-dir]
+
+# Background daemon server management
+tk webui server start [dir]    # Start daemon in background
+tk webui server status         # Check status, URL, and PID
+tk webui server stop           # Stop background daemon
+tk webui server restart [dir]  # Restart background daemon
 ```
-Launches the 4-lane Kanban, Table view, interactive DAG Mind Map, and Timeline views at `http://127.0.0.1:8000`.
+
+### 4. GitHub Synchronization Plugin
+```bash
+tk github sync                 # Sync open GitHub issues & PRs to .tickets/
+tk github sync --issues        # Sync only issues
+tk github sync --prs           # Sync only PRs
+tk github list                 # List synced GitHub tickets
+tk github unsync -y            # Remove synced tickets
+```
 
 ## Agent Best Practices
 
@@ -90,7 +125,9 @@ Launches the 4-lane Kanban, Table view, interactive DAG Mind Map, and Timeline v
    Always run `tk ready` to find actionable, unblocked tickets rather than picking blocked ones.
 2. **Start the ticket**:
    Run `tk start <id>` when beginning work so other team members and agents know it's in progress.
-3. **Document review notes**:
+3. **Decompose complex features**:
+   Create subtasks with `tk create "<title>" --parent <epic-id>` and wire `tk dep <child> <blocker>`.
+4. **Document review notes**:
    Use `tk add-note <id> "..."` when submitting code for review or recording architectural findings.
-4. **Close upon completion**:
+5. **Close upon completion**:
    Run `tk close <id>` when verification and tests pass.

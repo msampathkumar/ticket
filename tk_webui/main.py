@@ -182,15 +182,16 @@ def main():
 
     # Subcommand handling for 'server'
     if len(sys.argv) > 1 and sys.argv[1] == "server":
-        action = sys.argv[2] if len(sys.argv) > 2 else "status"
-        server_parser = argparse.ArgumentParser(description="tk Web UI Background Server Management")
-        server_parser.add_argument("server_cmd", help="server")
-        server_parser.add_argument("action", choices=["start", "stop", "status", "restart"], default="status", nargs="?")
-        server_parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Target repository directory")
+        server_parser = argparse.ArgumentParser(
+            prog="tk webui server",
+            description="tk Web UI Background Server Management"
+        )
+        server_parser.add_argument("action", choices=["start", "stop", "status", "restart"], default="status", nargs="?", help="Action to perform (default: status)")
+        server_parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Target repository directory (default: current directory)")
         server_parser.add_argument("--host", default="127.0.0.1", help="Host address (default: 127.0.0.1)")
         server_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Port number (default: {DEFAULT_PORT})")
         
-        args = server_parser.parse_args()
+        args = server_parser.parse_args(sys.argv[2:])
 
         if args.action == "start":
             sys.exit(start_server(args.directory, host=args.host, port=args.port))
@@ -202,7 +203,10 @@ def main():
             sys.exit(restart_server(args.directory, host=args.host, port=args.port))
         return
 
-    parser = argparse.ArgumentParser(description="tk Web UI Server")
+    parser = argparse.ArgumentParser(
+        prog="tk webui",
+        description="tk Web UI Server - Interactive Kanban & Review Dashboard"
+    )
     parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Initial directory to open")
     parser.add_argument("--host", default="127.0.0.1", help="Host address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Port number (default: {DEFAULT_PORT})")
