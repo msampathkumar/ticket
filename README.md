@@ -153,11 +153,11 @@ Plugins are organized into self-contained directories under `plugins/<plugin-nam
 
 ## 📚 Documentation & Specifications
 
+- **[AI Agent Guide & Workflow (AGENTS.md)](AGENTS.md)**: 10,000-foot overview of architecture, goals, and autonomous agent operating workflows.
 - **[System & Data Specification (SPEC.md)](docs/SPEC.md)**: Complete schema, DAG semantics, error codes, and lifecycle specification (spec-driven architecture).
 - **[Plugin Standard Specification (PLUGIN_SPEC.md)](docs/PLUGIN_SPEC.md)**: Official plugin development standard, directory convention, execution lifecycle, and metadata contracts.
 - **[Plugin Architecture & Catalog (plugins/README.md)](plugins/README.md)**: Catalog of built-in plugins with links to individual plugin specs.
 - **[Plugin Authoring Guide (PLUGINS.md)](docs/PLUGINS.md)**: Guide on writing and distributing custom plugins.
-- **[AI Agent Integration Guide (AGENTS.md)](docs/AGENTS.md)**: Operational patterns, subtask decomposition workflows, and ready-queue traversal for AI coding agents.
 - **[Agent Skill (SKILL.md)](skills/tk/SKILL.md)**: Agent skill definition installable to `~/.agents/skills/tk/SKILL.md`.
 
 ---
