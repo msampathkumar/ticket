@@ -28,6 +28,14 @@ cd ticket
 
 This installs binaries directly to `~/.local/bin/` (`tk` and `tk-webui`). Make sure `~/.local/bin` is in your `$PATH`.
 
+### 2. Run Locally (Without Installing)
+
+You can launch and try the Web UI immediately without global installation:
+
+```bash
+./run.sh [optional-project-path]
+```
+
 ---
 
 ## 🚀 Key Features
