@@ -108,10 +108,12 @@ Following the frontmatter, the Markdown body contains:
 
 ## 5. Plugin & Extension Protocol
 
-1. Any executable named `tk-<command>` or `ticket-<command>` in `$PATH` is automatically invoked when running `tk <command>`.
+1. Any executable named `tk-<command>` or `ticket-<command>` in `$PATH` or located within `plugins/<command>/` is automatically invoked when running `tk <command>`.
 2. When invoked, the core CLI exports:
    - `TICKETS_DIR`: Absolute path to the resolved `.tickets` directory.
    - `TK_SCRIPT`: Absolute path to the root `tk` executable.
-3. Plugins must support:
-   - `# tk-plugin: <description>` comment in header or `--tk-describe` flag for `tk help` discovery.
-   - `--version` flag for version reporting.
+3. Plugins must conform to **[PLUGIN_SPEC.md](PLUGIN_SPEC.md)**:
+   - Directory isolation: `plugins/<plugin-name>/` containing executable and `<PLUGIN-NAME>-SPEC.md`.
+   - Optionality: Except for `tk-webui`, all plugins are optional.
+   - Metadata discovery: `# tk-plugin: <description>` comment in header or `--tk-describe` flag for `tk help` discovery.
+   - Version contract: `--version` flag for standardized version reporting.

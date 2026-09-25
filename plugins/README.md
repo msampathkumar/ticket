@@ -2,56 +2,46 @@
 
 Official plugins that extend `tk` with additional commands.
 
-## Writing Plugins
+All plugins follow the official [Plugin Specification Standard (PLUGIN_SPEC.md)](../docs/PLUGIN_SPEC.md). Except for the Web UI, all plugins are strictly optional to install.
 
-Plugins are executables named `tk-<cmd>` or `ticket-<cmd>` in `$PATH`. This repo uses the `ticket-` prefix for consistency.
+---
 
-Required metadata in the first 10 lines:
+## 📁 Plugin Directories & Specifications
+
+| Plugin Folder | Command | Spec Document | Description |
+| :--- | :--- | :--- | :--- |
+| [`webui/`](../tk_webui) | `tk webui` | [WEBUI-SPEC.md](../tk_webui/WEBUI-SPEC.md) | Full-featured Kanban, Table, Mind Map DAG, and Timeline dashboard |
+| [`github/`](github/) | `tk github` | [GITHUB-SPEC.md](github/GITHUB-SPEC.md) | Sync GitHub issues & pull requests into local tickets |
+| [`ls/`](ls/) | `tk ls` / `tk list` | [LS-SPEC.md](ls/LS-SPEC.md) | Formatted ticket listings with status, assignee, and tag filters |
+| [`edit/`](edit/) | `tk edit` | [EDIT-SPEC.md](edit/EDIT-SPEC.md) | Open ticket in `$EDITOR` / `$VISUAL` |
+| [`query/`](query/) | `tk query` | [QUERY-SPEC.md](query/QUERY-SPEC.md) | Structured JSON queries and programmatic data access |
+| [`migrate-beads/`](migrate-beads/) | `tk migrate-beads` | [MIGRATE-BEADS-SPEC.md](migrate-beads/MIGRATE-BEADS-SPEC.md) | Migration from legacy beads issue repositories |
+
+---
+
+## 🔌 Writing Plugins
+
+Each plugin lives in its own folder under `plugins/<plugin-name>/` and includes:
+1. An executable named `ticket-<name>` and a symlink `tk-<name>`
+2. A specification file named `<PLUGIN-NAME>-SPEC.md`
+3. Metadata comments in the first 10 lines:
 
 ```bash
 #!/usr/bin/env bash
-# tk-plugin: sync tickets with GitHub issues
+# tk-plugin: description for tk help
 # tk-plugin-version: 1.0.0
 
 set -euo pipefail
-# implementation here
 ```
 
-## Environment Variables
+Or for compiled binaries, implement `--tk-describe` and `--version`.
+
+---
+
+## 🌐 Environment Variables
 
 Plugins receive:
 - `TICKETS_DIR` — absolute path to `.tickets/` directory
-- `TK_SCRIPT` — absolute path to the `tk` script
+- `TK_SCRIPT` — absolute path to the `tk` executable
 
-Use `$TK_SCRIPT super <cmd>` to call built-ins without recursing into plugins:
-
-```bash
-#!/usr/bin/env bash
-# tk-plugin: wrapper that creates tickets with defaults
-# tk-plugin-version: 1.0.0
-
-"$TK_SCRIPT" super create "$@" --type task --priority 1
-```
-
-## Packaging
-
-Plugins here are automatically packaged on release for Homebrew and AUR.
-
-**Meta-packages:**
-- `ticket-core` — core script only
-- `ticket-extras` — curated plugins (listed in `pkg/extras.txt`)
-- `ticket` — depends on core + extras
-
-**Install options:**
-```bash
-brew install ticket                      # Full: core + curated plugins
-brew install ticket-core                 # Minimal: core only
-brew install ticket-core ticket-query    # Core + specific plugin
-```
-
-## Adding a Plugin
-
-1. Create `plugins/ticket-<name>` with metadata comments
-2. `chmod +x plugins/ticket-<name>`
-3. Add to `pkg/extras.txt` if it should be in the extras bundle
-4. Commit and tag a release
+Use `"$TK_SCRIPT" super <cmd>` to call built-ins without recursing into plugins.

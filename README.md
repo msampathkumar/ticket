@@ -93,30 +93,44 @@ Commands:
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
-Plugins (tk-<cmd> or ticket-<cmd> in PATH):
+Plugins (tk-<cmd> or ticket-<cmd> in PATH or plugins/<cmd>/):
   webui                  Interactive Kanban Web UI & PR review dashboard
+  github                 Sync GitHub issues and pull requests into local tickets
+  ls                     List tickets with optional filters
+  edit                   Open ticket in $EDITOR
+  query                  Output tickets as JSON, optionally filtered with jq
+  migrate-beads          Import tickets from .beads/issues.jsonl
 ```
 
 ---
 
-## 🔌 Writing Plugins
+## 🔌 Plugins System
 
-Plugins are executables named `tk-<cmd>` or `ticket-<cmd>` in `$PATH`.
+Plugins are organized into self-contained directories under `plugins/<plugin-name>/`, each containing their executable, symlinks, and a dedicated specification (`<PLUGIN-NAME>-SPEC.md`). Except for the Web UI (`tk-webui`), all plugins are strictly **optional** to install.
 
-Add metadata comments in the first 10 lines of your script:
+| Plugin | Directory | Specification | Description |
+| :--- | :--- | :--- | :--- |
+| **`webui`** | [`tk_webui/`](tk_webui/) / [`plugins/webui/`](plugins/webui/) | [`WEBUI-SPEC.md`](tk_webui/WEBUI-SPEC.md) | Interactive Kanban & Review Dashboard |
+| **`github`** | [`plugins/github/`](plugins/github/) | [`GITHUB-SPEC.md`](plugins/github/GITHUB-SPEC.md) | Sync GitHub issues and pull requests |
+| **`ls`** | [`plugins/ls/`](plugins/ls/) | [`LS-SPEC.md`](plugins/ls/LS-SPEC.md) | Formatted ticket listings |
+| **`edit`** | [`plugins/edit/`](plugins/edit/) | [`EDIT-SPEC.md`](plugins/edit/EDIT-SPEC.md) | Interactive `$EDITOR` opening |
+| **`query`** | [`plugins/query/`](plugins/query/) | [`QUERY-SPEC.md`](plugins/query/QUERY-SPEC.md) | JSON output and `jq` query filter |
+| **`migrate-beads`** | [`plugins/migrate-beads/`](plugins/migrate-beads/) | [`MIGRATE-BEADS-SPEC.md`](plugins/migrate-beads/MIGRATE-BEADS-SPEC.md) | Migration from Beads issues format |
+
+### Modular Installation Options
+
 ```bash
-#!/usr/bin/env bash
-# tk-plugin: description for tk help
-# tk-plugin-version: 1.0.0
+# Core CLI Only
+./install.sh --core
 
-set -euo pipefail
-# implementation here
-```
+# Core + Web UI (Full default suite)
+./install.sh --full
 
-Or for compiled binaries, implement the `--tk-describe` flag:
-```bash
-$ my-binary --tk-describe
-tk-plugin: description for tk help
+# Install Everything (Core + Web UI + All Plugins + Agent Skill)
+./install.sh --all
+
+# Selectively install plugins
+./install.sh --github --skill
 ```
 
 ---
@@ -124,7 +138,9 @@ tk-plugin: description for tk help
 ## 📚 Documentation & Specifications
 
 - **[System & Data Specification (SPEC.md)](docs/SPEC.md)**: Complete schema, DAG semantics, error codes, and lifecycle specification (spec-driven architecture).
-- **[Plugin Architecture Guide (PLUGINS.md)](docs/PLUGINS.md)**: Guide on writing and distributing custom plugins with metadata discovery and version contracts.
+- **[Plugin Standard Specification (PLUGIN_SPEC.md)](docs/PLUGIN_SPEC.md)**: Official plugin development standard, directory convention, execution lifecycle, and metadata contracts.
+- **[Plugin Architecture & Catalog (plugins/README.md)](plugins/README.md)**: Catalog of built-in plugins with links to individual plugin specs.
+- **[Plugin Authoring Guide (PLUGINS.md)](docs/PLUGINS.md)**: Guide on writing and distributing custom plugins.
 - **[AI Agent Integration Guide (AGENTS.md)](docs/AGENTS.md)**: Operational patterns, subtask decomposition workflows, and ready-queue traversal for AI coding agents.
 - **[Agent Skill (SKILL.md)](skills/tk/SKILL.md)**: Agent skill definition installable to `~/.agents/skills/tk/SKILL.md`.
 

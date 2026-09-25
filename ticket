@@ -1362,13 +1362,56 @@ cmd_add_note() {
 }
 
 # List installed plugins with descriptions
+_find_plugin() {
+    local plugin="$1"
+    local cmd="${2:-${plugin#*-}}"
+    if command -v "$plugin" &>/dev/null; then
+        command -v "$plugin"
+        return 0
+    fi
+    local repo_dir
+    repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -x "$repo_dir/plugins/$cmd/$plugin" ]]; then
+        echo "$repo_dir/plugins/$cmd/$plugin"
+        return 0
+    fi
+    for f in "$repo_dir"/plugins/*/"$plugin"; do
+        if [[ -x "$f" && -f "$f" ]]; then
+            echo "$f"
+            return 0
+        fi
+    done
+    if [[ -x "$repo_dir/plugins/$plugin" ]]; then
+        echo "$repo_dir/plugins/$plugin"
+        return 0
+    fi
+    return 1
+}
+
+# List installed plugins with descriptions
 # Scripts: # tk-plugin: description (comment in first 10 lines)
 # Binaries: --tk-describe flag outputs description
 _list_plugins() {
-    local seen="" plugin cmd desc path out
+    local seen="" plugin cmd desc path out repo_dir
+
+    repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     for prefix in tk ticket; do
+        # Collect candidates from PATH and local repo plugins/ directory
+        local candidates=()
         while IFS= read -r plugin; do
+            [[ -n "$plugin" ]] && candidates+=("$plugin")
+        done < <(compgen -c "${prefix}-" 2>/dev/null | sort -u)
+
+        if [[ -d "$repo_dir/plugins" ]]; then
+            for f in "$repo_dir"/plugins/*/"${prefix}-"* "$repo_dir"/plugins/"${prefix}-"*; do
+                if [[ -x "$f" && -f "$f" ]]; then
+                    candidates+=("$(basename "$f")")
+                fi
+            done
+        fi
+
+        for plugin in "${candidates[@]}"; do
             [[ -z "$plugin" ]] && continue
             cmd="${plugin#${prefix}-}"
 
@@ -1376,7 +1419,7 @@ _list_plugins() {
             case " $seen " in *" $cmd "*) continue ;; esac
             seen="$seen $cmd"
 
-            path=$(command -v "$plugin" 2>/dev/null) || continue
+            path=$(_find_plugin "$plugin" "$cmd" 2>/dev/null) || continue
             [[ -f "$path" ]] || continue
 
             desc=""
@@ -1399,7 +1442,7 @@ _list_plugins() {
             fi
 
             printf "  %-22s %s\n" "$cmd" "${desc:-(no description)}"
-        done < <(compgen -c "${prefix}-" 2>/dev/null | sort -u)
+        done
     done
 }
 
@@ -1478,7 +1521,7 @@ fi
 if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
     for _prefix in tk ticket; do
         _plugin="${_prefix}-$1"
-        if command -v "$_plugin" &>/dev/null; then
+        if _plugin_exec=$(_find_plugin "$_plugin" "$1" 2>/dev/null); then
             # Export context for plugins
             if [[ -z "${TICKETS_DIR:-}" ]]; then
                 if _found=$(find_tickets_dir 2>/dev/null); then
@@ -1494,7 +1537,7 @@ if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--he
             fi
             export TK_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
             shift
-            exec "$_plugin" "$@"
+            exec "$_plugin_exec" "$@"
         fi
     done
 fi
