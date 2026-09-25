@@ -26,6 +26,20 @@
 5. **Settings & Preferences**: Theme accent color selector (Indigo, Emerald, Violet, Amber, Rose, Cyan), high-contrast border mode, start/end date range filtering, settings reset, and documentation link.
 6. **Task Detail Drawer**: Markdown renderer for descriptions, acceptance criteria, subtasks list, dependency manager, and timestamped review feedback feed.
 
+### Visual Interface Showcase
+
+| 4-Lane Kanban Board | Interactive Dependency Graph |
+| :---: | :---: |
+| ![Kanban Board](../../docs/images/tk-kanban.png) | ![Mind Map & DAG Graph](../../docs/images/tk-mind-map.png) |
+
+| Table & Filter View | Create & Edit Ticket |
+| :---: | :---: |
+| ![Table View](../../docs/images/tk-list-view.png) | ![Create & Edit Task](../../docs/images/tk-create-page.png) |
+
+| Settings & Themes |
+| :---: |
+| ![Settings](../../docs/images/tk-settings.png) |
+
 ---
 
 ## 3. CLI & Server Commands
@@ -38,14 +52,21 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `directory`: Initial directory containing `.tickets/` (default: current working directory).
 - `--host`: Host IP to bind (default: `127.0.0.1`).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
-- `--version` / `-v`: Displays version (`tk-webui 0.2.0`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.2.0`).
 
-### 3.2 Background Daemon Server (`tk webui server`)
+### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash
+# Daemon management
 tk webui server start [directory] [--port PORT]   # Start daemon in background
 tk webui server status                            # Check status, URL, PID, and logs
 tk webui server stop                              # Stop background daemon
 tk webui server restart [directory]               # Restart background daemon
+
+# Direct shortcuts
+tk webui start [directory]                        # Shortcut for server start
+tk webui status                                   # Shortcut for server status
+tk webui stop                                     # Shortcut for server stop
+tk webui restart [directory]                      # Shortcut for server restart
 ```
 
 State files and logs are managed under `~/.local/state/tk/`:

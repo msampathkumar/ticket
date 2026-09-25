@@ -2,14 +2,14 @@
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
-- **Version**: `0.1.0`
+- **Version**: `0.2.0`
 - **Installation**: Optional (`./install.sh --github`)
 
 ---
 
 ## 1. Overview
 
-`tk-github` provides bidirectional-aware synchronization between GitHub issues/pull requests and local `.tickets/` markdown files. It enables tracking remote GitHub work as local tickets with automated state reconciliation and clean removal.
+`tk-github` syncs GitHub issues and pull requests into local `.tickets/*.md` files, supporting automated state reconciliation and clean unsyncing.
 
 ---
 

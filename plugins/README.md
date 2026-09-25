@@ -1,8 +1,8 @@
 # Ticket Plugins
 
-Official plugins that extend `tk` with additional commands.
+Official plugins that extend `tk`.
 
-All plugins follow the official [Plugin Specification Standard (PLUGIN_SPEC.md)](../docs/PLUGIN_SPEC.md). Except for the Web UI, all plugins are strictly optional to install.
+All plugins follow the [Plugin Specification (PLUGIN_SPEC.md)](../docs/PLUGIN_SPEC.md) and are optional.
 
 ---
 

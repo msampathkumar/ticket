@@ -1,20 +1,20 @@
 # tk - System & Data Specification
 
-> **Specification Lifecycle Notice**  
-> This specification document was formulated following the initial reference implementation of `tk`. Future architecture evolutions, format updates, and feature additions adhere to a **spec-driven development lifecycle**.
+> **Specification Lifecycle**  
+> Architecture changes, format updates, and new features follow a **spec-driven development lifecycle**.
 
 ---
 
 ## 1. System Goals & Philosophy
 
-`tk` is a **minimal, offline task tracker with dependency intelligence** designed for both human software engineers and autonomous AI coding agents.
+`tk` is a **minimal, offline task tracker with dependency intelligence** designed for developers and autonomous AI coding agents.
 
 ### Core Principles
-1. **Zero Global Database**: All state is stored locally within the repository in `.tickets/`.
-2. **Plain-Text Transparency**: Every ticket is a human-readable Markdown file with a YAML frontmatter header.
-3. **Graph-Centric (DAG)**: Native dependency tracking (`deps`) enables robust topological sorting, cycle detection, and ready-queue computation.
-4. **Unix Portability**: The core CLI is implemented in POSIX-compliant Bash with `awk` and `sed`, requiring no runtimes or package managers.
-5. **Decoupled Extensions**: Heavy features (Web UI, integrations) operate as independent, modular plugins discovering each other via `$PATH`.
+1. **Zero Database**: State is stored locally in `.tickets/*.md`.
+2. **Plain-Text Transparency**: Every ticket is a Markdown file with YAML frontmatter.
+3. **DAG-Driven**: Native dependency tracking (`deps`) enables topological sorting, cycle detection, and ready-queue computation.
+4. **Unix Portability**: Core CLI runs on POSIX Bash with `awk` and `sed`—no external runtime required.
+5. **Decoupled Extensions**: Web UI and external integrations operate as modular plugins.
 
 ---
 
@@ -107,7 +107,8 @@ Following the frontmatter, the Markdown body contains:
 | `tk show <id>` | Displays ticket metadata and full markdown body |
 | `tk update <id> [options]` | Updates fields (title, desc, priority, tags, etc.) |
 | `tk add-note <id> [text]` | Appends timestamped note |
-| `tk version` / `--version` | Prints version string (`tk version <version>`) |
+| `tk agent-skill [--install]` | Displays or installs agent skill to `~/.agents/skills/tk/` |
+| `tk version` / `--version` | Prints version, description, and license information |
 | `tk help` | Displays available built-in commands and discovered plugins |
 
 ---

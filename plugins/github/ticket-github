@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # tk-plugin: Sync GitHub issues and pull requests into local tickets
-# tk-plugin-version: 0.1.0
+# tk-plugin-version: 0.2.0
 
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 # Find tk executable if TK_SCRIPT not passed
 if [[ -z "${TK_SCRIPT:-}" ]]; then
@@ -33,7 +33,10 @@ fi
 
 show_help() {
     cat << EOF
-tk-github - GitHub issues and pull requests synchronization plugin
+tk-github (v${VERSION}) — Sync GitHub issues and pull requests into local tk tickets.
+Created by Sampath Kumar & wedow contributors
+GitHub: https://github.com/msampathkumar/ticket
+License: MIT
 
 Usage: tk github <command> [options]
 
@@ -58,6 +61,21 @@ Examples:
   tk github sync --prs     # Sync only pull requests
   tk github list           # View all synced tickets
   tk github unsync -y      # Remove all synced GitHub tickets
+
+Thank you for using tk! If you find it helpful, please star the repo or contribute on GitHub.
+EOF
+}
+
+cmd_version() {
+    cat << EOF
+tk-github version ${VERSION}
+
+Sync GitHub issues and pull requests into local tk tickets.
+Created by Sampath Kumar & wedow contributors
+GitHub: https://github.com/msampathkumar/ticket
+License: MIT
+
+Thank you for using tk! If you find it helpful, please star the repo or contribute on GitHub.
 EOF
 }
 
@@ -304,7 +322,7 @@ case "${1:-sync}" in
         cmd_list "$@"
         ;;
     version|--version|-v)
-        echo "tk-github $VERSION"
+        cmd_version
         ;;
     --tk-describe)
         echo "tk-plugin: Sync GitHub issues and pull requests into local tickets"
@@ -317,8 +335,9 @@ case "${1:-sync}" in
         if [[ "$1" == --* ]]; then
             cmd_sync "$@"
         else
-            echo "Unknown command: $1" >&2
-            show_help >&2
+            echo "Error: unknown command '$1'" >&2
+            echo "" >&2
+            echo "Run 'tk github help' to see available commands." >&2
             exit 1
         fi
         ;;

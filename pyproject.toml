@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tk-webui"
-version = "0.1.0"
-description = "FastAPI & Kanban Web UI for tk (minimal ticket system with dependency tracking)"
+version = "0.2.0"
+description = "Interactive Kanban Web UI & PR review dashboard for tk"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Sampath Kumar" }]

@@ -1,15 +1,15 @@
 # tk - Plugin Specification Standard (PLUGIN_SPEC.md)
 
-This document defines the official standard, architecture, and compliance requirements for all `tk` plugins.
+Architecture and compliance requirements for `tk` plugins.
 
 ---
 
 ## 1. Core Principles
 
-1. **Decoupled & Independent**: Plugins extend the core `tk` system without modifying the base `ticket` Bash CLI.
-2. **Strictly Optional**: All plugins (with the standard exception of the Web UI review dashboard) are strictly optional to install. Users who choose only the zero-dependency core CLI must never be forced to install extra dependencies.
-3. **Spec-Driven**: Every plugin repository or folder MUST maintain a dedicated `<PLUGIN-NAME>-SPEC.md` defining its commands, flags, schema, and dependencies.
-4. **Isolated Folder Structure**: Each plugin lives in its own directory under `plugins/<plugin-name>/`.
+1. **Decoupled**: Plugins extend `tk` without modifying the core `ticket` CLI.
+2. **Optional**: Plugins are optional. Users who need only the core CLI never need external runtimes.
+3. **Spec-Driven**: Every plugin maintains a `<PLUGIN-NAME>-SPEC.md` specifying commands, flags, schema, and dependencies.
+4. **Isolated**: Each plugin lives in its own directory under `plugins/<plugin-name>/`.
 
 ---
 

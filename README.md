@@ -2,47 +2,45 @@
 
 Minimal, offline task tracker with dependency intelligence. Features an ultra-fast CLI and an optional modern Kanban & review dashboard.
 
-Rooted in the Unix Philosophy, `tk` is inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html) with quality-of-life features for managing and querying complex task dependency graphs.
+Inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html), `tk` manages and queries task dependency graphs in plain text.
 
 ---
 
 ## ⚡ Quick Install
 
-You can install either just the lightweight, zero-dependency Bash CLI, or the complete suite with the interactive Web UI.
-
-### 1. Using the Modular Installer Script
+Install the zero-dependency Bash CLI or the full suite with the interactive Web UI:
 
 ```bash
 git clone https://github.com/msampathkumar/ticket.git
 cd ticket
 
-# Option A: Full Suite (CLI + Interactive Web UI)
+# Full Suite (CLI + Web UI + Agent Skill)
 ./install.sh --full
 
-# Option B: Core CLI Only (Zero Python dependencies, pure Bash)
+# Core CLI Only (Pure Bash, zero Python dependencies)
 ./install.sh --core
 
-# Option C: Web UI Plugin Only
+# Web UI Plugin Only
 ./install.sh --webui
 ```
 
-This installs binaries directly to `~/.local/bin/` (`tk` and `tk-webui`). Make sure `~/.local/bin` is in your `$PATH`.
+Binaries install to `~/.local/bin/` (`tk` and `tk-webui`). Ensure `~/.local/bin` is in `$PATH`.
 
-### 2. Launching Web UI & Background Server
+### Launching Web UI & Background Server
 
-The Web UI runs on **port `8475`** by default (ASCII values for **T** = 84, **K** = 75):
+The Web UI runs on **port `8475`** (ASCII for **T** = 84, **K** = 75):
 
 ```bash
-# Option A: Foreground Server
+# Foreground Server
 tk webui [optional-project-path]
 
-# Option B: Background Daemon Management
+# Background Daemon
 tk webui server start [optional-project-path]  # Starts daemon on http://127.0.0.1:8475
-tk webui server status                         # Inspect server PID, URL, and log path
-tk webui server stop                           # Stop background daemon
-tk webui server restart                        # Restart background daemon
+tk webui server status                         # Inspect PID, URL, and log path
+tk webui server stop                           # Stop daemon
+tk webui server restart                        # Restart daemon
 
-# Option C: Run locally from repo clone without global install
+# Run locally without install
 ./run.sh [optional-project-path]
 ```
 
@@ -66,12 +64,29 @@ tk webui server restart                        # Restart background daemon
 - **Collapsible Completed Tasks**: Automatically cleans up closed tasks with a 1-click toggle to view older tasks.
 - **Multi-Project Switcher**: Switch between any repositories containing `.tickets/` on your system.
 
+### 🖼️ Web UI Showcase
+
+| 4-Lane Kanban Board | Interactive Dependency Graph |
+| :---: | :---: |
+| ![Kanban Board](docs/images/tk-kanban.png) | ![Mind Map & DAG Graph](docs/images/tk-mind-map.png) |
+
+| Table & Filter View | Create & Edit Ticket |
+| :---: | :---: |
+| ![Table View](docs/images/tk-list-view.png) | ![Create & Edit Task](docs/images/tk-create-page.png) |
+
+| Settings & Themes |
+| :---: |
+| ![Settings](docs/images/tk-settings.png) |
+
 ---
 
 ## 📖 CLI Usage
 
 ```bash
 tk (v0.2.0) — Minimal, offline task tracker with dependency intelligence.
+Created by Sampath Kumar & wedow contributors
+GitHub: https://github.com/msampathkumar/ticket
+License: MIT
 
 Usage: tk <command> [args]
 
@@ -115,6 +130,8 @@ Commands:
   show <id>                Display ticket
   update <id> [options]    Update title, description, priority, tags, etc.
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
+  agent-skill [options]    Display or install agent skill (--install, --path)
+  version, --version, -v   Display version, description, and license information
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
 Plugins (tk-<cmd> or ticket-<cmd> in PATH or plugins/<cmd>/):

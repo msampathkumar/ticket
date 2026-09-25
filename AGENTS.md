@@ -1,6 +1,6 @@
 # AGENTS.md — 10,000-Foot Architecture & Workflow Guide
 
-Welcome to the **`ticket` (`tk`)** repository. This document provides autonomous AI coding agents and human engineers with a high-level operational overview of project goals, codebase architecture, and execution workflows.
+Operational guide for autonomous AI coding agents and engineers working in `ticket` (`tk`).
 
 ---
 
@@ -8,10 +8,10 @@ Welcome to the **`ticket` (`tk`)** repository. This document provides autonomous
 
 `tk` is a **minimal, offline task tracker with dependency intelligence**, designed for frictionless collaboration between developers and AI coding assistants.
 
-- **Zero Database / Pure Plain Text**: State resides inside `.tickets/*.md` files with YAML frontmatter. Fully versioned by Git.
-- **DAG-Driven Dependency Tracking**: Native support for parent-child hierarchies, blockers, and cycle detection. Agents compute actionable next steps deterministically via topological order.
-- **Unix Simplicity & Speed**: Core CLI runs on portable POSIX Bash with `awk` and `sed`—zero Python/Node runtime required for base operations.
-- **Decoupled Modern Tooling**: Rich features (Web UI, GitHub Sync) live as modular, optional plugins that discover each other via `$PATH` and local repo paths.
+- **Zero Database / Pure Plain Text**: State resides in `.tickets/*.md` files with YAML frontmatter, versioned by Git.
+- **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, and cycle detection. Agents compute actionable next steps deterministically.
+- **Unix Speed**: Core CLI runs on portable POSIX Bash with `awk` and `sed`—zero Python/Node runtime required for base operations.
+- **Decoupled Extensions**: Web UI and GitHub Sync live as modular plugins discovered via `$PATH`.
 
 ---
 
