@@ -99,7 +99,7 @@ find_local_ticket_by_ref() {
     fi
     for file in "$TICKETS_DIR"/*.md; do
         [[ -f "$file" ]] || continue
-        if grep -q "^external_ref: $ref$" "$file" 2>/dev/null; then
+        if grep -q -E "^(external-ref|external_ref): $ref$" "$file" 2>/dev/null; then
             awk -F': ' '/^id:/{print $2; exit}' "$file"
             return 0
         fi
@@ -177,7 +177,11 @@ cmd_sync() {
                     local tags="github-sync,issue"
                     [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
                     
-                    local full_desc="$body"$'\n\n'"**GitHub URL:** $url"
+                    local desc_body="$body"
+                    if [[ -z "${desc_body// /}" ]]; then
+                        desc_body="*(No description provided on GitHub)*"
+                    fi
+                    local full_desc="${desc_body}"$'\n\n'"**GitHub URL:** $url"
                     local new_id
                     new_id=$("$TK_SCRIPT" super create "$title" -t bug --external-ref "$ext_ref" --tags "$tags" -d "$full_desc")
                     echo "  ✨ Created local ticket $new_id for Issue #$num ($title)"
@@ -222,7 +226,11 @@ cmd_sync() {
                     local tags="github-sync,pr"
                     [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
                     
-                    local full_desc="$body"$'\n\n'"**GitHub URL:** $url"
+                    local desc_body="$body"
+                    if [[ -z "${desc_body// /}" ]]; then
+                        desc_body="*(No description provided on GitHub)*"
+                    fi
+                    local full_desc="${desc_body}"$'\n\n'"**GitHub URL:** $url"
                     local new_id
                     new_id=$("$TK_SCRIPT" super create "$title" -t task --external-ref "$ext_ref" --tags "$tags" -d "$full_desc")
                     echo "  ✨ Created local ticket $new_id for PR #$num ($title)"
@@ -300,7 +308,7 @@ cmd_list() {
             id=$(awk -F': ' '/^id:/{print $2; exit}' "$file")
             status=$(awk -F': ' '/^status:/{print $2; exit}' "$file")
             type=$(awk -F': ' '/^type:/{print $2; exit}' "$file")
-            ref=$(awk -F': ' '/^external_ref:/{print $2; exit}' "$file")
+            ref=$(awk -F': ' '/^(external-ref|external_ref):/{print $2; exit}' "$file")
             title=$(awk -F'# ' '/^# /{print $2; exit}' "$file")
             printf "%-10s [%-8s] %-10s %-16s %s\n" "$id" "$status" "$type" "${ref:-—}" "$title"
         fi
