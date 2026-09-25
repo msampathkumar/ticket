@@ -1,0 +1,109 @@
+/* Custom styles and enhancements for tk-webui */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Drag and drop states */
+.sortable-ghost {
+  opacity: 0.35;
+  background: #e0e7ff !important;
+  border: 2px dashed #6366f1 !important;
+}
+
+.dark .sortable-ghost {
+  background: #1e1b4b !important;
+  border: 2px dashed #818cf8 !important;
+}
+
+.sortable-chosen {
+  cursor: grabbing !important;
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.15);
+  transform: scale(1.02);
+}
+
+.kanban-lane {
+  min-height: calc(100vh - 240px);
+}
+
+/* Prose markdown styling in modals */
+.prose pre {
+  background-color: #1e293b;
+  color: #f8fafc;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  margin: 0.75rem 0;
+}
+
+.prose code:not(pre code) {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.dark .prose code:not(pre code) {
+  background-color: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.prose ul, .prose ol {
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}

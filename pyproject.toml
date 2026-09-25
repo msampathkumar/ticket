@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tk-webui"
+version = "0.1.0"
+description = "FastAPI & Kanban Web UI for tk (minimal ticket system with dependency tracking)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Sampath Kumar" }]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "pydantic>=2.6.0",
+    "pyyaml>=6.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+tk-webui = "tk_webui.main:main"
+
+[tool.setuptools.packages.find]
+include = ["tk_webui*"]
+
+[tool.setuptools.package-data]
+tk_webui = ["static/*", "static/**/*"]

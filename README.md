@@ -1,55 +1,55 @@
-# ticket
+# ticket (tk)
 
-The git-backed issue tracker for AI agents. Rooted in the Unix Philosophy, `tk` is inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html) with additional quality of life features for managing and querying against complex issue dependency graphs.
+The git-backed issue tracker for AI agents and developers, featuring an ultra-fast CLI and an optional modern Kanban & review dashboard.
 
-`tk` was written as a full replacement for [beads](https://github.com/steveyegge/beads). It shares many similar commands but without the need for keeping a SQLite file in sync or a rogue background daemon mangling your changes. It ships with a `migrate-beads` command to make this a smooth transition.
+Rooted in the Unix Philosophy, `tk` is inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html) with quality-of-life features for managing and querying complex issue dependency graphs.
 
-Tickets are markdown files with YAML frontmatter in `.tickets/`. This allows AI agents to easily search them for relevant content without dumping ten thousand character JSONL lines into their context window.
+---
 
-Using ticket IDs as file names also allows IDEs to quickly navigate to the ticket for you. For example, you might run `git log` in your terminal and see something like:
+## ⚡ Quick Install
 
-```
-nw-5c46: add SSE connection management 
-```
+You can install either just the lightweight, zero-dependency Bash CLI, or the complete suite with the interactive Web UI.
 
-VS Code allows you to Ctrl+Click or Cmd+Click the ID and jump directly to the file to read the details.
+### 1. Using the Modular Installer Script
 
-## Install
-
-**Homebrew (macOS/Linux):**
 ```bash
-brew tap wedow/tools
-brew install ticket
+git clone https://github.com/msampathkumar/ticket.git
+cd ticket
+
+# Option A: Full Suite (CLI + Interactive Web UI)
+./install.sh --full
+
+# Option B: Core CLI Only (Zero Python dependencies, pure Bash)
+./install.sh --core
+
+# Option C: Web UI Plugin Only
+./install.sh --webui
 ```
 
-**Arch Linux (AUR):**
-```bash
-yay -S ticket  # or paru, etc.
-```
+This installs binaries directly to `~/.local/bin/` (`tk` and `tk-webui`). Make sure `~/.local/bin` is in your `$PATH`.
 
-**From source (auto-updates on git pull):**
-```bash
-git clone https://github.com/wedow/ticket.git
-cd ticket && ln -s "$PWD/ticket" ~/.local/bin/tk
-```
+---
 
-**Or** just copy `ticket` to somewhere in your PATH.
+## 🚀 Key Features
 
-## Requirements
+### 🖥️ Core CLI (`tk`)
+- **Git-Backed**: Tickets are stored as human-readable Markdown files with YAML frontmatter inside `.tickets/`.
+- **Dependency Tracking**: Track blocking relationships (`tk dep`, `tk dep tree`, `tk blocked`, `tk ready`, `tk dep cycle`).
+- **In-Place Ticket Updates**: Update fields, design notes, and acceptance criteria on the fly with `tk update`.
+- **Extensible Plugin System**: Discovers `tk-<cmd>` or `ticket-<cmd>` executables in `$PATH` automatically.
+- **Fast Bulk Operations**: Powered by portable `awk` and `sed` routines.
 
-`tk` is a portable bash script requiring only coreutils, so it works out of the box on any POSIX system with bash installed. The `query` command requires `jq`. Uses `rg` (ripgrep) if available, falls back to `grep`.
+### 🌐 Interactive Web UI (`tk webui` / `tk-webui`)
+- **4-Lane Kanban Board**: Fluid drag-and-drop between Ready, In Progress, Blocked, and Closed lanes.
+- **Multi-View Switcher**: Toggle instantly between **Kanban**, **Table View**, **Interactive Dependency Tree Graph**, and **Timeline/Gantt View**.
+- **In-Place Task Editing**: Edit title, description, tags, priority, assignee, design notes, and acceptance criteria directly in the browser.
+- **PR-Style Review Feedback**: Chronological audit trail for review notes and comments (`Cmd+Enter` to submit).
+- **Collapsible Completed Tasks**: Automatically cleans up closed tasks with a 1-click toggle to view older tasks.
+- **Multi-Project Switcher**: Switch between any repositories containing `.tickets/` on your system.
 
-## Agent Setup
+---
 
-Add this line to your `CLAUDE.md` or `AGENTS.md`:
-
-```
-This project uses a CLI ticket system for task management. Run `tk help` when you need to use it.
-```
-
-Claude Opus picks it up naturally from there. Other models may need additional guidance.
-
-## Usage
+## 📖 CLI Usage
 
 ```bash
 tk - minimal ticket system with dependency tracking
@@ -63,7 +63,7 @@ Commands:
     --acceptance           Acceptance criteria
     -t, --type             Type (bug|feature|task|epic|chore) [default: task]
     -p, --priority         Priority 0-4, 0=highest [default: 2]
-    -a, --assignee         Assignee [default: git user.name]
+    -a, --assignee         Assignee
     --external-ref         External reference (e.g., gh-123, JIRA-456)
     --parent               Parent ticket ID
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
@@ -71,13 +71,13 @@ Commands:
   close <id>               Set status to closed
   reopen <id>              Set status to open
   status <id> <status>     Update status (open|in_progress|closed)
+  update <id> [options]    Update title, description, priority, tags, etc.
   dep <id> <dep-id>        Add dependency (id depends on dep-id)
   dep tree [--full] <id>   Show dependency tree (--full disables dedup)
   dep cycle                Find dependency cycles in open tickets
   undep <id> <dep-id>      Remove dependency
   link <id> <id> [id...]   Link tickets together (symmetric)
   unlink <id> <target-id>  Remove link between tickets
-  ls|list [--status=X] [-a X] [-T X]   List tickets
   ready [-a X] [-T X]      List open/in-progress tickets with deps resolved
   blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
@@ -85,86 +85,50 @@ Commands:
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
-Bundled plugins (ticket-extras):
-  edit <id>                Open ticket in $EDITOR
-  ls|list [--status=X] [-a X] [-T X]   List tickets
-  query [jq-filter]        Output tickets as JSON, optionally filtered (requires jq)
-  migrate-beads            Import tickets from .beads/issues.jsonl (requires jq)
-
-Searches parent directories for .tickets/ (override with TICKETS_DIR env var)
-Supports partial ID matching (e.g., 'tk show 5c4' matches 'nw-5c46')
+Plugins (tk-<cmd> or ticket-<cmd> in PATH):
+  webui                  Interactive Kanban Web UI & PR review dashboard
 ```
 
-## Plugins
+---
 
-Executables named `tk-<cmd>` or `ticket-<cmd>` in your PATH are invoked automatically. This allows you to add custom commands or override built-in ones.
+## 🔌 Writing Plugins
+
+Plugins are executables named `tk-<cmd>` or `ticket-<cmd>` in `$PATH`.
+
+Add metadata comments in the first 10 lines of your script:
+```bash
+#!/usr/bin/env bash
+# tk-plugin: description for tk help
+# tk-plugin-version: 1.0.0
+
+set -euo pipefail
+# implementation here
+```
+
+Or for compiled binaries, implement the `--tk-describe` flag:
+```bash
+$ my-binary --tk-describe
+tk-plugin: description for tk help
+```
+
+---
+
+## 🧪 Testing
+
+The test suite is written using [Behave](https://behave.readthedocs.io/en/latest/).
 
 ```bash
-# Create a simple plugin
-cat > ~/.local/bin/tk-hello <<'EOF'
-#!/bin/bash
-# tk-plugin: Say hello
-echo "Hello from plugin!"
-EOF
-chmod +x ~/.local/bin/tk-hello
-
-# Now it's available
-tk hello        # runs tk-hello
-tk help         # lists it under "Plugins"
-```
-
-**Plugin descriptions** (shown in `tk help`):
-- Scripts: comment `# tk-plugin: description` in first 10 lines
-- Binaries: `--tk-describe` flag outputs `tk-plugin: description`
-
-**Plugin environment variables:**
-- `TICKETS_DIR` - path to the .tickets directory (may be empty)
-- `TK_SCRIPT` - absolute path to the tk script
-
-**Calling built-ins from plugins:**
-```bash
-#!/bin/bash
-# tk-plugin: Custom create with extras
-id=$("$TK_SCRIPT" super create "$@")
-echo "Created $id, doing extra stuff..."
-```
-
-Use `tk super <cmd>` to bypass plugins and run the built-in directly.
-
-## Testing
-
-The tests are written in the Behavior-Driven Development library [behave](https://behave.readthedocs.io/en/latest/) and require Python.
-
-If you have `uv` [installed](https://docs.astral.sh/uv/getting-started/installation/) simply:
-
-```sh
 make test
 ```
 
-## Migrating from Beads
+---
 
-```bash
-tk migrate-beads
+## 🙏 Credits & Acknowledgments
 
-# review new files if you like
-git status
+This project is built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project. We extend deep gratitude to the original author and contributors for creating such an elegant, git-backed ticket tracking foundation for developers and AI agents.
 
-# check state matches expectations
-tk ready
-tk blocked
+---
 
-# compare against
-bd ready
-bd blocked
+## 📝 License
 
-# all good, let's go
-git rm -rf .beads
-git add .tickets
-git commit -am "ditch beads"
-```
-
-For a thorough system-wide Beads cleanup, see [banteg's uninstall script](https://gist.github.com/banteg/1a539b88b3c8945cd71e4b958f319d8d).
-
-## License
-
-MIT
+[MIT License](LICENSE)

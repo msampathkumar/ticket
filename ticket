@@ -288,6 +288,145 @@ cmd_reopen() {
     cmd_status "$1" "open"
 }
 
+_update_ticket_file() {
+    local file="$1"
+    local title="$2" has_title="$3"
+    local desc="$4" has_desc="$5"
+    local design="$6" has_design="$7"
+    local accept="$8" has_accept="$9"
+
+    python3 - "$file" "$title" "$has_title" "$desc" "$has_desc" "$design" "$has_design" "$accept" "$has_accept" << 'PYEOF'
+import sys, re
+
+file_path = sys.argv[1]
+new_title, has_title = sys.argv[2], sys.argv[3] == "1"
+new_desc, has_desc = sys.argv[4], sys.argv[5] == "1"
+new_design, has_design = sys.argv[6], sys.argv[7] == "1"
+new_accept, has_accept = sys.argv[8], sys.argv[9] == "1"
+
+with open(file_path, "r", encoding="utf-8") as f:
+    content = f.read()
+
+m = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
+if not m:
+    sys.exit(0)
+
+frontmatter, body = m.group(1), m.group(2)
+
+title_m = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
+curr_title = title_m.group(1).strip() if title_m else ""
+body_rest = body[title_m.end():] if title_m else body
+
+sections = re.split(r"(?m)^##\s+", body_rest)
+curr_desc = sections[0].strip() if sections else ""
+
+design_sec = ""
+accept_sec = ""
+notes_sec = ""
+other_secs = []
+
+for s in sections[1:]:
+    lines = s.split("\n", 1)
+    stitle = lines[0].strip()
+    scontent = lines[1].strip() if len(lines) > 1 else ""
+    if "design" in stitle.lower():
+        design_sec = scontent
+    elif "acceptance" in stitle.lower():
+        accept_sec = scontent
+    elif "notes" in stitle.lower():
+        notes_sec = scontent
+    else:
+        other_secs.append((stitle, scontent))
+
+final_title = new_title if has_title else curr_title
+final_desc = new_desc if has_desc else curr_desc
+final_design = new_design if has_design else design_sec
+final_accept = new_accept if has_accept else accept_sec
+
+new_body = f"# {final_title}\n\n"
+if final_desc:
+    new_body += f"{final_desc}\n\n"
+if final_design:
+    new_body += f"## Design\n\n{final_design}\n\n"
+if final_accept:
+    new_body += f"## Acceptance Criteria\n\n{final_accept}\n\n"
+for stitle, scontent in other_secs:
+    new_body += f"## {stitle}\n\n{scontent}\n\n"
+if notes_sec:
+    new_body += f"## Notes\n\n{notes_sec}\n"
+
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(f"---\n{frontmatter}\n---\n{new_body}")
+PYEOF
+}
+
+cmd_update() {
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: $(basename "$0") update <id> [options]" >&2
+        echo "Options:" >&2
+        echo "  --title <text>         Update title" >&2
+        echo "  -d, --description <t>  Update description" >&2
+        echo "  -p, --priority <0-4>   Update priority" >&2
+        echo "  -t, --type <type>      Update type" >&2
+        echo "  -a, --assignee <name>  Update assignee" >&2
+        echo "  --tags <tags>          Update tags (comma-separated)" >&2
+        echo "  --design <text>        Update design notes" >&2
+        echo "  --acceptance <text>    Update acceptance criteria" >&2
+        echo "  --parent <id>          Update parent ticket" >&2
+        echo "  --external-ref <ref>   Update external ref" >&2
+        return 1
+    fi
+
+    local id="$1"
+    shift
+    local file
+    file=$(ticket_path "$id") || return 1
+    local target_id
+    target_id=$(basename "$file" .md)
+
+    local new_title="" new_desc="" new_prio="" new_type="" new_assignee=""
+    local new_tags="" new_design="" new_accept="" new_parent="" new_extref=""
+    local has_title=0 has_desc=0 has_design=0 has_accept=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --title) new_title="$2"; has_title=1; shift 2 ;;
+            -d|--description) new_desc="$2"; has_desc=1; shift 2 ;;
+            -p|--priority) new_prio="$2"; shift 2 ;;
+            -t|--type) new_type="$2"; shift 2 ;;
+            -a|--assignee) new_assignee="$2"; shift 2 ;;
+            --tags) new_tags="$2"; shift 2 ;;
+            --design) new_design="$2"; has_design=1; shift 2 ;;
+            --acceptance) new_accept="$2"; has_accept=1; shift 2 ;;
+            --parent) new_parent="$2"; shift 2 ;;
+            --external-ref) new_extref="$2"; shift 2 ;;
+            *) echo "Unknown option: $1" >&2; return 1 ;;
+        esac
+    done
+
+    # Update metadata fields
+    [[ -n "$new_prio" ]] && update_yaml_field "$file" "priority" "$new_prio"
+    [[ -n "$new_type" ]] && update_yaml_field "$file" "type" "$new_type"
+    [[ -n "$new_assignee" ]] && update_yaml_field "$file" "assignee" "$new_assignee"
+    [[ -n "$new_extref" ]] && update_yaml_field "$file" "external-ref" "$new_extref"
+    if [[ -n "$new_parent" ]]; then
+        local parent_file
+        parent_file=$(ticket_path "$new_parent") || return 1
+        local pid
+        pid=$(basename "$parent_file" .md)
+        update_yaml_field "$file" "parent" "$pid"
+    fi
+    if [[ -n "$new_tags" ]]; then
+        update_yaml_field "$file" "tags" "[${new_tags//,/, }]"
+    fi
+
+    if [[ $has_title -eq 1 || $has_desc -eq 1 || $has_design -eq 1 || $has_accept -eq 1 ]]; then
+        _update_ticket_file "$file" "$new_title" "$has_title" "$new_desc" "$has_desc" "$new_design" "$has_design" "$new_accept" "$has_accept"
+    fi
+
+    echo "Updated $target_id"
+}
+
 cmd_dep_tree() {
     local full_mode=0
     local root_id=""
@@ -1244,9 +1383,16 @@ _list_plugins() {
             # Try comment first (fast, no execution)
             desc=$(head -10 "$path" 2>/dev/null | grep -m1 '^# tk-plugin:' | sed 's/^# tk-plugin: *//')
 
-            # Fall back to --tk-describe for binaries (requires timeout command)
-            if [[ -z "$desc" ]] && command -v timeout &>/dev/null; then
-                if out=$(timeout 1 "$path" --tk-describe 2>/dev/null); then
+            # Fall back to --tk-describe for binaries (requires timeout or gtimeout command)
+            local timeout_cmd=""
+            if command -v timeout &>/dev/null; then
+                timeout_cmd="timeout"
+            elif command -v gtimeout &>/dev/null; then
+                timeout_cmd="gtimeout"
+            fi
+
+            if [[ -z "$desc" && -n "$timeout_cmd" ]]; then
+                if out=$($timeout_cmd 1 "$path" --tk-describe 2>/dev/null); then
                     out=$(printf '%s' "$out" | head -1)
                     [[ "$out" == "tk-plugin:"* ]] && desc="${out#tk-plugin: }"
                 fi
@@ -1290,6 +1436,7 @@ Commands:
   blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
   show <id>                Display ticket
+  update <id> [options]    Update ticket fields (title, desc, priority, tags, etc.)
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
 EOF
@@ -1373,6 +1520,7 @@ case "${1:-help}" in
     blocked) shift; cmd_blocked "$@" ;;
     closed) shift; cmd_closed "$@" ;;
     show)   shift; cmd_show "$@" ;;
+    update) shift; cmd_update "$@" ;;
     add-note) shift; cmd_add_note "$@" ;;
     help|--help|-h) cmd_help ;;
     *)
