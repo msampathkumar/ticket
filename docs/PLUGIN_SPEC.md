@@ -24,22 +24,8 @@ plugins/
 │   ├── GITHUB-SPEC.md           # Plugin-specific specification
 │   ├── ticket-github            # Executable binary / script
 │   └── tk-github -> ticket-github
-├── ls/
-│   ├── LS-SPEC.md
-│   ├── ticket-ls
-│   └── tk-ls -> ticket-ls
-├── edit/
-│   ├── EDIT-SPEC.md
-│   ├── ticket-edit
-│   └── tk-edit -> ticket-edit
-├── query/
-│   ├── QUERY-SPEC.md
-│   ├── ticket-query
-│   └── tk-query -> ticket-query
-└── migrate-beads/
-    ├── MIGRATE-BEADS-SPEC.md
-    ├── ticket-migrate-beads
-    └── tk-migrate-beads -> ticket-migrate-beads
+└── webui/
+    └── WEBUI-SPEC.md -> ../../tk_webui/WEBUI-SPEC.md
 ```
 
 ---

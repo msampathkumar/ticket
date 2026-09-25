@@ -99,6 +99,12 @@ Following the frontmatter, the Markdown body contains:
 | `tk dep cycle` | Traverses graph and outputs detected cycles |
 | `tk ready` | Lists unblocked, actionable tickets |
 | `tk blocked` | Lists blocked tickets with unresolved blockers |
+| `tk closed [--limit=N]` | Lists recently closed tickets |
+| `tk ls` / `tk list [options]` | Lists tickets (default: hides closed, limit 10, with filters) |
+| `tk edit <id>` | Opens ticket in `$EDITOR` |
+| `tk query [jq-filter]` | Outputs tickets as JSON lines, with optional jq filter |
+| `tk find <search-term>` | Case-insensitive text search across tickets |
+| `tk show <id>` | Displays ticket metadata and full markdown body |
 | `tk update <id> [options]` | Updates fields (title, desc, priority, tags, etc.) |
 | `tk add-note <id> [text]` | Appends timestamped note |
 | `tk version` / `--version` | Prints version string (`tk version <version>`) |

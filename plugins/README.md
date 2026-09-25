@@ -12,10 +12,9 @@ All plugins follow the official [Plugin Specification Standard (PLUGIN_SPEC.md)]
 | :--- | :--- | :--- | :--- |
 | [`webui/`](../tk_webui) | `tk webui` | [WEBUI-SPEC.md](../tk_webui/WEBUI-SPEC.md) | Full-featured Kanban, Table, Mind Map DAG, and Timeline dashboard |
 | [`github/`](github/) | `tk github` | [GITHUB-SPEC.md](github/GITHUB-SPEC.md) | Sync GitHub issues & pull requests into local tickets |
-| [`ls/`](ls/) | `tk ls` / `tk list` | [LS-SPEC.md](ls/LS-SPEC.md) | Formatted ticket listings with status, assignee, and tag filters |
-| [`edit/`](edit/) | `tk edit` | [EDIT-SPEC.md](edit/EDIT-SPEC.md) | Open ticket in `$EDITOR` / `$VISUAL` |
-| [`query/`](query/) | `tk query` | [QUERY-SPEC.md](query/QUERY-SPEC.md) | Structured JSON queries and programmatic data access |
-| [`migrate-beads/`](migrate-beads/) | `tk migrate-beads` | [MIGRATE-BEADS-SPEC.md](migrate-beads/MIGRATE-BEADS-SPEC.md) | Migration from legacy beads issue repositories |
+
+> [!NOTE]
+> Utility commands like `ls`, `list`, `edit`, `query`, and `find` are natively built into core `tk`.
 
 ---
 

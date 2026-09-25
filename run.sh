@@ -18,9 +18,9 @@ fi
 
 # Run tk-webui directly
 TARGET_DIR="${1:-$PWD}"
-PORT="${PORT:-8000}"
+PORT="${PORT:-8475}"
 
-echo "🚀 Starting tk-webui on http://127.0.0.1:$PORT for $TARGET_DIR"
+echo "🚀 Starting tk-webui on http://127.0.0.1:$PORT for $TARGET_DIR (ASCII: T=84, K=75)"
 echo "💡 Tip: To install 'tk' CLI and 'tk webui' globally to ~/.local/bin, run: ./install.sh"
 echo ""
 

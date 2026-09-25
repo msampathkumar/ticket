@@ -28,11 +28,21 @@ cd ticket
 
 This installs binaries directly to `~/.local/bin/` (`tk` and `tk-webui`). Make sure `~/.local/bin` is in your `$PATH`.
 
-### 2. Run Locally (Without Installing)
+### 2. Launching Web UI & Background Server
 
-You can launch and try the Web UI immediately without global installation:
+The Web UI runs on **port `8475`** by default (ASCII values for **T** = 84, **K** = 75):
 
 ```bash
+# Option A: Foreground Server
+tk webui [optional-project-path]
+
+# Option B: Background Daemon Management
+tk webui server start [optional-project-path]  # Starts daemon on http://127.0.0.1:8475
+tk webui server status                         # Inspect server PID, URL, and log path
+tk webui server stop                           # Stop background daemon
+tk webui server restart                        # Restart background daemon
+
+# Option C: Run locally from repo clone without global install
 ./run.sh [optional-project-path]
 ```
 
@@ -43,11 +53,12 @@ You can launch and try the Web UI immediately without global installation:
 ### 🖥️ Core CLI (`tk`)
 - **Git-Backed**: Tickets are stored as human-readable Markdown files with YAML frontmatter inside `.tickets/`.
 - **Dependency Tracking**: Track blocking relationships (`tk dep`, `tk dep tree`, `tk blocked`, `tk ready`, `tk dep cycle`).
+- **Core Querying & Editing**: Built-in `tk ls`, `tk edit`, `tk query`, `tk find`, and `tk show`.
 - **In-Place Ticket Updates**: Update fields, design notes, and acceptance criteria on the fly with `tk update`.
 - **Extensible Plugin System**: Discovers `tk-<cmd>` or `ticket-<cmd>` executables in `$PATH` automatically.
-- **Fast Bulk Operations**: Powered by portable `awk` and `sed` routines.
 
 ### 🌐 Interactive Web UI (`tk webui` / `tk-webui`)
+- **Background Server Management**: One-click `tk webui server start/stop/status` daemon management on default port `8475`.
 - **4-Lane Kanban Board**: Fluid drag-and-drop between Ready, In Progress, Blocked, and Closed lanes.
 - **Multi-View Switcher**: Toggle instantly between **Kanban**, **Table View**, **Interactive Dependency Tree Graph**, and **Timeline/Gantt View**.
 - **In-Place Task Editing**: Edit title, description, tags, priority, assignee, design notes, and acceptance criteria directly in the browser.
@@ -89,17 +100,26 @@ Commands:
   ready [-a X] [-T X]      List open/in-progress tickets with deps resolved
   blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
+  ls, list [options]       List tickets (default: hides closed, limit 10)
+    -s, --status           Filter status (open|in_progress|closed|all)
+    -a, --assignee         Filter assignee
+    -t, --type             Filter type
+    -p, --priority         Filter priority (0-4)
+    -T, --tag              Filter tag
+    -n, --limit            Limit results (default: 10)
+    --full                 Show all results (no limit)
+    --all                  Show all statuses without limit
+  edit <id>                Open ticket in $EDITOR
+  query [jq-filter]        Output tickets as JSON, optionally filtered with jq
+  find <search-term>       Search text across tickets
   show <id>                Display ticket
+  update <id> [options]    Update title, description, priority, tags, etc.
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
 Plugins (tk-<cmd> or ticket-<cmd> in PATH or plugins/<cmd>/):
   webui                  Interactive Kanban Web UI & PR review dashboard
   github                 Sync GitHub issues and pull requests into local tickets
-  ls                     List tickets with optional filters
-  edit                   Open ticket in $EDITOR
-  query                  Output tickets as JSON, optionally filtered with jq
-  migrate-beads          Import tickets from .beads/issues.jsonl
 ```
 
 ---
@@ -112,21 +132,17 @@ Plugins are organized into self-contained directories under `plugins/<plugin-nam
 | :--- | :--- | :--- | :--- |
 | **`webui`** | [`tk_webui/`](tk_webui/) / [`plugins/webui/`](plugins/webui/) | [`WEBUI-SPEC.md`](tk_webui/WEBUI-SPEC.md) | Interactive Kanban & Review Dashboard |
 | **`github`** | [`plugins/github/`](plugins/github/) | [`GITHUB-SPEC.md`](plugins/github/GITHUB-SPEC.md) | Sync GitHub issues and pull requests |
-| **`ls`** | [`plugins/ls/`](plugins/ls/) | [`LS-SPEC.md`](plugins/ls/LS-SPEC.md) | Formatted ticket listings |
-| **`edit`** | [`plugins/edit/`](plugins/edit/) | [`EDIT-SPEC.md`](plugins/edit/EDIT-SPEC.md) | Interactive `$EDITOR` opening |
-| **`query`** | [`plugins/query/`](plugins/query/) | [`QUERY-SPEC.md`](plugins/query/QUERY-SPEC.md) | JSON output and `jq` query filter |
-| **`migrate-beads`** | [`plugins/migrate-beads/`](plugins/migrate-beads/) | [`MIGRATE-BEADS-SPEC.md`](plugins/migrate-beads/MIGRATE-BEADS-SPEC.md) | Migration from Beads issues format |
 
 ### Modular Installation Options
 
 ```bash
-# Core CLI Only
+# Core CLI Only (Includes create, show, ls, edit, query, find, etc.)
 ./install.sh --core
 
 # Core + Web UI (Full default suite)
 ./install.sh --full
 
-# Install Everything (Core + Web UI + All Plugins + Agent Skill)
+# Install Everything (Core + Web UI + GitHub Plugin + Agent Skill)
 ./install.sh --all
 
 # Selectively install plugins

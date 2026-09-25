@@ -174,21 +174,45 @@ def serve_index():
 
 def main():
     import sys
+    from .server import DEFAULT_PORT, start_server, stop_server, status_server, restart_server
+
     if "--tk-describe" in sys.argv:
         print("tk-plugin: Interactive Kanban Web UI & PR review dashboard")
+        return
+
+    # Subcommand handling for 'server'
+    if len(sys.argv) > 1 and sys.argv[1] == "server":
+        action = sys.argv[2] if len(sys.argv) > 2 else "status"
+        server_parser = argparse.ArgumentParser(description="tk Web UI Background Server Management")
+        server_parser.add_argument("server_cmd", help="server")
+        server_parser.add_argument("action", choices=["start", "stop", "status", "restart"], default="status", nargs="?")
+        server_parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Target repository directory")
+        server_parser.add_argument("--host", default="127.0.0.1", help="Host address (default: 127.0.0.1)")
+        server_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Port number (default: {DEFAULT_PORT})")
+        
+        args = server_parser.parse_args()
+
+        if args.action == "start":
+            sys.exit(start_server(args.directory, host=args.host, port=args.port))
+        elif args.action == "stop":
+            sys.exit(stop_server())
+        elif args.action == "status":
+            sys.exit(status_server())
+        elif args.action == "restart":
+            sys.exit(restart_server(args.directory, host=args.host, port=args.port))
         return
 
     parser = argparse.ArgumentParser(description="tk Web UI Server")
     parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Initial directory to open")
     parser.add_argument("--host", default="127.0.0.1", help="Host address (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8000, help="Port number (default: 8000)")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Port number (default: {DEFAULT_PORT})")
     parser.add_argument("--reload", action="store_true", help="Auto-reload on code change")
     parser.add_argument("--version", "-v", action="version", version="tk-webui 0.2.0")
     parser.add_argument("--tk-describe", action="store_true", help="Print plugin description for tk CLI")
     args = parser.parse_args()
 
     os.environ["INITIAL_PROJECT_DIR"] = os.path.abspath(os.path.expanduser(args.directory))
-    print(f"🚀 Starting tk-webui on http://{args.host}:{args.port}")
+    print(f"🚀 Starting tk-webui on http://{args.host}:{args.port} (ASCII: T=84, K=75)")
     print(f"📁 Initial directory: {os.environ['INITIAL_PROJECT_DIR']}")
     uvicorn.run("tk_webui.main:app", host=args.host, port=args.port, reload=args.reload)
 

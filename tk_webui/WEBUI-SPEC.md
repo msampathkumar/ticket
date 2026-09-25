@@ -28,16 +28,29 @@
 
 ---
 
-## 3. CLI Options
+## 3. CLI & Server Commands
 
+### 3.1 Foreground Server
 ```bash
 tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 ```
 
 - `directory`: Initial directory containing `.tickets/` (default: current working directory).
 - `--host`: Host IP to bind (default: `127.0.0.1`).
-- `--port`: Port number (default: `8000`).
+- `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
 - `--version` / `-v`: Displays version (`tk-webui 0.2.0`).
+
+### 3.2 Background Daemon Server (`tk webui server`)
+```bash
+tk webui server start [directory] [--port PORT]   # Start daemon in background
+tk webui server status                            # Check status, URL, PID, and logs
+tk webui server stop                              # Stop background daemon
+tk webui server restart [directory]               # Restart background daemon
+```
+
+State files and logs are managed under `~/.local/state/tk/`:
+- PID file: `~/.local/state/tk/webui.json`
+- Daemon log: `~/.local/state/tk/webui.log`
 
 ---
 

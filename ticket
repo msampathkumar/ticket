@@ -1361,6 +1361,225 @@ cmd_add_note() {
     echo "Note added to $(basename "$file" .md)"
 }
 
+cmd_ls() {
+    local status_filter="" assignee_filter="" type_filter="" priority_filter="" tag_filter=""
+    local limit=10 full=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--status) status_filter="$2"; shift 2 ;;
+            --status=*) status_filter="${1#--status=}"; shift ;;
+            -a|--assignee) assignee_filter="$2"; shift 2 ;;
+            --assignee=*) assignee_filter="${1#--assignee=}"; shift ;;
+            -t|--type) type_filter="$2"; shift 2 ;;
+            --type=*) type_filter="${1#--type=}"; shift ;;
+            -p|--priority) priority_filter="$2"; shift 2 ;;
+            --priority=*) priority_filter="${1#--priority=}"; shift ;;
+            -T|--tag) tag_filter="$2"; shift 2 ;;
+            --tag=*) tag_filter="${1#--tag=}"; shift ;;
+            -n|--limit) limit="$2"; shift 2 ;;
+            --limit=*) limit="${1#--limit=}"; shift ;;
+            --full) full=1; shift ;;
+            --all) status_filter="all"; full=1; shift ;;
+            open|in_progress|closed|all)
+                status_filter="$1"
+                shift
+                ;;
+            *)
+                echo "Error: unknown option '$1'" >&2
+                return 1
+                ;;
+        esac
+    done
+
+    awk -v status_filter="$status_filter" \
+        -v assignee_filter="$assignee_filter" \
+        -v type_filter="$type_filter" \
+        -v priority_filter="$priority_filter" \
+        -v tag_filter="$tag_filter" \
+        -v limit="$limit" \
+        -v full="$full" '
+    BEGIN { FS=": "; in_front=0 }
+    FNR==1 {
+        if (prev_file) emit()
+        id=""; status=""; title=""; deps=""; priority=""; type=""; assignee=""; tags=""; in_front=0
+        prev_file=FILENAME
+    }
+    /^---$/ { in_front = !in_front; next }
+    in_front && /^id:/ { id = $2 }
+    in_front && /^status:/ { status = $2 }
+    in_front && /^priority:/ { priority = $2 }
+    in_front && /^type:/ { type = $2 }
+    in_front && /^assignee:/ { assignee = $2 }
+    in_front && /^tags:/ { tags = $2; gsub(/[\[\] ]/, "", tags) }
+    in_front && /^deps:/ {
+        deps = $0
+        sub(/^[a-z]+: *\[?/, "", deps)
+        sub(/\]? *$/, "", deps)
+        gsub(/["\047]/, "", deps)
+    }
+    !in_front && /^# / && title == "" { title = substr($0, 3) }
+
+    function has_tag(tags_str, tag,    i, n, arr) {
+        n = split(tags_str, arr, ",")
+        for (i = 1; i <= n; i++) if (arr[i] == tag) return 1
+        return 0
+    }
+
+    function emit() {
+        if (id == "") return
+
+        # Status filter: default excludes "closed"
+        if (status_filter == "") {
+            if (status == "closed") return
+        } else if (status_filter != "all") {
+            if (status != status_filter) return
+        }
+
+        if (assignee_filter != "" && assignee != assignee_filter) return
+        if (type_filter != "" && type != type_filter) return
+        if (priority_filter != "" && priority != priority_filter) return
+        if (tag_filter != "" && !has_tag(tags, tag_filter)) return
+
+        deps_display = (deps != "") ? "[" deps "]" : "[]"
+        gsub(/,/, ", ", deps_display)
+        dep_str = (deps_display != "[]") ? " <- " deps_display : ""
+
+        count++
+        output[count] = sprintf("%-8s [%s] - %s%s", id, status, title, dep_str)
+    }
+
+    END {
+        if (prev_file) emit()
+        max = (full == 1 || limit <= 0) ? count : (limit < count ? limit : count)
+        for (i = 1; i <= max; i++) {
+            print output[i]
+        }
+    }
+    ' "$TICKETS_DIR"/*.md 2>/dev/null
+}
+
+cmd_edit() {
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: ticket edit <id>" >&2
+        return 1
+    fi
+    local file
+    file=$(ticket_path "$1") || return 1
+
+    # In non-interactive mode (no tty), just print the path
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        echo "Edit ticket file: $file"
+        return 0
+    fi
+
+    local editor="${EDITOR:-${VISUAL:-nano}}"
+    if ! command -v "$editor" &>/dev/null; then
+        if command -v nano &>/dev/null; then
+            editor="nano"
+        elif command -v vim &>/dev/null; then
+            editor="vim"
+        elif command -v vi &>/dev/null; then
+            editor="vi"
+        fi
+    fi
+    "$editor" "$file"
+}
+
+cmd_query() {
+    local filter="${1:-}"
+    local json_output
+    json_output=$(awk '
+    BEGIN { FS=": "; in_front=0 }
+    FNR==1 {
+        if (prev_file) emit()
+        field_count=0; in_front=0; title=""
+        prev_file=FILENAME
+    }
+    /^---$/ { in_front = !in_front; next }
+    in_front && /^[a-zA-Z]/ {
+        key = $1
+        val = substr($0, length($1) + 3)
+        gsub(/^ +| +$/, "", val)
+        field_count++
+        field_keys[field_count] = key
+        field_vals[field_count] = val
+    }
+    !in_front && /^# / && title == "" {
+        title = substr($0, 3)
+    }
+    function emit() {
+        if (field_count > 0) {
+            printf "{"
+            for (i = 1; i <= field_count; i++) {
+                if (i > 1) printf ","
+                key = field_keys[i]
+                val = field_vals[i]
+                if (val ~ /^\[.*\]$/) {
+                    gsub(/^\[|\]$/, "", val)
+                    n = split(val, items, ", *")
+                    printf "\"%s\":[", key
+                    for (j = 1; j <= n; j++) {
+                        if (j > 1) printf ","
+                        gsub(/^ +| +$/, "", items[j])
+                        gsub(/^["\047]|["\047]$/, "", items[j])
+                        if (items[j] != "") printf "\"%s\"", items[j]
+                    }
+                    printf "]"
+                } else {
+                    gsub(/"/, "\\\"", val)
+                    printf "\"%s\":\"%s\"", key, val
+                }
+            }
+            if (title != "") {
+                gsub(/"/, "\\\"", title)
+                printf ",\"title\":\"%s\"", title
+            }
+            printf "}\n"
+        }
+    }
+    END { if (prev_file) emit() }
+    ' "$TICKETS_DIR"/*.md 2>/dev/null)
+
+    if [[ -n "$filter" ]]; then
+        if command -v jq &>/dev/null; then
+            echo "$json_output" | jq -c "select($filter)"
+        else
+            echo "Error: jq is required for filtering queries" >&2
+            return 1
+        fi
+    else
+        echo "$json_output"
+    fi
+}
+
+cmd_find() {
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: ticket find <search-term>" >&2
+        return 1
+    fi
+    local term="$1"
+    awk -v term="$term" '
+    BEGIN { FS=": "; in_front=0; IGNORECASE=1 }
+    FNR==1 {
+        if (prev_file) emit()
+        id=""; status=""; title=""; content=""; in_front=0
+        prev_file=FILENAME
+    }
+    /^---$/ { in_front = !in_front; next }
+    in_front && /^id:/ { id = $2 }
+    in_front && /^status:/ { status = $2 }
+    !in_front && /^# / && title == "" { title = substr($0, 3) }
+    { content = content " " $0 }
+    function emit() {
+        if (id != "" && index(tolower(content), tolower(term)) > 0) {
+            printf "%-8s [%s] - %s\n", id, status, title
+        }
+    }
+    END { if (prev_file) emit() }
+    ' "$TICKETS_DIR"/*.md 2>/dev/null
+}
+
 # List installed plugins with descriptions
 _find_plugin() {
     local plugin="$1"
@@ -1478,6 +1697,18 @@ Commands:
   ready [-a X] [-T X]      List open/in-progress tickets with deps resolved
   blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
+  ls, list [options]       List tickets (default: hides closed, limit 10)
+    -s, --status           Filter status (open|in_progress|closed|all)
+    -a, --assignee         Filter assignee
+    -t, --type             Filter type
+    -p, --priority         Filter priority (0-4)
+    -T, --tag              Filter tag
+    -n, --limit            Limit results (default: 10)
+    --full                 Show all results (no limit)
+    --all                  Show all statuses without limit
+  edit <id>                Open ticket in \$EDITOR
+  query [jq-filter]        Output tickets as JSON, optionally filtered with jq
+  find <search-term>       Search text across tickets
   show <id>                Display ticket
   update <id> [options]    Update ticket fields (title, desc, priority, tags, etc.)
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
@@ -1562,6 +1793,10 @@ case "${1:-help}" in
     ready)  shift; cmd_ready "$@" ;;
     blocked) shift; cmd_blocked "$@" ;;
     closed) shift; cmd_closed "$@" ;;
+    ls|list) shift; cmd_ls "$@" ;;
+    edit)   shift; cmd_edit "$@" ;;
+    query)  shift; cmd_query "$@" ;;
+    find)   shift; cmd_find "$@" ;;
     show)   shift; cmd_show "$@" ;;
     update) shift; cmd_update "$@" ;;
     add-note) shift; cmd_add_note "$@" ;;
