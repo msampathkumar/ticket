@@ -49,6 +49,21 @@ EOF
     echo "✅ Web UI plugin installed to $BIN_DIR/tk-webui"
 }
 
+install_skill() {
+    echo "🤖 Installing tk Agent Skill to $HOME/.agents/skills/tk/SKILL.md..."
+    mkdir -p "$HOME/.agents/skills/tk"
+    cp -f "$DIR/skills/tk/SKILL.md" "$HOME/.agents/skills/tk/SKILL.md"
+    echo "✅ Agent skill installed successfully!"
+}
+
+install_github() {
+    echo "🐙 Installing tk-github plugin to $BIN_DIR/tk-github..."
+    cp -f "$DIR/plugins/ticket-github" "$BIN_DIR/tk-github"
+    chmod +x "$BIN_DIR/tk-github"
+    ln -sf "$BIN_DIR/tk-github" "$BIN_DIR/ticket-github"
+    echo "✅ GitHub sync plugin installed to $BIN_DIR/tk-github"
+}
+
 case "$MODE" in
     --core|-c)
         install_core
@@ -56,9 +71,22 @@ case "$MODE" in
     --webui|-w)
         install_webui
         ;;
+    --skill|-s)
+        install_skill
+        ;;
+    --github|-g)
+        install_github
+        ;;
+    --all)
+        install_core
+        install_webui
+        install_skill
+        install_github
+        ;;
     --full|-f|*)
         install_core
         install_webui
+        install_skill
         ;;
 esac
 

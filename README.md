@@ -121,6 +121,15 @@ tk-plugin: description for tk help
 
 ---
 
+## 📚 Documentation & Specifications
+
+- **[System & Data Specification (SPEC.md)](docs/SPEC.md)**: Complete schema, DAG semantics, error codes, and lifecycle specification (spec-driven architecture).
+- **[Plugin Architecture Guide (PLUGINS.md)](docs/PLUGINS.md)**: Guide on writing and distributing custom plugins with metadata discovery and version contracts.
+- **[AI Agent Integration Guide (AGENTS.md)](docs/AGENTS.md)**: Operational patterns, subtask decomposition workflows, and ready-queue traversal for AI coding agents.
+- **[Agent Skill (SKILL.md)](skills/tk/SKILL.md)**: Agent skill definition installable to `~/.agents/skills/tk/SKILL.md`.
+
+---
+
 ## 🧪 Testing
 
 The test suite is written using [Behave](https://behave.readthedocs.io/en/latest/).

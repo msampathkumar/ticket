@@ -1499,9 +1499,9 @@ if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--he
     done
 fi
 
-# Initialize tickets dir for built-in commands (skip for help)
+# Initialize tickets dir for built-in commands (skip for help and version)
 case "${1:-help}" in
-    help|--help|-h) ;;
+    help|--help|-h|version|--version|-v) ;;
     *) init_tickets_dir "${1:-}" || exit 1 ;;
 esac
 
@@ -1522,6 +1522,9 @@ case "${1:-help}" in
     show)   shift; cmd_show "$@" ;;
     update) shift; cmd_update "$@" ;;
     add-note) shift; cmd_add_note "$@" ;;
+    version|--version|-v)
+        echo "tk version 0.2.0"
+        ;;
     help|--help|-h) cmd_help ;;
     *)
         echo "Unknown command: $1" >&2

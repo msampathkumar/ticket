@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+# tk-plugin: Sync GitHub issues and pull requests into local tickets
+# tk-plugin-version: 0.1.0
+
+set -euo pipefail
+
+VERSION="0.1.0"
+
+# Find tk executable if TK_SCRIPT not passed
+if [[ -z "${TK_SCRIPT:-}" ]]; then
+    if command -v tk &>/dev/null; then
+        TK_SCRIPT="tk"
+    elif command -v ticket &>/dev/null; then
+        TK_SCRIPT="ticket"
+    else
+        echo "Error: tk executable not found in PATH." >&2
+        exit 1
+    fi
+fi
+
+# Find tickets directory if TICKETS_DIR not passed
+if [[ -z "${TICKETS_DIR:-}" ]]; then
+    dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/.tickets" ]]; then
+            TICKETS_DIR="$dir/.tickets"
+            break
+        fi
+        dir=$(dirname "$dir")
+    done
+    TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+fi
+
+show_help() {
+    cat << EOF
+tk-github - GitHub issues and pull requests synchronization plugin
+
+Usage: tk github <command> [options]
+
+Commands:
+  sync                     Sync open GitHub issues and/or PRs (default)
+  unsync [--force|-y]      Remove all tickets created by github-sync
+  list | status            List all locally synced GitHub tickets
+  version | --version | -v Display plugin version
+  help | --help | -h       Display this help message
+
+Options:
+  --issues                 Sync only GitHub issues
+  --prs                    Sync only GitHub pull requests
+  --all                    Sync both issues and pull requests (default)
+  --repo <owner/repo>      Target a specific GitHub repository
+  --limit <N>              Max number of issues/PRs to fetch (default: 50)
+  --force, -y              Bypass confirmation prompt on unsync
+
+Examples:
+  tk github sync           # Sync both issues and PRs from current repo
+  tk github sync --issues  # Sync only issues
+  tk github sync --prs     # Sync only pull requests
+  tk github list           # View all synced tickets
+  tk github unsync -y      # Remove all synced GitHub tickets
+EOF
+}
+
+check_gh_cli() {
+    if ! command -v gh &>/dev/null; then
+        echo "Error: GitHub CLI ('gh') is required for tk-github." >&2
+        echo "Please install gh: https://cli.github.com" >&2
+        exit 1
+    fi
+
+    if ! gh auth status &>/dev/null; then
+        echo "Error: GitHub CLI is not authenticated. Run 'gh auth login' first." >&2
+        exit 1
+    fi
+}
+
+find_local_ticket_by_ref() {
+    local ref="$1"
+    if [[ ! -d "$TICKETS_DIR" ]]; then
+        return 1
+    fi
+    for file in "$TICKETS_DIR"/*.md; do
+        [[ -f "$file" ]] || continue
+        if grep -q "^external_ref: $ref$" "$file" 2>/dev/null; then
+            awk -F': ' '/^id:/{print $2; exit}' "$file"
+            return 0
+        fi
+    done
+    return 1
+}
+
+find_local_ticket_status() {
+    local tid="$1"
+    local file="$TICKETS_DIR/$tid.md"
+    if [[ -f "$file" ]]; then
+        awk -F': ' '/^status:/{print $2; exit}' "$file"
+    fi
+}
+
+cmd_sync() {
+    check_gh_cli
+    mkdir -p "$TICKETS_DIR"
+
+    local sync_issues=1
+    local sync_prs=1
+    local repo_flag=""
+    local limit=50
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --issues) sync_prs=0; shift ;;
+            --prs) sync_issues=0; shift ;;
+            --all) sync_issues=1; sync_prs=1; shift ;;
+            --repo) repo_flag="-R $2"; shift 2 ;;
+            --repo=*) repo_flag="-R ${1#--repo=}"; shift ;;
+            --limit) limit="$2"; shift 2 ;;
+            --limit=*) limit="${1#--limit=}"; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    echo "🔄 Starting GitHub sync for tickets in $TICKETS_DIR..."
+    local created_count=0
+    local closed_count=0
+    local existing_count=0
+
+    # 1. Sync Issues
+    if [[ $sync_issues -eq 1 ]]; then
+        echo "📥 Fetching GitHub issues (limit: $limit)..."
+        local issues_json
+        issues_json=$(gh issue list $repo_flag --limit "$limit" --state all --json number,title,body,url,state,labels 2>/dev/null || echo "[]")
+        
+        local count
+        count=$(echo "$issues_json" | jq '. | length' 2>/dev/null || echo 0)
+
+        for ((i=0; i<count; i++)); do
+            local num title body url state labels_str ext_ref
+            num=$(echo "$issues_json" | jq -r ".[$i].number")
+            title=$(echo "$issues_json" | jq -r ".[$i].title")
+            body=$(echo "$issues_json" | jq -r ".[$i].body // \"\"")
+            url=$(echo "$issues_json" | jq -r ".[$i].url")
+            state=$(echo "$issues_json" | jq -r ".[$i].state")
+            labels_str=$(echo "$issues_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+
+            ext_ref="gh-issue-$num"
+            local local_id
+            if local_id=$(find_local_ticket_by_ref "$ext_ref"); then
+                local local_status
+                local_status=$(find_local_ticket_status "$local_id")
+                if [[ "$state" == "CLOSED" && "$local_status" != "closed" ]]; then
+                    "$TK_SCRIPT" super close "$local_id" >/dev/null
+                    echo "  ✅ Closed local ticket $local_id (Issue #$num closed on GitHub)"
+                    ((closed_count++))
+                else
+                    ((existing_count++))
+                fi
+            else
+                if [[ "$state" == "OPEN" ]]; then
+                    local tags="github-sync,issue"
+                    [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
+                    
+                    local full_desc="$body"$'\n\n'"**GitHub URL:** $url"
+                    local new_id
+                    new_id=$("$TK_SCRIPT" super create "$title" -t bug --external-ref "$ext_ref" --tags "$tags" -d "$full_desc")
+                    echo "  ✨ Created local ticket $new_id for Issue #$num ($title)"
+                    ((created_count++))
+                fi
+            fi
+        done
+    fi
+
+    # 2. Sync Pull Requests
+    if [[ $sync_prs -eq 1 ]]; then
+        echo "📥 Fetching GitHub pull requests (limit: $limit)..."
+        local prs_json
+        prs_json=$(gh pr list $repo_flag --limit "$limit" --state all --json number,title,body,url,state,labels 2>/dev/null || echo "[]")
+        
+        local pr_count
+        pr_count=$(echo "$prs_json" | jq '. | length' 2>/dev/null || echo 0)
+
+        for ((i=0; i<pr_count; i++)); do
+            local num title body url state labels_str ext_ref
+            num=$(echo "$prs_json" | jq -r ".[$i].number")
+            title=$(echo "$prs_json" | jq -r ".[$i].title")
+            body=$(echo "$prs_json" | jq -r ".[$i].body // \"\"")
+            url=$(echo "$prs_json" | jq -r ".[$i].url")
+            state=$(echo "$prs_json" | jq -r ".[$i].state")
+            labels_str=$(echo "$prs_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+
+            ext_ref="gh-pr-$num"
+            local local_id
+            if local_id=$(find_local_ticket_by_ref "$ext_ref"); then
+                local local_status
+                local_status=$(find_local_ticket_status "$local_id")
+                if [[ ("$state" == "MERGED" || "$state" == "CLOSED") && "$local_status" != "closed" ]]; then
+                    "$TK_SCRIPT" super close "$local_id" >/dev/null
+                    echo "  ✅ Closed local ticket $local_id (PR #$num $state on GitHub)"
+                    ((closed_count++))
+                else
+                    ((existing_count++))
+                fi
+            else
+                if [[ "$state" == "OPEN" ]]; then
+                    local tags="github-sync,pr"
+                    [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
+                    
+                    local full_desc="$body"$'\n\n'"**GitHub URL:** $url"
+                    local new_id
+                    new_id=$("$TK_SCRIPT" super create "$title" -t task --external-ref "$ext_ref" --tags "$tags" -d "$full_desc")
+                    echo "  ✨ Created local ticket $new_id for PR #$num ($title)"
+                    ((created_count++))
+                fi
+            fi
+        done
+    fi
+
+    echo ""
+    echo "🎉 Sync finished: $created_count created, $closed_count closed, $existing_count up to date."
+}
+
+cmd_unsync() {
+    local force=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force|-y) force=1; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    if [[ ! -d "$TICKETS_DIR" ]]; then
+        echo "No .tickets directory found."
+        return 0
+    fi
+
+    local synced_files=()
+    for file in "$TICKETS_DIR"/*.md; do
+        [[ -f "$file" ]] || continue
+        if grep -q "github-sync" "$file" 2>/dev/null; then
+            synced_files+=("$file")
+        fi
+    done
+
+    local count="${#synced_files[@]}"
+    if [[ $count -eq 0 ]]; then
+        echo "ℹ️ No GitHub-synced tickets found in $TICKETS_DIR."
+        return 0
+    fi
+
+    echo "Found $count ticket(s) with tag 'github-sync'."
+    if [[ $force -eq 0 ]]; then
+        read -r -p "Are you sure you want to permanently delete these $count ticket(s)? [y/N] " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            echo "Cancelled."
+            return 0
+        fi
+    fi
+
+    for file in "${synced_files[@]}"; do
+        local id
+        id=$(basename "$file" .md)
+        rm -f "$file"
+        echo "  🗑️ Deleted $id"
+    done
+
+    echo "✅ Removed $count GitHub-synced ticket(s)."
+}
+
+cmd_list() {
+    if [[ ! -d "$TICKETS_DIR" ]]; then
+        echo "No .tickets directory found."
+        return 0
+    fi
+
+    echo "📋 GitHub-Synced Tickets in $TICKETS_DIR:"
+    printf "%-10s %-12s %-10s %-16s %s\n" "ID" "STATUS" "TYPE" "REF" "TITLE"
+    echo "----------------------------------------------------------------------"
+
+    for file in "$TICKETS_DIR"/*.md; do
+        [[ -f "$file" ]] || continue
+        if grep -q "github-sync" "$file" 2>/dev/null; then
+            local id status type ref title
+            id=$(awk -F': ' '/^id:/{print $2; exit}' "$file")
+            status=$(awk -F': ' '/^status:/{print $2; exit}' "$file")
+            type=$(awk -F': ' '/^type:/{print $2; exit}' "$file")
+            ref=$(awk -F': ' '/^external_ref:/{print $2; exit}' "$file")
+            title=$(awk -F'# ' '/^# /{print $2; exit}' "$file")
+            printf "%-10s [%-8s] %-10s %-16s %s\n" "$id" "$status" "$type" "${ref:-—}" "$title"
+        fi
+    done
+}
+
+# Main entry point
+case "${1:-sync}" in
+    sync)
+        shift
+        cmd_sync "$@"
+        ;;
+    unsync)
+        shift
+        cmd_unsync "$@"
+        ;;
+    list|status)
+        shift
+        cmd_list "$@"
+        ;;
+    version|--version|-v)
+        echo "tk-github $VERSION"
+        ;;
+    --tk-describe)
+        echo "tk-plugin: Sync GitHub issues and pull requests into local tickets"
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        # Treat unknown options as arguments to sync (e.g. tk github --issues)
+        if [[ "$1" == --* ]]; then
+            cmd_sync "$@"
+        else
+            echo "Unknown command: $1" >&2
+            show_help >&2
+            exit 1
+        fi
+        ;;
+esac

@@ -150,6 +150,15 @@
           <i data-lucide="moon" id="themeIcon" class="w-4 h-4"></i>
         </button>
 
+        <!-- Settings Button (tic-6mex) -->
+        <button
+          id="settingsBtn"
+          title="Settings & Preferences"
+          class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+        >
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+
         <!-- New Ticket Button -->
         <button
           id="openNewTicketModalBtn"
@@ -304,25 +313,76 @@
     </div>
   </section>
 
-  <!-- VIEW 3: Interactive Tree / Dependency Graph Container -->
+  <!-- VIEW 3: Interactive Tree / Dependency Graph Container (tic-d04l) -->
   <section id="treeView" class="view-container hidden flex-1 max-w-[1700px] w-full mx-auto p-4 sm:p-6 lg:p-8">
-    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 min-h-[600px] flex flex-col">
-      <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 min-h-[700px] flex flex-col">
+      <div class="flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>
           <h3 class="font-bold text-base flex items-center gap-2">
             <i data-lucide="network" class="w-4 h-4 text-brand-600"></i>
-            <span>Project & Dependency Tree Graph</span>
+            <span>Project Mind Map & Dependency DAG</span>
           </h3>
-          <p class="text-xs text-slate-400 mt-0.5">Visual representation of tasks, parents, and dependency relationships</p>
+          <p class="text-xs text-slate-400 mt-0.5">Interactive visual tree with parent hierarchies and directional dependency arrows</p>
         </div>
-        <div class="flex items-center gap-3 text-xs">
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Ready</span>
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> In Progress</span>
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Blocked</span>
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Closed</span>
+        
+        <!-- Graph Legend & Controls -->
+        <div class="flex items-center gap-4 text-xs flex-wrap">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Ready</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> In Progress</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Blocked</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Closed</span>
+          </div>
+
+          <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+
+          <div class="flex items-center gap-2 text-slate-500 text-[11px]">
+            <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-slate-400 inline-block"></span> Parent link</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-0.5 border-b border-rose-500 border-dashed inline-block"></span> Dependency</span>
+          </div>
+
+          <!-- Orientation & Collapse Controls -->
+          <div class="flex items-center gap-1.5">
+            <button id="treeOrientationBtn" title="Toggle Layout: Top-Down or Left-to-Right" class="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition">
+              <i data-lucide="split" class="w-3.5 h-3.5 text-brand-600"></i>
+              <span id="treeOrientationLabel">Top-Down</span>
+            </button>
+
+            <button id="treeCollapseAllBtn" title="Collapse / Expand All Subtrees" class="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition">
+              <i data-lucide="chevrons-down-up" class="w-3.5 h-3.5 text-brand-600"></i>
+              <span id="treeCollapseAllLabel">Collapse All</span>
+            </button>
+          </div>
+
+          <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button id="treeZoomInBtn" title="Zoom In" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
+              <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
+            </button>
+            <button id="treeZoomOutBtn" title="Zoom Out" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
+              <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
+            </button>
+            <button id="treeResetZoomBtn" title="Reset View" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
+              <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
         </div>
       </div>
-      <div id="treeContainer" class="flex-1 overflow-auto flex flex-col items-center justify-start p-4"></div>
+
+      <!-- Graph Canvas Container -->
+      <div id="treeCanvasWrapper" class="flex-1 rounded-xl border border-slate-200/70 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 relative min-h-[580px]">
+        <svg id="treeSvgLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="min-width: 100%; min-height: 100%;">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#f43f5e" />
+            </marker>
+            <marker id="parentArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#94a3b8" />
+            </marker>
+          </defs>
+          <g id="treeSvgEdges"></g>
+        </svg>
+        <div id="treeContainer" class="relative w-full h-full min-h-[580px] p-8 origin-top-left transition-transform duration-100"></div>
+      </div>
     </div>
   </section>
 
@@ -415,8 +475,23 @@
           <div id="detailAcceptance" class="prose dark:prose-invert text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-800/70"></div>
         </div>
 
+        <!-- Subtasks / Child Tasks Section -->
+        <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i data-lucide="git-fork" class="w-3.5 h-3.5 text-brand-500"></i>
+              <span>Subtasks & Child Tickets</span>
+            </h3>
+            <button id="addSubtaskModalBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
+              <i data-lucide="plus" class="w-3 h-3"></i> Add Subtask
+            </button>
+          </div>
+
+          <div id="detailSubtasksList" class="space-y-1.5"></div>
+        </div>
+
         <!-- Dependencies and Links Section -->
-        <div class="space-y-2">
+        <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
           <div class="flex items-center justify-between">
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Dependencies & Links</h3>
             <button id="addDepToggleBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
@@ -685,6 +760,127 @@
 
       </form>
 
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: Settings & Preferences (tic-6mex)                  -->
+  <!-- ======================================================== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] animate-fade-in">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h2 class="font-bold text-lg flex items-center gap-2">
+          <i data-lucide="settings-2" class="w-5 h-5 text-brand-600"></i>
+          <span>Settings & Preferences</span>
+        </h2>
+        <button id="closeSettingsModalBtn" class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+        <!-- Theme Accent Colors -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Accent Color Theme</label>
+          <div class="grid grid-cols-3 sm:grid-cols-6 gap-2" id="accentColorPicker">
+            <button type="button" data-accent="indigo" class="accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40">
+              <span class="w-6 h-6 rounded-full bg-indigo-600 shadow"></span>
+              <span class="text-[11px] font-medium">Indigo</span>
+            </button>
+            <button type="button" data-accent="emerald" class="accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <span class="w-6 h-6 rounded-full bg-emerald-500 shadow"></span>
+              <span class="text-[11px] font-medium">Emerald</span>
+            </button>
+            <button type="button" data-accent="violet" class="accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <span class="w-6 h-6 rounded-full bg-violet-500 shadow"></span>
+              <span class="text-[11px] font-medium">Violet</span>
+            </button>
+            <button type="button" data-accent="amber" class="accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <span class="w-6 h-6 rounded-full bg-amber-500 shadow"></span>
+              <span class="text-[11px] font-medium">Amber</span>
+            </button>
+            <button type="button" data-accent="rose" class="accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <span class="w-6 h-6 rounded-full bg-rose-500 shadow"></span>
+              <span class="text-[11px] font-medium">Rose</span>
+            </button>
+            <button type="button" data-accent="cyan" class="accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <span class="w-6 h-6 rounded-full bg-cyan-500 shadow"></span>
+              <span class="text-[11px] font-medium">Cyan</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Contrast Mode -->
+        <div class="pt-4 border-t border-slate-200 dark:border-slate-800">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Border & Line Contrast</label>
+          <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <div class="font-semibold text-slate-800 dark:text-slate-200">High Contrast Lines & Borders</div>
+              <div class="text-xs text-slate-400">Makes lane borders, dividers, and card outlines more prominent</div>
+            </div>
+            <input type="checkbox" id="highContrastToggle" class="w-5 h-5 accent-brand-600 rounded cursor-pointer">
+          </div>
+        </div>
+
+        <!-- Date Range Filter -->
+        <div class="pt-4 border-t border-slate-200 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Ticket Date Range Filter</label>
+            <button type="button" id="clearDateFilterBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline">Reset Dates</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Start Date (From)</label>
+              <input type="date" id="startDateFilter" class="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg outline-none font-mono">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">End Date (To)</label>
+              <input type="date" id="endDateFilter" class="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg outline-none font-mono">
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1.5">Filters visible tickets created within the selected date window.</p>
+        </div>
+
+        <!-- Documentation & Repository Link -->
+        <div class="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="p-1.5 bg-brand-50 dark:bg-slate-800 rounded-lg text-brand-600 dark:text-brand-400">
+              <i data-lucide="info" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <div class="font-semibold text-slate-800 dark:text-slate-200 text-xs">tk Documentation & Repository</div>
+              <div class="text-[11px] text-slate-400 font-mono">msampathkumar/ticket</div>
+            </div>
+          </div>
+          <a
+            href="https://github.com/msampathkumar/ticket"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open GitHub repository"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-slate-800 rounded-lg border border-brand-200 dark:border-slate-700 transition"
+          >
+            <span>Help & Docs</span>
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </a>
+        </div>
+
+        <!-- Settings Reset -->
+        <div class="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="font-semibold text-slate-800 dark:text-slate-200 text-xs">Reset All Preferences</div>
+            <div class="text-[11px] text-slate-400">Restore theme, colors, contrast, and filters to defaults</div>
+          </div>
+          <button type="button" id="resetSettingsBtn" class="px-3 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-lg border border-rose-200 dark:border-rose-900/60 transition">
+            Reset Settings
+          </button>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+        <button type="button" id="saveSettingsBtn" class="px-5 py-2 text-sm bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg shadow transition active:scale-95">
+          Done
+        </button>
+      </div>
     </div>
   </div>
 

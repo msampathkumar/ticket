@@ -183,6 +183,7 @@ def main():
     parser.add_argument("--host", default="127.0.0.1", help="Host address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Port number (default: 8000)")
     parser.add_argument("--reload", action="store_true", help="Auto-reload on code change")
+    parser.add_argument("--version", "-v", action="version", version="tk-webui 0.2.0")
     parser.add_argument("--tk-describe", action="store_true", help="Print plugin description for tk CLI")
     args = parser.parse_args()
 

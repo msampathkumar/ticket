@@ -8,7 +8,14 @@ const state = {
   showAllClosed: false,
   recentDirs: JSON.parse(localStorage.getItem('tk_recent_dirs') || '[]'),
   browsingDir: '~',
-  isDarkMode: localStorage.getItem('tk_theme') === 'dark' || (!('tk_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  isDarkMode: localStorage.getItem('tk_theme') === 'dark' || (!('tk_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches),
+  accentColor: localStorage.getItem('tk_accent') || 'indigo',
+  contrastHigh: localStorage.getItem('tk_contrast_high') === 'true',
+  startDateFilter: localStorage.getItem('tk_filter_start_date') || '',
+  endDateFilter: localStorage.getItem('tk_filter_date_end') || '',
+  treeZoom: 1.0,
+  treeOrientation: localStorage.getItem('tk_tree_orientation') || 'vertical', // 'vertical' (top-down) or 'horizontal' (left-to-right)
+  collapsedNodes: new Set(JSON.parse(localStorage.getItem('tk_tree_collapsed') || '[]')),
 };
 
 // DOM elements
@@ -24,6 +31,7 @@ const elements = {
   refreshBtn: document.getElementById('refreshBtn'),
   themeToggle: document.getElementById('themeToggle'),
   themeIcon: document.getElementById('themeIcon'),
+  settingsBtn: document.getElementById('settingsBtn'),
   statusDot: document.getElementById('statusDot'),
   currentPathLabel: document.getElementById('currentPathLabel'),
   ticketCountBadge: document.getElementById('ticketCountBadge'),
@@ -45,7 +53,26 @@ const elements = {
   tableBody: document.getElementById('tableBody'),
   tableResultsCount: document.getElementById('tableResultsCount'),
   treeContainer: document.getElementById('treeContainer'),
+  treeSvgLayer: document.getElementById('treeSvgLayer'),
+  treeSvgEdges: document.getElementById('treeSvgEdges'),
+  treeZoomInBtn: document.getElementById('treeZoomInBtn'),
+  treeZoomOutBtn: document.getElementById('treeZoomOutBtn'),
+  treeResetZoomBtn: document.getElementById('treeResetZoomBtn'),
+  treeOrientationBtn: document.getElementById('treeOrientationBtn'),
+  treeOrientationLabel: document.getElementById('treeOrientationLabel'),
+  treeCollapseAllBtn: document.getElementById('treeCollapseAllBtn'),
+  treeCollapseAllLabel: document.getElementById('treeCollapseAllLabel'),
   timelineContainer: document.getElementById('timelineContainer'),
+
+  // Settings Modal (tic-6mex)
+  settingsModal: document.getElementById('settingsModal'),
+  closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
+  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+  resetSettingsBtn: document.getElementById('resetSettingsBtn'),
+  highContrastToggle: document.getElementById('highContrastToggle'),
+  startDateFilter: document.getElementById('startDateFilter'),
+  endDateFilter: document.getElementById('endDateFilter'),
+  clearDateFilterBtn: document.getElementById('clearDateFilterBtn'),
 
   // Lanes
   laneOpen: document.getElementById('lane-open'),
@@ -115,6 +142,12 @@ function initTheme() {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
+  }
+  document.body.setAttribute('data-accent', state.accentColor);
+  if (state.contrastHigh) {
+    document.body.classList.add('contrast-high');
+  } else {
+    document.body.classList.remove('contrast-high');
   }
   updateThemeIcon();
 }
@@ -232,6 +265,16 @@ function filterTickets() {
 
   state.filteredTickets = state.tickets.filter(t => {
     if (typeVal !== 'all' && t.type !== typeVal) return false;
+
+    // Date range filter (tic-6mex)
+    if (state.startDateFilter && t.created) {
+      const ticketDate = new Date(t.created).toISOString().split('T')[0];
+      if (ticketDate < state.startDateFilter) return false;
+    }
+    if (state.endDateFilter && t.created) {
+      const ticketDate = new Date(t.created).toISOString().split('T')[0];
+      if (ticketDate > state.endDateFilter) return false;
+    }
 
     if (query) {
       const matchId = t.id.toLowerCase().includes(query);
@@ -405,7 +448,7 @@ function createTicketCardElement(ticket) {
   card.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-2">
       <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="font-mono text-xs font-bold text-slate-500 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition">${ticket.id}</span>
+        <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${ticket.id}</span>
         ${getTypeBadge(ticket.type)}
         ${getPriorityBadge(ticket.priority)}
       </div>
@@ -414,7 +457,7 @@ function createTicketCardElement(ticket) {
       </div>
     </div>
 
-    <h3 class="font-semibold text-sm text-slate-900 dark:text-slate-100 leading-snug line-clamp-2 mb-2">${ticket.title}</h3>
+    <h3 class="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition leading-snug line-clamp-2 mb-2">${ticket.title}</h3>
 
     ${blockedBadge}
 
@@ -473,55 +516,356 @@ function renderTableView() {
   lucide.createIcons();
 }
 
-// 3. RENDER TREE / DEPENDENCY GRAPH VIEW (msa-cvsb)
+// 3. RENDER TREE / DEPENDENCY GRAPH VIEW (tic-d04l)
 function renderTreeView() {
   elements.treeContainer.innerHTML = '';
+  elements.treeSvgEdges.innerHTML = '';
+
+  const isHorizontal = state.treeOrientation === 'horizontal';
+  elements.treeOrientationLabel.textContent = isHorizontal ? 'Left-to-Right' : 'Top-Down';
+
+  const tickets = state.filteredTickets;
+  if (tickets.length === 0) {
+    elements.treeContainer.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-96 text-slate-400">
+        <i data-lucide="network" class="w-12 h-12 mb-3 opacity-40"></i>
+        <p class="text-sm">No tickets to display in graph</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
 
   const projectName = state.currentDir.split('/').filter(Boolean).pop() || 'Project';
 
-  const rootNode = document.createElement('div');
-  rootNode.className = 'p-4 bg-brand-600 text-white rounded-2xl shadow-lg font-bold text-base flex items-center gap-2 mb-8';
-  rootNode.innerHTML = `<i data-lucide="folder-git-2" class="w-5 h-5"></i> <span>${projectName} Root</span>`;
-  elements.treeContainer.appendChild(rootNode);
+  // Build hierarchy and dependency index
+  const ticketMap = new Map();
+  const childrenMap = new Map(); // parentId -> [childTicket]
+  const topLevel = [];
 
-  // Group root tasks vs dependent child tasks
-  const grid = document.createElement('div');
-  grid.className = 'w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+  tickets.forEach(t => ticketMap.set(t.id, t));
 
-  state.filteredTickets.forEach(t => {
-    const node = document.createElement('div');
-    node.className = 'p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-2 hover:border-brand-500 cursor-pointer transition';
-    
-    let depsHtml = '';
-    if (t.deps && t.deps.length > 0) {
-      depsHtml = `<div class="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
-        <i data-lucide="link" class="w-3 h-3 text-brand-500"></i> Depends on: <strong>${t.deps.join(', ')}</strong>
-      </div>`;
+  tickets.forEach(t => {
+    if (t.parent && ticketMap.has(t.parent)) {
+      if (!childrenMap.has(t.parent)) childrenMap.set(t.parent, []);
+      childrenMap.get(t.parent).push(t);
+    } else {
+      topLevel.push(t);
     }
-
-    let parentHtml = '';
-    if (t.parent) {
-      parentHtml = `<div class="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
-        <i data-lucide="corner-down-right" class="w-3 h-3 text-indigo-500"></i> Parent: <strong>${t.parent}</strong>
-      </div>`;
-    }
-
-    node.innerHTML = `
-      <div class="flex items-center justify-between">
-        <span class="font-mono text-xs font-bold text-brand-600">${t.id}</span>
-        ${getStatusBadge(t.status, t.is_blocked)}
-      </div>
-      <h4 class="font-semibold text-sm text-slate-800 dark:text-slate-200 leading-snug">${t.title}</h4>
-      ${parentHtml}
-      ${depsHtml}
-    `;
-
-    node.addEventListener('click', () => openDetailModal(t));
-    grid.appendChild(node);
   });
 
-  elements.treeContainer.appendChild(grid);
+  const CARD_WIDTH = 270;
+  const CARD_HEIGHT = 135;
+  const posMap = new Map(); // ticketId -> { x, y }
+
+  if (!isHorizontal) {
+    // -------------------------------------------------------------
+    // VERTICAL (TOP-DOWN) LAYOUT
+    // -------------------------------------------------------------
+    const HORIZONTAL_GAP = 50;
+    const VERTICAL_GAP = 175;
+
+    function getSubtreeWidth(ticket) {
+      if (state.collapsedNodes.has(ticket.id)) {
+        return CARD_WIDTH + HORIZONTAL_GAP;
+      }
+      const children = childrenMap.get(ticket.id) || [];
+      if (children.length === 0) return CARD_WIDTH + HORIZONTAL_GAP;
+      let sum = 0;
+      children.forEach(c => { sum += getSubtreeWidth(c); });
+      return Math.max(CARD_WIDTH + HORIZONTAL_GAP, sum);
+    }
+
+    let totalTopWidth = 0;
+    topLevel.forEach(t => { totalTopWidth += getSubtreeWidth(t); });
+
+    const canvasWidth = Math.max(1200, totalTopWidth + 200);
+    let currentX = (canvasWidth - totalTopWidth) / 2;
+    const rootPos = { x: canvasWidth / 2, y: 55 };
+
+    let maxDepth = 1;
+
+    function layoutVertical(ticket, leftX, tier) {
+      if (tier > maxDepth) maxDepth = tier;
+      const branchWidth = getSubtreeWidth(ticket);
+      const x = leftX + branchWidth / 2;
+      const y = 55 + tier * VERTICAL_GAP;
+      posMap.set(ticket.id, { x, y });
+
+      if (state.collapsedNodes.has(ticket.id)) return;
+
+      const children = childrenMap.get(ticket.id) || [];
+      let childLeftX = leftX;
+      children.forEach(c => {
+        layoutVertical(c, childLeftX, tier + 1);
+        childLeftX += getSubtreeWidth(c);
+      });
+    }
+
+    topLevel.forEach(t => {
+      const branchWidth = getSubtreeWidth(t);
+      layoutVertical(t, currentX, 1);
+      currentX += branchWidth;
+    });
+
+    const canvasHeight = Math.max(650, 55 + (maxDepth + 1) * VERTICAL_GAP + 100);
+
+    elements.treeSvgLayer.setAttribute('width', canvasWidth);
+    elements.treeSvgLayer.setAttribute('height', canvasHeight);
+    elements.treeSvgLayer.style.width = `${canvasWidth}px`;
+    elements.treeSvgLayer.style.height = `${canvasHeight}px`;
+    elements.treeContainer.style.width = `${canvasWidth}px`;
+    elements.treeContainer.style.height = `${canvasHeight}px`;
+
+    // Root Node
+    const rootNode = document.createElement('div');
+    rootNode.className = 'graph-node-card flex items-center justify-center gap-2.5 px-6 py-3.5 bg-brand-600 text-white rounded-2xl shadow-xl font-bold text-sm tracking-wide border-2 border-white/20 dark:border-slate-800';
+    rootNode.style.left = `${rootPos.x}px`;
+    rootNode.style.top = `${rootPos.y}px`;
+    rootNode.innerHTML = `
+      <span class="p-1 bg-white/20 rounded-lg"><i data-lucide="folder-git-2" class="w-4 h-4"></i></span>
+      <span>${projectName} Root</span>
+    `;
+    elements.treeContainer.appendChild(rootNode);
+
+    // Hierarchy Lines
+    topLevel.forEach(t => {
+      const p = posMap.get(t.id);
+      if (!p) return;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${rootPos.x} ${rootPos.y + 25} C ${rootPos.x} ${(rootPos.y + p.y) / 2}, ${p.x} ${(rootPos.y + p.y) / 2}, ${p.x} ${p.y - 50}`);
+      path.setAttribute('class', 'graph-edge');
+      elements.treeSvgEdges.appendChild(path);
+    });
+
+    childrenMap.forEach((children, parentId) => {
+      if (state.collapsedNodes.has(parentId)) return;
+      const parentPos = posMap.get(parentId);
+      if (!parentPos) return;
+      children.forEach(c => {
+        const childPos = posMap.get(c.id);
+        if (!childPos) return;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${parentPos.x} ${parentPos.y + 50} C ${parentPos.x} ${(parentPos.y + childPos.y) / 2}, ${childPos.x} ${(parentPos.y + childPos.y) / 2}, ${childPos.x} ${childPos.y - 50}`);
+        path.setAttribute('class', 'graph-edge');
+        elements.treeSvgEdges.appendChild(path);
+      });
+    });
+
+  } else {
+    // -------------------------------------------------------------
+    // HORIZONTAL (LEFT-TO-RIGHT) LAYOUT
+    // -------------------------------------------------------------
+    const VERTICAL_GAP = 35;
+    const HORIZONTAL_GAP = 330;
+
+    function getSubtreeHeight(ticket) {
+      if (state.collapsedNodes.has(ticket.id)) {
+        return CARD_HEIGHT + VERTICAL_GAP;
+      }
+      const children = childrenMap.get(ticket.id) || [];
+      if (children.length === 0) return CARD_HEIGHT + VERTICAL_GAP;
+      let sum = 0;
+      children.forEach(c => { sum += getSubtreeHeight(c); });
+      return Math.max(CARD_HEIGHT + VERTICAL_GAP, sum);
+    }
+
+    let totalTopHeight = 0;
+    topLevel.forEach(t => { totalTopHeight += getSubtreeHeight(t); });
+
+    const canvasHeight = Math.max(650, totalTopHeight + 150);
+    let currentY = (canvasHeight - totalTopHeight) / 2;
+    const rootPos = { x: 120, y: canvasHeight / 2 };
+
+    let maxDepth = 1;
+
+    function layoutHorizontal(ticket, topY, tier) {
+      if (tier > maxDepth) maxDepth = tier;
+      const branchHeight = getSubtreeHeight(ticket);
+      const x = 120 + tier * HORIZONTAL_GAP;
+      const y = topY + branchHeight / 2;
+      posMap.set(ticket.id, { x, y });
+
+      if (state.collapsedNodes.has(ticket.id)) return;
+
+      const children = childrenMap.get(ticket.id) || [];
+      let childTopY = topY;
+      children.forEach(c => {
+        layoutHorizontal(c, childTopY, tier + 1);
+        childTopY += getSubtreeHeight(c);
+      });
+    }
+
+    topLevel.forEach(t => {
+      const branchHeight = getSubtreeHeight(t);
+      layoutHorizontal(t, currentY, 1);
+      currentY += branchHeight;
+    });
+
+    const canvasWidth = Math.max(1200, 120 + (maxDepth + 1) * HORIZONTAL_GAP + 150);
+
+    elements.treeSvgLayer.setAttribute('width', canvasWidth);
+    elements.treeSvgLayer.setAttribute('height', canvasHeight);
+    elements.treeSvgLayer.style.width = `${canvasWidth}px`;
+    elements.treeSvgLayer.style.height = `${canvasHeight}px`;
+    elements.treeContainer.style.width = `${canvasWidth}px`;
+    elements.treeContainer.style.height = `${canvasHeight}px`;
+
+    // Root Node
+    const rootNode = document.createElement('div');
+    rootNode.className = 'graph-node-card flex items-center justify-center gap-2.5 px-6 py-3.5 bg-brand-600 text-white rounded-2xl shadow-xl font-bold text-sm tracking-wide border-2 border-white/20 dark:border-slate-800';
+    rootNode.style.left = `${rootPos.x}px`;
+    rootNode.style.top = `${rootPos.y}px`;
+    rootNode.innerHTML = `
+      <span class="p-1 bg-white/20 rounded-lg"><i data-lucide="folder-git-2" class="w-4 h-4"></i></span>
+      <span>${projectName} Root</span>
+    `;
+    elements.treeContainer.appendChild(rootNode);
+
+    // Hierarchy Lines
+    topLevel.forEach(t => {
+      const p = posMap.get(t.id);
+      if (!p) return;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${rootPos.x + 90} ${rootPos.y} C ${(rootPos.x + p.x) / 2} ${rootPos.y}, ${(rootPos.x + p.x) / 2} ${p.y}, ${p.x - 135} ${p.y}`);
+      path.setAttribute('class', 'graph-edge');
+      elements.treeSvgEdges.appendChild(path);
+    });
+
+    childrenMap.forEach((children, parentId) => {
+      if (state.collapsedNodes.has(parentId)) return;
+      const parentPos = posMap.get(parentId);
+      if (!parentPos) return;
+      children.forEach(c => {
+        const childPos = posMap.get(c.id);
+        if (!childPos) return;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${parentPos.x + 135} ${parentPos.y} C ${(parentPos.x + childPos.x) / 2} ${parentPos.y}, ${(parentPos.x + childPos.x) / 2} ${childPos.y}, ${childPos.x - 135} ${childPos.y}`);
+        path.setAttribute('class', 'graph-edge');
+        elements.treeSvgEdges.appendChild(path);
+      });
+    });
+  }
+
+  // Draw Directional Dependency Arrows (DAG)
+  tickets.forEach(t => {
+    if (!t.deps || t.deps.length === 0) return;
+    const targetPos = posMap.get(t.id);
+    if (!targetPos) return;
+
+    t.deps.forEach(blockerId => {
+      const sourcePos = posMap.get(blockerId);
+      if (!sourcePos) return;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const dx = targetPos.x - sourcePos.x;
+      const dy = targetPos.y - sourcePos.y;
+      const offset = 45;
+      const cx1 = sourcePos.x + dx * 0.3 + (isHorizontal ? 0 : offset);
+      const cy1 = sourcePos.y + dy * 0.5 + (isHorizontal ? offset : 0);
+      const cx2 = targetPos.x - dx * 0.3 + (isHorizontal ? 0 : offset);
+      const cy2 = targetPos.y - dy * 0.5 + (isHorizontal ? offset : 0);
+
+      path.setAttribute('d', `M ${sourcePos.x} ${sourcePos.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${targetPos.x} ${targetPos.y}`);
+      path.setAttribute('class', 'graph-edge-dep');
+      path.setAttribute('marker-end', 'url(#arrow)');
+      elements.treeSvgEdges.appendChild(path);
+    });
+  });
+
+  // Render Visible Ticket Node Cards
+  posMap.forEach((pos, ticketId) => {
+    const t = ticketMap.get(ticketId);
+    if (!t) return;
+
+    const children = childrenMap.get(ticketId) || [];
+    const hasChildren = children.length > 0;
+    const isCollapsed = state.collapsedNodes.has(ticketId);
+
+    const card = document.createElement('div');
+    card.id = `tree-node-${t.id}`;
+    card.className = 'graph-node-card bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md hover:border-brand-500 cursor-pointer space-y-2 select-none';
+    card.style.left = `${pos.x}px`;
+    card.style.top = `${pos.y}px`;
+
+    const depsBadge = (t.deps && t.deps.length > 0)
+      ? `<div class="text-[10px] text-rose-500 dark:text-rose-400 font-semibold flex items-center gap-1 truncate"><i data-lucide="link" class="w-3 h-3 shrink-0"></i><span class="truncate">Depends: ${t.deps.join(', ')}</span></div>`
+      : '';
+
+    let collapseBadge = '';
+    if (hasChildren) {
+      collapseBadge = isCollapsed
+        ? `<button data-toggle-id="${t.id}" title="Expand subtasks" class="tree-toggle-collapse flex items-center gap-1 px-2 py-0.5 rounded-md bg-brand-50 dark:bg-slate-800 text-brand-600 dark:text-brand-400 text-[10px] font-bold border border-brand-200 dark:border-slate-700 hover:bg-brand-100 transition">
+             <i data-lucide="plus-circle" class="w-3 h-3"></i>
+             <span>+${children.length} subtask${children.length === 1 ? '' : 's'}</span>
+           </button>`
+        : `<button data-toggle-id="${t.id}" title="Collapse subtasks" class="tree-toggle-collapse flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+             <i data-lucide="minus-circle" class="w-3 h-3"></i>
+             <span>${children.length}</span>
+           </button>`;
+    }
+
+    card.innerHTML = `
+      <div class="flex items-center justify-between gap-1">
+        <div class="flex items-center gap-1.5">
+          <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</span>
+          ${collapseBadge}
+        </div>
+        <div class="flex items-center gap-1">
+          ${getTypeBadge(t.type)}
+          ${getPriorityBadge(t.priority)}
+        </div>
+      </div>
+      <h4 class="font-semibold text-xs text-slate-800 dark:text-slate-100 line-clamp-2 leading-snug">${t.title}</h4>
+      <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px]">
+        ${getStatusBadge(t.status, t.is_blocked)}
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-400 truncate max-w-[80px] font-mono">${t.assignee || 'Unassigned'}</span>
+          <button data-add-child-id="${t.id}" title="Add Subtask under this ticket" class="tree-add-subtask p-0.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
+            <i data-lucide="plus" class="w-3 h-3"></i>
+          </button>
+        </div>
+      </div>
+      ${depsBadge}
+    `;
+
+    card.addEventListener('click', (e) => {
+      const toggleBtn = e.target.closest('.tree-toggle-collapse');
+      const addSubtaskBtn = e.target.closest('.tree-add-subtask');
+      if (toggleBtn) {
+        e.stopPropagation();
+        const id = toggleBtn.dataset.toggleId;
+        if (state.collapsedNodes.has(id)) {
+          state.collapsedNodes.delete(id);
+        } else {
+          state.collapsedNodes.add(id);
+        }
+        localStorage.setItem('tk_tree_collapsed', JSON.stringify([...state.collapsedNodes]));
+        renderTreeView();
+        return;
+      }
+      if (addSubtaskBtn) {
+        e.stopPropagation();
+        const parentId = addSubtaskBtn.dataset.addChildId;
+        openNewTicketModal('open', parentId);
+        return;
+      }
+      openDetailModal(t);
+    });
+
+    elements.treeContainer.appendChild(card);
+  });
+
+  applyTreeZoom();
   lucide.createIcons();
+}
+
+function applyTreeZoom() {
+  const transform = `scale(${state.treeZoom})`;
+  elements.treeContainer.style.transform = transform;
+  elements.treeSvgLayer.style.transform = transform;
+  elements.treeContainer.style.transformOrigin = state.treeOrientation === 'horizontal' ? 'left center' : 'top center';
+  elements.treeSvgLayer.style.transformOrigin = state.treeOrientation === 'horizontal' ? 'left center' : 'top center';
 }
 
 // 4. RENDER TIMELINE VIEW (msa-cvsb)
@@ -549,14 +893,15 @@ function renderTimelineView() {
       <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full ${dotColor} ring-4 ring-white dark:ring-slate-900"></div>
       <div class="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 group-hover:border-brand-500 transition">
         <div class="flex items-center justify-between text-xs text-slate-400 mb-1 font-mono">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-slate-700 dark:text-slate-300">${t.id}</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</span>
+            ${getStatusBadge(t.status, t.is_blocked)}
             ${getTypeBadge(t.type)}
             ${getPriorityBadge(t.priority)}
           </div>
           <span>${t.created ? new Date(t.created).toLocaleString() : 'Recently'}</span>
         </div>
-        <h4 class="font-semibold text-sm text-slate-900 dark:text-slate-100">${t.title}</h4>
+        <h4 class="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition">${t.title}</h4>
         <p class="text-xs text-slate-500 mt-1 line-clamp-2">${t.description || 'No description provided'}</p>
       </div>
     `;
@@ -670,11 +1015,43 @@ function openDetailModal(ticket) {
     acceptSec.classList.add('hidden');
   }
 
+  renderDetailSubtasks(ticket);
   renderDetailDependencies(ticket);
   renderDetailNotes(ticket);
 
   elements.detailModal.classList.remove('hidden');
   lucide.createIcons();
+}
+
+function renderDetailSubtasks(ticket) {
+  const container = document.getElementById('detailSubtasksList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const subtasks = state.tickets.filter(t => t.parent === ticket.id);
+  if (subtasks.length === 0) {
+    container.innerHTML = '<span class="text-slate-400 text-xs italic">No subtasks created for this ticket.</span>';
+    return;
+  }
+
+  subtasks.forEach(st => {
+    const item = document.createElement('div');
+    item.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-brand-500 cursor-pointer transition';
+    item.innerHTML = `
+      <div class="flex items-center gap-2 truncate">
+        <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${st.id}</span>
+        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${st.title}</span>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        ${getStatusBadge(st.status, st.is_blocked)}
+        ${getPriorityBadge(st.priority)}
+      </div>
+    `;
+    item.onclick = () => {
+      openDetailModal(st);
+    };
+    container.appendChild(item);
+  });
 }
 
 function renderDetailDependencies(ticket) {
@@ -903,8 +1280,11 @@ async function removeDependency(ticketId, depId) {
 }
 
 // CREATE TICKET
-function openNewTicketModal(status = 'open') {
+function openNewTicketModal(status = 'open', prefillParent = '') {
   elements.createTicketForm.reset();
+  if (prefillParent) {
+    document.getElementById('newTicketParent').value = prefillParent;
+  }
   elements.newTicketModal.classList.remove('hidden');
   document.getElementById('newTicketTitle').focus();
   lucide.createIcons();
@@ -1138,6 +1518,142 @@ function setupEventListeners() {
 
   elements.initTicketsBtn.addEventListener('click', initRepository);
 
+  // Settings Modal (tic-6mex)
+  function updateAccentButtons() {
+    document.querySelectorAll('.accent-btn').forEach(btn => {
+      if (btn.dataset.accent === state.accentColor) {
+        btn.className = 'accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 shadow-sm';
+      } else {
+        btn.className = 'accent-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-800/50';
+      }
+    });
+  }
+
+  function openSettingsModal() {
+    updateAccentButtons();
+    elements.highContrastToggle.checked = state.contrastHigh;
+    elements.startDateFilter.value = state.startDateFilter;
+    elements.endDateFilter.value = state.endDateFilter;
+    elements.settingsModal.classList.remove('hidden');
+    lucide.createIcons();
+  }
+
+  elements.settingsBtn.addEventListener('click', openSettingsModal);
+  elements.closeSettingsModalBtn.addEventListener('click', () => elements.settingsModal.classList.add('hidden'));
+  elements.saveSettingsBtn.addEventListener('click', () => elements.settingsModal.classList.add('hidden'));
+  elements.settingsModal.addEventListener('click', (e) => {
+    if (e.target === elements.settingsModal) elements.settingsModal.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.accent-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const accent = btn.dataset.accent;
+      state.accentColor = accent;
+      localStorage.setItem('tk_accent', accent);
+      initTheme();
+      updateAccentButtons();
+      showToast(`Accent color updated to ${accent}`, 'info');
+    });
+  });
+
+  elements.highContrastToggle.addEventListener('change', (e) => {
+    state.contrastHigh = e.target.checked;
+    localStorage.setItem('tk_contrast_high', state.contrastHigh ? 'true' : 'false');
+    initTheme();
+    showToast(`High contrast ${state.contrastHigh ? 'enabled' : 'disabled'}`, 'info');
+  });
+
+  elements.startDateFilter.addEventListener('change', (e) => {
+    state.startDateFilter = e.target.value;
+    localStorage.setItem('tk_filter_start_date', state.startDateFilter);
+    filterTickets();
+  });
+
+  elements.endDateFilter.addEventListener('change', (e) => {
+    state.endDateFilter = e.target.value;
+    localStorage.setItem('tk_filter_end_date', state.endDateFilter);
+    filterTickets();
+  });
+
+  elements.clearDateFilterBtn.addEventListener('click', () => {
+    state.startDateFilter = '';
+    state.endDateFilter = '';
+    elements.startDateFilter.value = '';
+    elements.endDateFilter.value = '';
+    localStorage.removeItem('tk_filter_start_date');
+    localStorage.removeItem('tk_filter_end_date');
+    filterTickets();
+    showToast('Date range filter reset', 'info');
+  });
+
+  elements.resetSettingsBtn.addEventListener('click', () => {
+    state.accentColor = 'indigo';
+    state.contrastHigh = false;
+    state.startDateFilter = '';
+    state.endDateFilter = '';
+    localStorage.removeItem('tk_accent');
+    localStorage.removeItem('tk_contrast_high');
+    localStorage.removeItem('tk_filter_start_date');
+    localStorage.removeItem('tk_filter_end_date');
+    elements.highContrastToggle.checked = false;
+    elements.startDateFilter.value = '';
+    elements.endDateFilter.value = '';
+    initTheme();
+    updateAccentButtons();
+    filterTickets();
+    showToast('Settings restored to defaults', 'success');
+  });
+
+  // Tree Orientation & Collapse Controls (tic-d04l)
+  elements.treeOrientationBtn.addEventListener('click', () => {
+    state.treeOrientation = state.treeOrientation === 'vertical' ? 'horizontal' : 'vertical';
+    localStorage.setItem('tk_tree_orientation', state.treeOrientation);
+    renderTreeView();
+    showToast(`Mind Map oriented ${state.treeOrientation === 'horizontal' ? 'Left-to-Right' : 'Top-Down'}`, 'info');
+  });
+
+  elements.treeCollapseAllBtn.addEventListener('click', () => {
+    // Find all tickets that have children
+    const parentIds = new Set();
+    state.filteredTickets.forEach(t => {
+      if (t.parent) parentIds.add(t.parent);
+    });
+
+    if (state.collapsedNodes.size >= parentIds.size && parentIds.size > 0) {
+      // Expand all
+      state.collapsedNodes.clear();
+      elements.treeCollapseAllLabel.textContent = 'Collapse All';
+      showToast('Expanded all subtrees', 'info');
+    } else {
+      // Collapse all
+      parentIds.forEach(id => state.collapsedNodes.add(id));
+      elements.treeCollapseAllLabel.textContent = 'Expand All';
+      showToast('Collapsed all subtrees', 'info');
+    }
+    localStorage.setItem('tk_tree_collapsed', JSON.stringify([...state.collapsedNodes]));
+    renderTreeView();
+  });
+
+  document.getElementById('addSubtaskModalBtn')?.addEventListener('click', () => {
+    if (state.activeTicket) {
+      openNewTicketModal('open', state.activeTicket.id);
+    }
+  });
+
+  // Tree Zoom Controls (tic-d04l)
+  elements.treeZoomInBtn.addEventListener('click', () => {
+    state.treeZoom = Math.min(2.0, state.treeZoom + 0.15);
+    applyTreeZoom();
+  });
+  elements.treeZoomOutBtn.addEventListener('click', () => {
+    state.treeZoom = Math.max(0.4, state.treeZoom - 0.15);
+    applyTreeZoom();
+  });
+  elements.treeResetZoomBtn.addEventListener('click', () => {
+    state.treeZoom = 1.0;
+    applyTreeZoom();
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       elements.newTicketModal.classList.add('hidden');
@@ -1145,6 +1661,7 @@ function setupEventListeners() {
       elements.detailModal.classList.add('hidden');
       elements.folderModal.classList.add('hidden');
       elements.recentDirsPopover.classList.add('hidden');
+      elements.settingsModal.classList.add('hidden');
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();

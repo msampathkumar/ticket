@@ -1,5 +1,90 @@
 /* Custom styles and enhancements for tk-webui */
 
+:root {
+  --brand-primary: #6366f1;
+  --brand-primary-hover: #4f46e5;
+  --brand-light: #eef2ff;
+  --brand-dark: #1e1b4b;
+}
+
+/* Theme Accent Variations */
+body[data-accent="indigo"] {
+  --brand-primary: #6366f1;
+  --brand-primary-hover: #4f46e5;
+  --brand-light: #eef2ff;
+}
+body[data-accent="emerald"] {
+  --brand-primary: #10b981;
+  --brand-primary-hover: #059669;
+  --brand-light: #ecfdf5;
+}
+body[data-accent="violet"] {
+  --brand-primary: #8b5cf6;
+  --brand-primary-hover: #7c3aed;
+  --brand-light: #f5f3ff;
+}
+body[data-accent="amber"] {
+  --brand-primary: #f59e0b;
+  --brand-primary-hover: #d97706;
+  --brand-light: #fffbeb;
+}
+body[data-accent="rose"] {
+  --brand-primary: #f43f5e;
+  --brand-primary-hover: #e11d48;
+  --brand-light: #fff1f2;
+}
+body[data-accent="cyan"] {
+  --brand-primary: #06b6d4;
+  --brand-primary-hover: #0891b2;
+  --brand-light: #ecfeff;
+}
+
+/* Dynamic Brand Utility Overrides */
+.bg-brand-600, .bg-brand-500 {
+  background-color: var(--brand-primary) !important;
+}
+.hover\:bg-brand-700:hover, .hover\:bg-brand-600:hover {
+  background-color: var(--brand-primary-hover) !important;
+}
+.text-brand-600, .text-brand-500, .text-brand-400,
+.dark .text-brand-500, .dark .text-brand-400, .dark .text-brand-600 {
+  color: var(--brand-primary) !important;
+}
+.border-brand-500, .border-brand-600,
+.hover\:border-brand-500:hover, .hover\:border-brand-500\/50:hover {
+  border-color: var(--brand-primary) !important;
+}
+.bg-brand-50, .dark .bg-brand-950\/40, .dark .bg-brand-950\/50 {
+  background-color: var(--brand-light) !important;
+}
+.focus\:border-brand-500:focus {
+  border-color: var(--brand-primary) !important;
+}
+.accent-brand-600 {
+  accent-color: var(--brand-primary) !important;
+}
+
+/* Contrast Modes */
+body.contrast-high .kanban-lane,
+body.contrast-high .border,
+body.contrast-high .border-b,
+body.contrast-high .border-t,
+body.contrast-high .border-l,
+body.contrast-high .border-r {
+  border-color: #94a3b8 !important;
+  border-width: 1.5px !important;
+}
+
+body.contrast-high.dark .kanban-lane,
+body.contrast-high.dark .border,
+body.contrast-high.dark .border-b,
+body.contrast-high.dark .border-t,
+body.contrast-high.dark .border-l,
+body.contrast-high.dark .border-r {
+  border-color: #64748b !important;
+  border-width: 1.5px !important;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -40,13 +125,8 @@
 /* Drag and drop states */
 .sortable-ghost {
   opacity: 0.35;
-  background: #e0e7ff !important;
-  border: 2px dashed #6366f1 !important;
-}
-
-.dark .sortable-ghost {
-  background: #1e1b4b !important;
-  border: 2px dashed #818cf8 !important;
+  background: var(--brand-light) !important;
+  border: 2px dashed var(--brand-primary) !important;
 }
 
 .sortable-chosen {
@@ -57,6 +137,57 @@
 
 .kanban-lane {
   min-height: calc(100vh - 240px);
+}
+
+/* Mind Map / Tree Graph Visualizer */
+#treeCanvasWrapper {
+  position: relative;
+  min-height: 650px;
+  width: 100%;
+  overflow: auto;
+  user-select: none;
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark #treeCanvasWrapper {
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.graph-edge {
+  stroke: #94a3b8;
+  stroke-width: 2;
+  fill: none;
+  transition: stroke 0.2s;
+}
+
+.graph-edge-dep {
+  stroke: #f43f5e;
+  stroke-width: 2;
+  stroke-dasharray: 5, 4;
+  fill: none;
+  animation: dash 30s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+.graph-node-card {
+  position: absolute;
+  width: 260px;
+  transform: translate(-50%, -50%);
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  z-index: 10;
+}
+
+.graph-node-card:hover {
+  transform: translate(-50%, -52%) scale(1.03);
+  z-index: 20;
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.15);
 }
 
 /* Prose markdown styling in modals */
@@ -72,7 +203,7 @@
 
 .prose code:not(pre code) {
   background-color: rgba(99, 102, 241, 0.1);
-  color: #4f46e5;
+  color: var(--brand-primary);
   padding: 0.15rem 0.35rem;
   border-radius: 0.25rem;
   font-size: 0.85em;
