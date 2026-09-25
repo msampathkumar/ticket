@@ -58,7 +58,7 @@ install_skill() {
 
 install_github() {
     echo "🐙 Installing tk-github plugin to $BIN_DIR/tk-github..."
-    cp -f "$DIR/plugins/ticket-github" "$BIN_DIR/tk-github"
+    cp -f "$DIR/plugins/github/ticket-github" "$BIN_DIR/tk-github"
     chmod +x "$BIN_DIR/tk-github"
     ln -sf "$BIN_DIR/tk-github" "$BIN_DIR/ticket-github"
     echo "✅ GitHub sync plugin installed to $BIN_DIR/tk-github"
