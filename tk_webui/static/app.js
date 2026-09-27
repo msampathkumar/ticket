@@ -10,6 +10,8 @@ const state = {
   browsingDir: '~',
   isDarkMode: localStorage.getItem('tk_theme') === 'dark' || (!('tk_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches),
   accentColor: localStorage.getItem('tk_accent') || 'indigo',
+  fontFamily: localStorage.getItem('tk_font_family') || 'sans',
+  fontSize: localStorage.getItem('tk_font_size') || 'md',
   contrastHigh: localStorage.getItem('tk_contrast_high') === 'true',
   startDateFilter: localStorage.getItem('tk_filter_start_date') || '',
   endDateFilter: localStorage.getItem('tk_filter_date_end') || '',
@@ -77,6 +79,8 @@ const elements = {
   closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   resetSettingsBtn: document.getElementById('resetSettingsBtn'),
+  fontFamilySelect: document.getElementById('fontFamilySelect'),
+  fontSizeSelect: document.getElementById('fontSizeSelect'),
   highContrastToggle: document.getElementById('highContrastToggle'),
   startDateFilter: document.getElementById('startDateFilter'),
   endDateFilter: document.getElementById('endDateFilter'),
@@ -152,6 +156,8 @@ function initTheme() {
     document.documentElement.classList.remove('dark');
   }
   document.body.setAttribute('data-accent', state.accentColor);
+  document.body.setAttribute('data-font-family', state.fontFamily);
+  document.documentElement.setAttribute('data-font-size', state.fontSize);
   if (state.contrastHigh) {
     document.body.classList.add('contrast-high');
   } else {
@@ -1932,6 +1938,8 @@ function setupEventListeners() {
 
   function openSettingsModal() {
     updateAccentButtons();
+    if (elements.fontFamilySelect) elements.fontFamilySelect.value = state.fontFamily;
+    if (elements.fontSizeSelect) elements.fontSizeSelect.value = state.fontSize;
     elements.highContrastToggle.checked = state.contrastHigh;
     elements.startDateFilter.value = state.startDateFilter;
     elements.endDateFilter.value = state.endDateFilter;
@@ -1945,6 +1953,26 @@ function setupEventListeners() {
   elements.settingsModal.addEventListener('click', (e) => {
     if (e.target === elements.settingsModal) elements.settingsModal.classList.add('hidden');
   });
+
+  if (elements.fontFamilySelect) {
+    elements.fontFamilySelect.addEventListener('change', (e) => {
+      const font = e.target.value;
+      state.fontFamily = font;
+      localStorage.setItem('tk_font_family', font);
+      initTheme();
+      showToast(`Font family updated to ${e.target.options[e.target.selectedIndex].text}`, 'info');
+    });
+  }
+
+  if (elements.fontSizeSelect) {
+    elements.fontSizeSelect.addEventListener('change', (e) => {
+      const size = e.target.value;
+      state.fontSize = size;
+      localStorage.setItem('tk_font_size', size);
+      initTheme();
+      showToast(`Font size updated to ${e.target.options[e.target.selectedIndex].text}`, 'info');
+    });
+  }
 
   document.querySelectorAll('.accent-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1989,13 +2017,19 @@ function setupEventListeners() {
 
   elements.resetSettingsBtn.addEventListener('click', () => {
     state.accentColor = 'indigo';
+    state.fontFamily = 'sans';
+    state.fontSize = 'md';
     state.contrastHigh = false;
     state.startDateFilter = '';
     state.endDateFilter = '';
     localStorage.removeItem('tk_accent');
+    localStorage.removeItem('tk_font_family');
+    localStorage.removeItem('tk_font_size');
     localStorage.removeItem('tk_contrast_high');
     localStorage.removeItem('tk_filter_start_date');
     localStorage.removeItem('tk_filter_end_date');
+    if (elements.fontFamilySelect) elements.fontFamilySelect.value = 'sans';
+    if (elements.fontSizeSelect) elements.fontSizeSelect.value = 'md';
     elements.highContrastToggle.checked = false;
     elements.startDateFilter.value = '';
     elements.endDateFilter.value = '';
