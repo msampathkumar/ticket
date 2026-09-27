@@ -1,4 +1,10 @@
-# ticket (tk)
+# <img src="docs/images/logo.svg" width="30" height="30" alt="tk logo" style="vertical-align: -4px; display: inline-block;" /> ticket (tk)
+
+[![Test Suite](https://img.shields.io/github/actions/workflow/status/msampathkumar/ticket/test.yml?branch=master&label=tests&style=flat-square)](https://github.com/msampathkumar/ticket/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/msampathkumar/ticket?style=flat-square&color=6366f1)](https://github.com/msampathkumar/ticket/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg?style=flat-square)](#)
+[![Zero Dependency Core](https://img.shields.io/badge/core-POSIX%20Bash%20(Zero%20Runtime)-emerald.svg?style=flat-square)](#)
 
 Minimal, offline task tracker with dependency intelligence. Features an ultra-fast CLI and an optional modern Kanban & review dashboard.
 

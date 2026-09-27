@@ -1,0 +1,36 @@
+name: Code Quality & Linting
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint-shell:
+    name: ShellCheck (POSIX Bash)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          severity: warning
+          ignore_paths: '.venv features plugins/github/vendor'
+
+  lint-python:
+    name: Python Linting (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Run Ruff Linter
+        run: |
+          uvx ruff check tk_webui/

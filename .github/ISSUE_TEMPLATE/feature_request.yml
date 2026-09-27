@@ -1,0 +1,45 @@
+name: ✨ Feature Request
+description: Suggest a new capability, CLI command, or Web UI enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve tk!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem or limitation?
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: A clear and concise description of what you want to happen.
+      placeholder: Add a command or UI control that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or workarounds you've evaluated.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Target Component
+      options:
+        - Core CLI (tk)
+        - Web UI (tk-webui)
+        - GitHub Plugin (tk-github)
+        - Agent Skill & AI Workflows
+        - Documentation / Other
+    validations:
+      required: true

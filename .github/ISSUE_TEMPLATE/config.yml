@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions & Questions
+    url: https://github.com/msampathkumar/ticket/discussions
+    about: Ask questions, share ideas, and connect with other tk users and contributors.
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/msampathkumar/ticket/security/advisories/new
+    about: Please report security vulnerabilities privately via GitHub Security Advisories.

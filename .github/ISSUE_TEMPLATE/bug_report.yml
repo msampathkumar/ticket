@@ -1,0 +1,59 @@
+name: 🐛 Bug Report
+description: Report a defect or unexpected behavior in tk CLI or tk-webui
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue!
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Exact CLI commands or UI interactions to reproduce the issue.
+      placeholder: |
+        1. Run `tk create "Test ticket"`
+        2. Run `...`
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - Core CLI (tk)
+        - Web UI (tk-webui)
+        - GitHub Plugin (tk-github)
+        - Agent Skill
+        - Installer / Setup
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, shell, and tool version.
+      placeholder: "macOS 15.1, zsh / Linux Ubuntu 24.04, bash (tk v0.2.0)"
+    validations:
+      required: true

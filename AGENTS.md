@@ -82,5 +82,6 @@ flowchart LR
   - Web UI default port: **`8475`** (ASCII `T=84`, `K=75`).
   - Web UI default theme: **Indigo** (`#6366f1`).
   - Default `tk ls`: Hides closed tickets and defaults to 10 items (unlimited with `--full` or `--all`).
-- **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks.
+- **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu & macOS across Python 3.9–3.13.
+- **Automated Linting & Quality**: Ensure code satisfies linting checks (`shellcheck ticket` and `ruff check tk_webui`).
 - **Git Hygiene**: Do not mutate Git history or push commits without explicit confirmation.
