@@ -113,6 +113,29 @@ body.contrast-high.dark .border-r {
   border-width: 1.5px !important;
 }
 
+/* Ensure hover borders take priority over high contrast default borders across all views */
+body.contrast-high [id^="card-"]:hover,
+body.contrast-high .kanban-lane [id^="card-"]:hover,
+body.contrast-high .graph-node-card:hover,
+body.contrast-high #timelineContainer .group:hover > div:last-child,
+body.contrast-high .hover\:border-brand-500:hover,
+body.contrast-high .hover\:border-brand-500\/50:hover,
+body.contrast-high .hover\:border-brand-500\/40:hover,
+body.contrast-high .group:hover .group-hover\:border-brand-500 {
+  border-color: var(--brand-primary) !important;
+}
+
+body.contrast-high.dark [id^="card-"]:hover,
+body.contrast-high.dark .kanban-lane [id^="card-"]:hover,
+body.contrast-high.dark .graph-node-card:hover,
+body.contrast-high.dark #timelineContainer .group:hover > div:last-child,
+body.contrast-high.dark .hover\:border-brand-500:hover,
+body.contrast-high.dark .hover\:border-brand-500\/50:hover,
+body.contrast-high.dark .hover\:border-brand-500\/40:hover,
+body.contrast-high.dark .group:hover .group-hover\:border-brand-500 {
+  border-color: var(--brand-primary) !important;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -216,6 +239,7 @@ body.contrast-high.dark .border-r {
   transform: translate(-50%, -52%) scale(1.03);
   z-index: 20;
   box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.15);
+  border-color: var(--brand-primary) !important;
 }
 
 .graph-root-node {

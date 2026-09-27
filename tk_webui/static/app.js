@@ -510,7 +510,7 @@ function renderTableView() {
 
     tr.innerHTML = `
       <td class="p-3.5 font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</td>
-      <td class="p-3.5 font-semibold text-slate-900 dark:text-slate-100 max-w-xs truncate">${t.title}</td>
+      <td class="p-3.5 font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition max-w-xs truncate">${t.title}</td>
       <td class="p-3.5">${getStatusBadge(t.status, t.is_blocked)}</td>
       <td class="p-3.5">${getTypeBadge(t.type)}</td>
       <td class="p-3.5">${getPriorityBadge(t.priority)}</td>
@@ -518,7 +518,7 @@ function renderTableView() {
       <td class="p-3.5">${tagsHtml || '<span class="text-slate-400 text-xs">—</span>'}</td>
       <td class="p-3.5 text-xs text-slate-400 font-mono">${t.created ? new Date(t.created).toLocaleDateString() : '—'}</td>
       <td class="p-3.5 text-right">
-        <button class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded transition" onclick="event.stopPropagation(); openDetailModal(state.tickets.find(x => x.id === '${t.id}'))">
+        <button class="p-1 text-slate-400 group-hover:text-brand-600 dark:group-hover:text-brand-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 rounded transition" onclick="event.stopPropagation(); openDetailModal(state.tickets.find(x => x.id === '${t.id}'))">
           <i data-lucide="eye" class="w-4 h-4"></i>
         </button>
       </td>
