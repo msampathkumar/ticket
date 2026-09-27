@@ -16,7 +16,7 @@
 ## 2. Core Views & Components
 
 1. **Kanban Board**: 4 drag-and-drop lanes (`Ready`, `In Progress`, `Blocked`, `Closed`) with pagination for older completed tasks.
-2. **Table View**: High-density tabular layout with search, sorting, and type filters.
+2. **Table View**: High-density tabular layout with search, sorting, type filters, and 4-sided active theme border highlights on row hover.
 3. **Mind Map & DAG Graph**: Visual node-and-edge hierarchical canvas with:
    - Orientation toggle (`Top-Down` $\leftrightarrow$ `Left-to-Right`).
    - Multi-select status filtering (`Ready`, `In Progress`, `Blocked`, `Closed`) with active counter badges.
@@ -24,7 +24,7 @@
    - Directional dashed dependency curves (`marker-end="url(#arrow)"`).
    - Zoom in, Zoom out, and Reset View canvas controls.
 4. **Timeline View**: Chronological audit feed of tickets sorted by creation and modification timestamps.
-5. **Settings & Preferences**: Theme accent color selector (Indigo, Emerald, Violet, Amber, Rose, Cyan), high-contrast border mode, start/end date range filtering, settings reset, and documentation link.
+5. **Settings & Preferences**: Theme accent color selector (Indigo, Emerald, Violet, Amber, Rose, Cyan), Typography preferences (Font Family: System Sans, Inter, Monospace, Serif; Font Size: Small 14px, Default 16px, Large 18px, Extra Large 20px), high-contrast border mode with hover preservation, start/end date range filtering, settings reset, and documentation link.
 6. **Task Detail Drawer**: Markdown renderer for descriptions, acceptance criteria, parent task selector & subtask hierarchy linking/unlinking, symmetric links manager, dependency manager, and timestamped review feedback feed.
 
 ### Visual Interface Showcase

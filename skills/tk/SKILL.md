@@ -14,6 +14,11 @@ Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` dire
 ## Core Commands Reference
 
 ### 1. Ticket Lifecycle
+- **Initialize Repository**:
+  ```bash
+  tk init [directory]   # Initialize .tickets tracking repository
+  ```
+
 - **Create**:
   ```bash
   tk create "Feature title" -t feature -p 2 -d "Detailed description" --tags "ui,backend"
@@ -25,7 +30,7 @@ Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` dire
   - `-d, --description`: Description text
   - `--design`: Architecture / design notes
   - `--acceptance`: Acceptance criteria checklist
-  - `--parent`: Parent ticket ID for subtasks
+  - `--parent`: Parent ticket ID for subtasks (or `--parent none` to unlink)
   - `--external-ref`: GitHub issue / PR / JIRA reference (e.g. `gh-42`)
   - `--tags`: Comma-separated tags
 
@@ -68,7 +73,7 @@ Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` dire
   tk edit <ticket-id>            # Open in $EDITOR
   ```
 
-### 2. Dependency Management & DAG Queries
+### 2. Dependency Management & Symmetrical Links
 - **Add dependency**:
   ```bash
   tk dep <ticket-id> <blocker-id>   # <ticket-id> now depends on <blocker-id>
@@ -76,6 +81,14 @@ Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` dire
 - **Remove dependency**:
   ```bash
   tk undep <ticket-id> <blocker-id>
+  ```
+- **Link related tickets (symmetric)**:
+  ```bash
+  tk link <ticket-a> <ticket-b>     # Relates tickets without blocking semantics
+  ```
+- **Unlink related tickets**:
+  ```bash
+  tk unlink <ticket-a> <ticket-b>
   ```
 - **Show dependency tree**:
   ```bash
