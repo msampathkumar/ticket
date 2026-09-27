@@ -278,3 +278,43 @@ body.contrast-high.dark .border-r {
 .prose ol {
   list-style-type: decimal;
 }
+
+/* Interactive Table Row Hover Effects */
+#tableBody tr {
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+#tableBody tr:hover {
+  background-color: var(--brand-light) !important;
+}
+
+#tableBody tr:hover td {
+  border-top: 1.5px solid var(--brand-primary) !important;
+  border-bottom: 1.5px solid var(--brand-primary) !important;
+}
+
+#tableBody tr:hover td:first-child {
+  border-left: 2px solid var(--brand-primary) !important;
+}
+
+#tableBody tr:hover td:last-child {
+  border-right: 2px solid var(--brand-primary) !important;
+}
+
+.dark #tableBody tr:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+body.contrast-high #tableBody tr:hover td {
+  border-top-width: 2px !important;
+  border-bottom-width: 2px !important;
+}
+
+body.contrast-high #tableBody tr:hover td:first-child {
+  border-left-width: 2.5px !important;
+}
+
+body.contrast-high #tableBody tr:hover td:last-child {
+  border-right-width: 2.5px !important;
+}

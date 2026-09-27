@@ -502,7 +502,7 @@ function renderTableView() {
 
   state.filteredTickets.forEach(t => {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition cursor-pointer';
+    tr.className = 'group hover:bg-slate-50/90 dark:hover:bg-slate-800/60 transition duration-150 cursor-pointer select-none border-b border-slate-100 dark:border-slate-800/60 last:border-b-0';
     
     const tagsHtml = (t.tags || []).map(tag => 
       `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mr-1">#${tag}</span>`
@@ -518,7 +518,7 @@ function renderTableView() {
       <td class="p-3.5">${tagsHtml || '<span class="text-slate-400 text-xs">—</span>'}</td>
       <td class="p-3.5 text-xs text-slate-400 font-mono">${t.created ? new Date(t.created).toLocaleDateString() : '—'}</td>
       <td class="p-3.5 text-right">
-        <button class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded" onclick="event.stopPropagation(); openDetailModal(state.tickets.find(x => x.id === '${t.id}'))">
+        <button class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded transition" onclick="event.stopPropagation(); openDetailModal(state.tickets.find(x => x.id === '${t.id}'))">
           <i data-lucide="eye" class="w-4 h-4"></i>
         </button>
       </td>
