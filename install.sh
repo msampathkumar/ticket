@@ -38,10 +38,11 @@ install_webui() {
     fi
 
     # Create tk-webui launcher with metadata
+    rm -f "$BIN_DIR/tk-webui"
     cat << EOF > "$BIN_DIR/tk-webui"
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban Web UI & PR review dashboard
-# tk-plugin-version: 0.1.0
+# tk-plugin-version: 0.2.0
 
 exec "$DIR/.venv/bin/python3" -m tk_webui.main "\$@"
 EOF
