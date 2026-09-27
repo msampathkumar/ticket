@@ -19,12 +19,13 @@
 2. **Table View**: High-density tabular layout with search, sorting, and type filters.
 3. **Mind Map & DAG Graph**: Visual node-and-edge hierarchical canvas with:
    - Orientation toggle (`Top-Down` $\leftrightarrow$ `Left-to-Right`).
+   - Multi-select status filtering (`Ready`, `In Progress`, `Blocked`, `Closed`) with active counter badges.
    - Subtree collapse and expand at task level and root level.
    - Directional dashed dependency curves (`marker-end="url(#arrow)"`).
    - Zoom in, Zoom out, and Reset View canvas controls.
 4. **Timeline View**: Chronological audit feed of tickets sorted by creation and modification timestamps.
 5. **Settings & Preferences**: Theme accent color selector (Indigo, Emerald, Violet, Amber, Rose, Cyan), high-contrast border mode, start/end date range filtering, settings reset, and documentation link.
-6. **Task Detail Drawer**: Markdown renderer for descriptions, acceptance criteria, subtasks list, dependency manager, and timestamped review feedback feed.
+6. **Task Detail Drawer**: Markdown renderer for descriptions, acceptance criteria, parent task selector & subtask hierarchy linking/unlinking, symmetric links manager, dependency manager, and timestamped review feedback feed.
 
 ### Visual Interface Showcase
 
@@ -86,4 +87,6 @@ State files and logs are managed under `~/.local/state/tk/`:
 - `POST /api/tickets/notes`: Appends timestamped review notes.
 - `POST /api/tickets/dependencies`: Adds a dependency relationship.
 - `DELETE /api/tickets/dependencies`: Removes a dependency relationship.
+- `POST /api/tickets/links`: Adds a symmetric relational link between two tickets.
+- `DELETE /api/tickets/links`: Removes a symmetric relational link between two tickets.
 - `POST /api/init`: Initializes `.tickets/` repository.

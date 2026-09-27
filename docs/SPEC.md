@@ -88,6 +88,7 @@ Following the frontmatter, the Markdown body contains:
 
 | Command | Description |
 | :--- | :--- |
+| `tk init [path]` | Initializes `.tickets/` tracking repository |
 | `tk create <title> [options]` | Creates ticket, prints generated ID to stdout |
 | `tk start <id>` | Sets status to `in_progress` |
 | `tk close <id>` | Sets status to `closed` |
@@ -95,6 +96,8 @@ Following the frontmatter, the Markdown body contains:
 | `tk status <id> <status>` | Updates status directly (`open`, `in_progress`, `closed`) |
 | `tk dep <id> <dep-id>` | Adds dependency relationship |
 | `tk undep <id> <dep-id>` | Removes dependency relationship |
+| `tk link <id> <link-id>` | Adds symmetric relational link between tickets |
+| `tk unlink <id> <link-id>` | Removes symmetric relational link between tickets |
 | `tk dep tree <id>` | Prints hierarchical ASCII dependency tree |
 | `tk dep cycle` | Traverses graph and outputs detected cycles |
 | `tk ready` | Lists unblocked, actionable tickets |

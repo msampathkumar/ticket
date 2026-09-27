@@ -50,14 +50,18 @@ tk webui server restart                        # Restart daemon
 
 ### 🖥️ Core CLI (`tk`)
 - **Git-Backed**: Tickets are stored as human-readable Markdown files with YAML frontmatter inside `.tickets/`.
+- **Project Initialization**: Seamless `tk init` command (with automatic init on `tk create`).
 - **Dependency Tracking**: Track blocking relationships (`tk dep`, `tk dep tree`, `tk blocked`, `tk ready`, `tk dep cycle`).
 - **Core Querying & Editing**: Built-in `tk ls`, `tk edit`, `tk query`, `tk find`, and `tk show`.
 - **In-Place Ticket Updates**: Update fields, design notes, and acceptance criteria on the fly with `tk update`.
+- **Symmetric Links**: Connect related tickets via `tk link` and `tk unlink`.
 - **Extensible Plugin System**: Discovers `tk-<cmd>` or `ticket-<cmd>` executables in `$PATH` automatically.
 
 ### 🌐 Interactive Web UI (`tk webui` / `tk-webui`)
 - **Background Server Management**: One-click `tk webui server start/stop/status` daemon management on default port `8475`.
 - **4-Lane Kanban Board**: Fluid drag-and-drop between Ready, In Progress, Blocked, and Closed lanes.
+- **Mind Map & Dependency DAG**: Interactive DAG graph with multi-select status filter dropdown, top-down/left-to-right layout toggle, root node task creation, and collapsible subtrees.
+- **Parent & Child Linking**: Link or unlink parent tickets and subtasks directly in the task detail drawer.
 - **Multi-View Switcher**: Toggle instantly between **Kanban**, **Table View**, **Interactive Dependency Tree Graph**, and **Timeline/Gantt View**.
 - **In-Place Task Editing**: Edit title, description, tags, priority, assignee, design notes, and acceptance criteria directly in the browser.
 - **PR-Style Review Feedback**: Chronological audit trail for review notes and comments (`Cmd+Enter` to submit).
@@ -91,6 +95,7 @@ License: MIT
 Usage: tk <command> [args]
 
 Commands:
+  init [path]              Initialize .tickets repository in current or target folder
   create [title] [options] Create ticket, prints ID
     -d, --description      Description text
     --design               Design notes
