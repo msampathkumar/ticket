@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>tk • Ticket Suite & Web UI</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -343,6 +344,34 @@
 
           <!-- Orientation & Collapse Controls -->
           <div class="flex items-center gap-1.5">
+            <!-- Status Multi-Select Filter (tic-s0le) -->
+            <div class="relative">
+              <button id="treeStatusFilterBtn" title="Filter DAG by Status" class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition">
+                <i data-lucide="filter" class="w-3.5 h-3.5 text-brand-600"></i>
+                <span>Status:</span>
+                <span id="treeStatusFilterSummary" class="text-brand-600 dark:text-brand-400 font-bold">Active</span>
+                <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+              </button>
+              <div id="treeStatusFilterMenu" class="hidden absolute right-0 mt-1 w-44 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 z-40 space-y-1 text-xs">
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer select-none">
+                  <input type="checkbox" id="treeStatusReady" value="ready" checked class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                  <span class="flex items-center gap-1.5 font-medium"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Ready</span>
+                </label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer select-none">
+                  <input type="checkbox" id="treeStatusInProgress" value="in_progress" checked class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                  <span class="flex items-center gap-1.5 font-medium"><span class="w-2 h-2 rounded-full bg-amber-500"></span> In Progress</span>
+                </label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer select-none">
+                  <input type="checkbox" id="treeStatusBlocked" value="blocked" checked class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                  <span class="flex items-center gap-1.5 font-medium"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Blocked</span>
+                </label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer select-none">
+                  <input type="checkbox" id="treeStatusClosed" value="closed" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                  <span class="flex items-center gap-1.5 font-medium"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Closed</span>
+                </label>
+              </div>
+            </div>
+
             <button id="treeOrientationBtn" title="Toggle Layout: Top-Down or Left-to-Right" class="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition">
               <i data-lucide="split" class="w-3.5 h-3.5 text-brand-600"></i>
               <span id="treeOrientationLabel">Top-Down</span>
@@ -475,6 +504,31 @@
           <div id="detailAcceptance" class="prose dark:prose-invert text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-800/70"></div>
         </div>
 
+        <!-- Parent Ticket Section -->
+        <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i data-lucide="corner-left-up" class="w-3.5 h-3.5 text-brand-500"></i>
+              <span>Parent Ticket</span>
+            </h3>
+            <button id="detailToggleParentBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
+              <i data-lucide="link" class="w-3 h-3"></i> <span id="detailToggleParentLabel">Set Parent</span>
+            </button>
+          </div>
+
+          <!-- Set / Change Parent Form -->
+          <div id="detailSetParentForm" class="hidden flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
+            <select id="detailParentSelect" class="flex-1 px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 outline-none">
+              <option value="">-- Select Parent Ticket --</option>
+            </select>
+            <button id="submitSetParentBtn" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-semibold">Link</button>
+            <button id="cancelSetParentBtn" class="px-2 py-1.5 text-slate-400 hover:text-slate-600 text-xs">Cancel</button>
+          </div>
+
+          <!-- Active Parent Display Card -->
+          <div id="detailParentDisplay"></div>
+        </div>
+
         <!-- Subtasks / Child Tasks Section -->
         <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
           <div class="flex items-center justify-between">
@@ -482,18 +536,35 @@
               <i data-lucide="git-fork" class="w-3.5 h-3.5 text-brand-500"></i>
               <span>Subtasks & Child Tickets</span>
             </h3>
-            <button id="addSubtaskModalBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
-              <i data-lucide="plus" class="w-3 h-3"></i> Add Subtask
-            </button>
+            <div class="flex items-center gap-3">
+              <button id="linkChildToggleBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
+                <i data-lucide="link" class="w-3 h-3"></i> Link Existing
+              </button>
+              <button id="addSubtaskModalBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
+                <i data-lucide="plus" class="w-3 h-3"></i> New Subtask
+              </button>
+            </div>
+          </div>
+
+          <!-- Link Child Inline Form -->
+          <div id="linkChildForm" class="hidden flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
+            <select id="linkChildSelect" class="flex-1 px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 outline-none">
+              <option value="">-- Select Existing Ticket to Link as Child --</option>
+            </select>
+            <button id="submitLinkChildBtn" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-semibold">Link Child</button>
+            <button id="cancelLinkChildBtn" class="px-2 py-1.5 text-slate-400 hover:text-slate-600 text-xs">Cancel</button>
           </div>
 
           <div id="detailSubtasksList" class="space-y-1.5"></div>
         </div>
 
-        <!-- Dependencies and Links Section -->
+        <!-- Dependencies Section -->
         <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
           <div class="flex items-center justify-between">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Dependencies & Links</h3>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i data-lucide="git-commit" class="w-3.5 h-3.5 text-rose-500"></i>
+              <span>Blocked By (Dependencies)</span>
+            </h3>
             <button id="addDepToggleBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
               <i data-lucide="plus" class="w-3 h-3"></i> Add Dependency
             </button>
@@ -501,11 +572,38 @@
 
           <!-- Add Dep Inline Form -->
           <div id="addDepForm" class="hidden flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
-            <input type="text" id="newDepIdInput" placeholder="Dependency ticket ID (e.g. nw-5c46)" class="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 font-mono outline-none">
-            <button id="submitAddDepBtn" class="px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-semibold">Add</button>
+            <select id="newDepSelect" class="flex-1 px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 outline-none">
+              <option value="">-- Select Blocker / Dependency Ticket --</option>
+            </select>
+            <button id="submitAddDepBtn" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-semibold">Add</button>
+            <button id="cancelAddDepBtn" class="px-2 py-1.5 text-slate-400 hover:text-slate-600 text-xs">Cancel</button>
           </div>
 
           <div id="detailDepsList" class="flex flex-wrap gap-2 text-xs font-mono"></div>
+        </div>
+
+        <!-- Related Links Section -->
+        <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i data-lucide="link-2" class="w-3.5 h-3.5 text-indigo-500"></i>
+              <span>Related Links</span>
+            </h3>
+            <button id="addLinkToggleBtn" class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold">
+              <i data-lucide="plus" class="w-3 h-3"></i> Add Link
+            </button>
+          </div>
+
+          <!-- Add Link Inline Form -->
+          <div id="addLinkForm" class="hidden flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
+            <select id="newLinkSelect" class="flex-1 px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 outline-none">
+              <option value="">-- Select Related Ticket --</option>
+            </select>
+            <button id="submitAddLinkBtn" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-semibold">Link</button>
+            <button id="cancelAddLinkBtn" class="px-2 py-1.5 text-slate-400 hover:text-slate-600 text-xs">Cancel</button>
+          </div>
+
+          <div id="detailLinksList" class="flex flex-wrap gap-2 text-xs font-mono"></div>
         </div>
 
         <!-- Review Feedback / Notes Audit Trail -->

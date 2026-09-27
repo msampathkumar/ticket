@@ -86,6 +86,12 @@ class TicketDependencyRequest(BaseModel):
     dep_id: str
 
 
+class TicketLinkRequest(BaseModel):
+    directory: str
+    ticket_id: str
+    target_id: str
+
+
 class DirectoryBrowseItem(BaseModel):
     name: str
     path: str

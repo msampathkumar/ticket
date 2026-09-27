@@ -1,6 +1,6 @@
 ---
 id: tic-33b1
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-09-25T13:17:19Z

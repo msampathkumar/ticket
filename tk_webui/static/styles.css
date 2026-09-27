@@ -190,6 +190,18 @@ body.contrast-high.dark .border-r {
   box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.15);
 }
 
+.graph-root-node {
+  width: auto !important;
+  min-width: 220px;
+  max-width: 380px;
+}
+
+.graph-empty-hint {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
 /* Prose markdown styling in modals */
 .prose pre {
   background-color: #1e293b;

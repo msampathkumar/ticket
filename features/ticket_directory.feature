@@ -76,3 +76,10 @@ Feature: Ticket Directory Resolution
     When I run "ticket help"
     Then the command should succeed
     And the output should contain "Minimal, offline task tracker"
+
+  Scenario: Init command initializes repository and creates setup ticket
+    Given the tickets directory does not exist
+    When I run "ticket init"
+    Then the command should succeed
+    And the output should contain "Initialized ticket repository"
+    And the output should contain "Created initial setup ticket"

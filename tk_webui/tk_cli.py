@@ -269,7 +269,7 @@ def update_ticket_content_cli(
     if acceptance is not None:
         args.extend(["--acceptance", acceptance])
     if parent is not None:
-        args.extend(["--parent", parent])
+        args.extend(["--parent", parent if parent != "" else "none"])
     if external_ref is not None:
         args.extend(["--external-ref", external_ref])
 
@@ -317,6 +317,24 @@ def add_dep_cli(directory: str, ticket_id: str, dep_id: str) -> Tuple[bool, str]
 def remove_dep_cli(directory: str, ticket_id: str, dep_id: str) -> Tuple[bool, str]:
     """Remove dependency."""
     args = ["undep", ticket_id, dep_id]
+    code, stdout, stderr = run_tk_cmd(directory, args)
+    if code == 0:
+        return True, stdout
+    return False, stderr or stdout
+
+
+def add_link_cli(directory: str, ticket_id: str, target_id: str) -> Tuple[bool, str]:
+    """Add symmetric link between two tickets."""
+    args = ["link", ticket_id, target_id]
+    code, stdout, stderr = run_tk_cmd(directory, args)
+    if code == 0:
+        return True, stdout
+    return False, stderr or stdout
+
+
+def remove_link_cli(directory: str, ticket_id: str, target_id: str) -> Tuple[bool, str]:
+    """Remove symmetric link between two tickets."""
+    args = ["unlink", ticket_id, target_id]
     code, stdout, stderr = run_tk_cmd(directory, args)
     if code == 0:
         return True, stdout

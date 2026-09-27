@@ -16,6 +16,7 @@ const state = {
   treeZoom: 1.0,
   treeOrientation: localStorage.getItem('tk_tree_orientation') || 'vertical', // 'vertical' (top-down) or 'horizontal' (left-to-right)
   collapsedNodes: new Set(JSON.parse(localStorage.getItem('tk_tree_collapsed') || '[]')),
+  treeStatusFilter: new Set(JSON.parse(localStorage.getItem('tk_tree_status_filter') || '["ready", "in_progress", "blocked"]')),
 };
 
 // DOM elements
@@ -62,6 +63,13 @@ const elements = {
   treeOrientationLabel: document.getElementById('treeOrientationLabel'),
   treeCollapseAllBtn: document.getElementById('treeCollapseAllBtn'),
   treeCollapseAllLabel: document.getElementById('treeCollapseAllLabel'),
+  treeStatusFilterBtn: document.getElementById('treeStatusFilterBtn'),
+  treeStatusFilterSummary: document.getElementById('treeStatusFilterSummary'),
+  treeStatusFilterMenu: document.getElementById('treeStatusFilterMenu'),
+  treeStatusReady: document.getElementById('treeStatusReady'),
+  treeStatusInProgress: document.getElementById('treeStatusInProgress'),
+  treeStatusBlocked: document.getElementById('treeStatusBlocked'),
+  treeStatusClosed: document.getElementById('treeStatusClosed'),
   timelineContainer: document.getElementById('timelineContainer'),
 
   // Settings Modal (tic-6mex)
@@ -516,25 +524,38 @@ function renderTableView() {
   lucide.createIcons();
 }
 
-// 3. RENDER TREE / DEPENDENCY GRAPH VIEW (tic-d04l)
+// 3. RENDER TREE / DEPENDENCY GRAPH VIEW (tic-d04l & tic-s0le)
+function updateTreeStatusSummary() {
+  if (!elements.treeStatusFilterSummary) return;
+  const s = state.treeStatusFilter;
+  if (s.size === 4) {
+    elements.treeStatusFilterSummary.textContent = 'All';
+  } else if (s.size === 0) {
+    elements.treeStatusFilterSummary.textContent = 'None';
+  } else if (s.has('ready') && s.has('in_progress') && s.has('blocked') && !s.has('closed')) {
+    elements.treeStatusFilterSummary.textContent = 'Active';
+  } else {
+    elements.treeStatusFilterSummary.textContent = `${s.size} sel`;
+  }
+}
+
 function renderTreeView() {
   elements.treeContainer.innerHTML = '';
   elements.treeSvgEdges.innerHTML = '';
 
   const isHorizontal = state.treeOrientation === 'horizontal';
   elements.treeOrientationLabel.textContent = isHorizontal ? 'Left-to-Right' : 'Top-Down';
+  updateTreeStatusSummary();
 
-  const tickets = state.filteredTickets;
-  if (tickets.length === 0) {
-    elements.treeContainer.innerHTML = `
-      <div class="flex flex-col items-center justify-center h-96 text-slate-400">
-        <i data-lucide="network" class="w-12 h-12 mb-3 opacity-40"></i>
-        <p class="text-sm">No tickets to display in graph</p>
-      </div>
-    `;
-    lucide.createIcons();
-    return;
-  }
+  // Filter tickets by selected statuses (tic-s0le)
+  const tickets = state.filteredTickets.filter(t => {
+    let category = 'ready';
+    if (t.status === 'closed') category = 'closed';
+    else if (t.is_blocked) category = 'blocked';
+    else if (t.status === 'in_progress') category = 'in_progress';
+    else category = 'ready';
+    return state.treeStatusFilter.has(category);
+  });
 
   const projectName = state.currentDir.split('/').filter(Boolean).pop() || 'Project';
 
@@ -542,8 +563,45 @@ function renderTreeView() {
   const ticketMap = new Map();
   const childrenMap = new Map(); // parentId -> [childTicket]
   const topLevel = [];
+  const parentIds = new Set();
 
-  tickets.forEach(t => ticketMap.set(t.id, t));
+  tickets.forEach(t => {
+    ticketMap.set(t.id, t);
+    if (t.parent) parentIds.add(t.parent);
+  });
+
+  const isAllCollapsed = parentIds.size > 0 && state.collapsedNodes.size >= parentIds.size;
+
+  function createRootNode(pos) {
+    const rootNode = document.createElement('div');
+    rootNode.className = 'graph-node-card graph-root-node flex items-center justify-between gap-3 px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-2xl shadow-xl font-bold text-sm tracking-wide border-2 border-white/20 dark:border-slate-800 transition select-none';
+    rootNode.style.left = `${pos.x}px`;
+    rootNode.style.top = `${pos.y}px`;
+
+    rootNode.innerHTML = `
+      <div class="flex items-center gap-2 min-w-0 flex-1 mr-1">
+        <span class="p-1 bg-white/20 rounded-lg shrink-0"><i data-lucide="folder-git-2" class="w-4 h-4"></i></span>
+        <span class="truncate font-bold text-sm tracking-wide" title="${projectName}">${projectName}</span>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button class="root-add-task-btn p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition shrink-0" title="Create new task">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    `;
+
+    rootNode.addEventListener('click', (e) => {
+      const addBtn = e.target.closest('.root-add-task-btn');
+      if (addBtn) {
+        e.stopPropagation();
+        openNewTicketModal('open');
+        return;
+      }
+      openNewTicketModal('open');
+    });
+
+    return rootNode;
+  }
 
   tickets.forEach(t => {
     if (t.parent && ticketMap.has(t.parent)) {
@@ -581,7 +639,7 @@ function renderTreeView() {
 
     const canvasWidth = Math.max(1200, totalTopWidth + 200);
     let currentX = (canvasWidth - totalTopWidth) / 2;
-    const rootPos = { x: canvasWidth / 2, y: 55 };
+    const rootPos = { x: canvasWidth / 2, y: topLevel.length === 0 ? 140 : 55 };
 
     let maxDepth = 1;
 
@@ -618,15 +676,21 @@ function renderTreeView() {
     elements.treeContainer.style.height = `${canvasHeight}px`;
 
     // Root Node
-    const rootNode = document.createElement('div');
-    rootNode.className = 'graph-node-card flex items-center justify-center gap-2.5 px-6 py-3.5 bg-brand-600 text-white rounded-2xl shadow-xl font-bold text-sm tracking-wide border-2 border-white/20 dark:border-slate-800';
-    rootNode.style.left = `${rootPos.x}px`;
-    rootNode.style.top = `${rootPos.y}px`;
-    rootNode.innerHTML = `
-      <span class="p-1 bg-white/20 rounded-lg"><i data-lucide="folder-git-2" class="w-4 h-4"></i></span>
-      <span>${projectName} Root</span>
-    `;
+    const rootNode = createRootNode(rootPos);
     elements.treeContainer.appendChild(rootNode);
+
+    if (tickets.length === 0) {
+      const emptyHint = document.createElement('div');
+      emptyHint.className = 'graph-empty-hint flex flex-col items-center justify-center text-slate-400 text-xs gap-1 pointer-events-none text-center';
+      emptyHint.style.left = `${rootPos.x}px`;
+      emptyHint.style.top = `${rootPos.y + 60}px`;
+      emptyHint.style.transform = 'translate(-50%, 0)';
+      emptyHint.innerHTML = `
+        <p class="font-medium text-slate-500 dark:text-slate-400">No tasks match current filters</p>
+        <p class="text-[11px] text-slate-400">Click <span class="font-semibold text-brand-600 dark:text-brand-400">+</span> on <span class="font-semibold text-slate-700 dark:text-slate-300">${projectName}</span> to create a task</p>
+      `;
+      elements.treeContainer.appendChild(emptyHint);
+    }
 
     // Hierarchy Lines
     topLevel.forEach(t => {
@@ -675,7 +739,7 @@ function renderTreeView() {
 
     const canvasHeight = Math.max(650, totalTopHeight + 150);
     let currentY = (canvasHeight - totalTopHeight) / 2;
-    const rootPos = { x: 120, y: canvasHeight / 2 };
+    const rootPos = { x: 120, y: topLevel.length === 0 ? canvasHeight / 2 : canvasHeight / 2 };
 
     let maxDepth = 1;
 
@@ -712,15 +776,21 @@ function renderTreeView() {
     elements.treeContainer.style.height = `${canvasHeight}px`;
 
     // Root Node
-    const rootNode = document.createElement('div');
-    rootNode.className = 'graph-node-card flex items-center justify-center gap-2.5 px-6 py-3.5 bg-brand-600 text-white rounded-2xl shadow-xl font-bold text-sm tracking-wide border-2 border-white/20 dark:border-slate-800';
-    rootNode.style.left = `${rootPos.x}px`;
-    rootNode.style.top = `${rootPos.y}px`;
-    rootNode.innerHTML = `
-      <span class="p-1 bg-white/20 rounded-lg"><i data-lucide="folder-git-2" class="w-4 h-4"></i></span>
-      <span>${projectName} Root</span>
-    `;
+    const rootNode = createRootNode(rootPos);
     elements.treeContainer.appendChild(rootNode);
+
+    if (tickets.length === 0) {
+      const emptyHint = document.createElement('div');
+      emptyHint.className = 'graph-empty-hint flex flex-col items-start justify-center text-slate-400 text-xs gap-1 pointer-events-none';
+      emptyHint.style.left = `${rootPos.x + 190}px`;
+      emptyHint.style.top = `${rootPos.y}px`;
+      emptyHint.style.transform = 'translate(0, -50%)';
+      emptyHint.innerHTML = `
+        <p class="font-medium text-slate-500 dark:text-slate-400">No tasks match current filters</p>
+        <p class="text-[11px] text-slate-400">Click <span class="font-semibold text-brand-600 dark:text-brand-400">+</span> on <span class="font-semibold text-slate-700 dark:text-slate-300">${projectName}</span> to create a task</p>
+      `;
+      elements.treeContainer.appendChild(emptyHint);
+    }
 
     // Hierarchy Lines
     topLevel.forEach(t => {
@@ -1015,22 +1085,114 @@ function openDetailModal(ticket) {
     acceptSec.classList.add('hidden');
   }
 
+  renderDetailParent(ticket);
   renderDetailSubtasks(ticket);
   renderDetailDependencies(ticket);
+  renderDetailLinks(ticket);
   renderDetailNotes(ticket);
 
   elements.detailModal.classList.remove('hidden');
   lucide.createIcons();
 }
 
+function getDescendantIds(ticketId) {
+  const descendants = new Set();
+  const queue = [ticketId];
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    for (const t of state.tickets) {
+      if (t.parent === curr && !descendants.has(t.id)) {
+        descendants.add(t.id);
+        queue.push(t.id);
+      }
+    }
+  }
+  return descendants;
+}
+
+function getAncestorIds(ticketId) {
+  const ancestors = new Set();
+  let curr = state.tickets.find(t => t.id === ticketId);
+  while (curr && curr.parent) {
+    if (ancestors.has(curr.parent)) break;
+    ancestors.add(curr.parent);
+    curr = state.tickets.find(t => t.id === curr.parent);
+  }
+  return ancestors;
+}
+
+function renderDetailParent(ticket) {
+  const parentDisplay = document.getElementById('detailParentDisplay');
+  const parentSelect = document.getElementById('detailParentSelect');
+  const toggleBtnLabel = document.getElementById('detailToggleParentLabel');
+  const parentForm = document.getElementById('detailSetParentForm');
+  if (parentForm) parentForm.classList.add('hidden');
+
+  // Populate Parent dropdown with available candidates
+  const descendants = getDescendantIds(ticket.id);
+  const availableParents = state.tickets.filter(t => t.id !== ticket.id && !descendants.has(t.id) && t.id !== ticket.parent);
+  
+  if (parentSelect) {
+    parentSelect.innerHTML = '<option value="">-- Select Parent Ticket --</option>' +
+      availableParents.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+  }
+
+  if (ticket.parent) {
+    const parentTicket = state.tickets.find(t => t.id === ticket.parent);
+    if (toggleBtnLabel) toggleBtnLabel.textContent = 'Change Parent';
+    if (parentTicket) {
+      parentDisplay.innerHTML = `
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-brand-500 transition group cursor-pointer" onclick="openDetailModal(state.tickets.find(x => x.id === '${parentTicket.id}'))">
+          <div class="flex items-center gap-2 truncate">
+            <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${parentTicket.id}</span>
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${parentTicket.title}</span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            ${getStatusBadge(parentTicket.status, parentTicket.is_blocked)}
+            <button title="Unlink Parent" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition" onclick="event.stopPropagation(); setTicketParent('${ticket.id}', '');">
+              <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      parentDisplay.innerHTML = `
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80">
+          <span class="font-mono text-xs text-slate-500">${ticket.parent} (unresolved parent)</span>
+          <button title="Unlink Parent" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition" onclick="setTicketParent('${ticket.id}', '');">
+            <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      `;
+    }
+  } else {
+    if (toggleBtnLabel) toggleBtnLabel.textContent = 'Set Parent';
+    parentDisplay.innerHTML = '<span class="text-slate-400 text-xs italic">No parent ticket (Root-level task).</span>';
+  }
+  lucide.createIcons();
+}
+
 function renderDetailSubtasks(ticket) {
   const container = document.getElementById('detailSubtasksList');
+  const linkChildForm = document.getElementById('linkChildForm');
+  const linkChildSelect = document.getElementById('linkChildSelect');
+  if (linkChildForm) linkChildForm.classList.add('hidden');
+
   if (!container) return;
   container.innerHTML = '';
+
+  // Populate linkChildSelect with candidate children
+  const ancestors = getAncestorIds(ticket.id);
+  const candidateChildren = state.tickets.filter(t => t.id !== ticket.id && !ancestors.has(t.id) && t.parent !== ticket.id);
+  if (linkChildSelect) {
+    linkChildSelect.innerHTML = '<option value="">-- Select Existing Ticket to Link as Child --</option>' +
+      candidateChildren.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+  }
 
   const subtasks = state.tickets.filter(t => t.parent === ticket.id);
   if (subtasks.length === 0) {
     container.innerHTML = '<span class="text-slate-400 text-xs italic">No subtasks created for this ticket.</span>';
+    lucide.createIcons();
     return;
   }
 
@@ -1045,6 +1207,9 @@ function renderDetailSubtasks(ticket) {
       <div class="flex items-center gap-1.5 shrink-0">
         ${getStatusBadge(st.status, st.is_blocked)}
         ${getPriorityBadge(st.priority)}
+        <button title="Unlink Child" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition ml-1" onclick="event.stopPropagation(); setTicketParent('${st.id}', '');">
+          <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
     `;
     item.onclick = () => {
@@ -1052,11 +1217,24 @@ function renderDetailSubtasks(ticket) {
     };
     container.appendChild(item);
   });
+  lucide.createIcons();
 }
 
 function renderDetailDependencies(ticket) {
   const depsList = document.getElementById('detailDepsList');
+  const depSelect = document.getElementById('newDepSelect');
+  const depForm = document.getElementById('addDepForm');
+  if (depForm) depForm.classList.add('hidden');
+
   depsList.innerHTML = '';
+
+  // Populate candidate dependencies
+  const currentDeps = new Set(ticket.deps || []);
+  const candidateDeps = state.tickets.filter(t => t.id !== ticket.id && !currentDeps.has(t.id));
+  if (depSelect) {
+    depSelect.innerHTML = '<option value="">-- Select Blocker / Dependency Ticket --</option>' +
+      candidateDeps.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+  }
 
   if (ticket.deps && ticket.deps.length > 0) {
     ticket.deps.forEach(depId => {
@@ -1074,6 +1252,42 @@ function renderDetailDependencies(ticket) {
   } else {
     depsList.innerHTML = '<span class="text-slate-400 text-xs italic">No dependencies</span>';
   }
+  lucide.createIcons();
+}
+
+function renderDetailLinks(ticket) {
+  const linksList = document.getElementById('detailLinksList');
+  const linkSelect = document.getElementById('newLinkSelect');
+  const linkForm = document.getElementById('addLinkForm');
+  if (linkForm) linkForm.classList.add('hidden');
+
+  if (!linksList) return;
+  linksList.innerHTML = '';
+
+  const currentLinks = new Set(ticket.links || []);
+  const candidateLinks = state.tickets.filter(t => t.id !== ticket.id && !currentLinks.has(t.id));
+  if (linkSelect) {
+    linkSelect.innerHTML = '<option value="">-- Select Related Ticket --</option>' +
+      candidateLinks.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+  }
+
+  if (ticket.links && ticket.links.length > 0) {
+    ticket.links.forEach(linkId => {
+      const linkBadge = document.createElement('div');
+      linkBadge.className = 'flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700';
+      linkBadge.innerHTML = `
+        <i data-lucide="link-2" class="w-3 h-3 text-indigo-500"></i>
+        <span>${linkId}</span>
+        <button title="Remove link" class="text-slate-400 hover:text-rose-500 ml-1 p-0.5" onclick="removeTicketLink('${ticket.id}', '${linkId}')">
+          <i data-lucide="x" class="w-3 h-3"></i>
+        </button>
+      `;
+      linksList.appendChild(linkBadge);
+    });
+  } else {
+    linksList.innerHTML = '<span class="text-slate-400 text-xs italic">No related links</span>';
+  }
+  lucide.createIcons();
 }
 
 function renderDetailNotes(ticket) {
@@ -1273,6 +1487,96 @@ async function removeDependency(ticketId, depId) {
     if (updated) {
       state.activeTicket = updated;
       renderDetailDependencies(updated);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// PARENT AND LINK ACTIONS
+async function setTicketParent(ticketId, parentId) {
+  try {
+    const res = await fetch('/api/tickets', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        directory: state.currentDir,
+        ticket_id: ticketId,
+        parent: parentId || ''
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to update parent');
+    }
+
+    showToast(parentId ? `Linked parent ${parentId} to ${ticketId}` : `Unlinked parent for ${ticketId}`, 'success');
+    await fetchTickets();
+
+    const updated = state.tickets.find(t => t.id === (state.activeTicket ? state.activeTicket.id : ticketId));
+    if (updated) {
+      openDetailModal(updated);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function addTicketLink(ticketId, targetId) {
+  try {
+    const res = await fetch('/api/tickets/links', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        directory: state.currentDir,
+        ticket_id: ticketId,
+        target_id: targetId
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to add link');
+    }
+
+    showToast(`Linked ${ticketId} <-> ${targetId}`, 'success');
+    await fetchTickets();
+
+    const updated = state.tickets.find(t => t.id === ticketId);
+    if (updated) {
+      state.activeTicket = updated;
+      renderDetailLinks(updated);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function removeTicketLink(ticketId, targetId) {
+  try {
+    const res = await fetch('/api/tickets/links', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        directory: state.currentDir,
+        ticket_id: ticketId,
+        target_id: targetId
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to remove link');
+    }
+
+    showToast(`Unlinked ${ticketId} <-> ${targetId}`, 'success');
+    await fetchTickets();
+
+    const updated = state.tickets.find(t => t.id === ticketId);
+    if (updated) {
+      state.activeTicket = updated;
+      renderDetailLinks(updated);
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -1503,18 +1807,115 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('addDepToggleBtn').addEventListener('click', () => {
-    document.getElementById('addDepForm').classList.toggle('hidden');
-  });
-  document.getElementById('submitAddDepBtn').addEventListener('click', () => {
-    const depInput = document.getElementById('newDepIdInput');
-    const depId = depInput.value.trim();
-    if (depId && state.activeTicket) {
-      addDependency(state.activeTicket.id, depId);
-      depInput.value = '';
+  // Parent linking
+  const detailToggleParentBtn = document.getElementById('detailToggleParentBtn');
+  if (detailToggleParentBtn) {
+    detailToggleParentBtn.addEventListener('click', () => {
+      document.getElementById('detailSetParentForm').classList.toggle('hidden');
+    });
+  }
+  const cancelSetParentBtn = document.getElementById('cancelSetParentBtn');
+  if (cancelSetParentBtn) {
+    cancelSetParentBtn.addEventListener('click', () => {
+      document.getElementById('detailSetParentForm').classList.add('hidden');
+    });
+  }
+  const submitSetParentBtn = document.getElementById('submitSetParentBtn');
+  if (submitSetParentBtn) {
+    submitSetParentBtn.addEventListener('click', () => {
+      const parentSelect = document.getElementById('detailParentSelect');
+      const parentId = parentSelect ? parentSelect.value : '';
+      if (parentId && state.activeTicket) {
+        setTicketParent(state.activeTicket.id, parentId);
+        document.getElementById('detailSetParentForm').classList.add('hidden');
+      }
+    });
+  }
+
+  // Link child
+  const linkChildToggleBtn = document.getElementById('linkChildToggleBtn');
+  if (linkChildToggleBtn) {
+    linkChildToggleBtn.addEventListener('click', () => {
+      document.getElementById('linkChildForm').classList.toggle('hidden');
+    });
+  }
+  const cancelLinkChildBtn = document.getElementById('cancelLinkChildBtn');
+  if (cancelLinkChildBtn) {
+    cancelLinkChildBtn.addEventListener('click', () => {
+      document.getElementById('linkChildForm').classList.add('hidden');
+    });
+  }
+  const submitLinkChildBtn = document.getElementById('submitLinkChildBtn');
+  if (submitLinkChildBtn) {
+    submitLinkChildBtn.addEventListener('click', () => {
+      const childSelect = document.getElementById('linkChildSelect');
+      const childId = childSelect ? childSelect.value : '';
+      if (childId && state.activeTicket) {
+        setTicketParent(childId, state.activeTicket.id);
+        document.getElementById('linkChildForm').classList.add('hidden');
+      }
+    });
+  }
+
+  // Add subtask modal opener
+  const addSubtaskModalBtn = document.getElementById('addSubtaskModalBtn');
+  if (addSubtaskModalBtn) {
+    addSubtaskModalBtn.addEventListener('click', () => {
+      if (state.activeTicket) {
+        openNewTicketModal('open', state.activeTicket.id);
+      }
+    });
+  }
+
+  // Add dependency
+  const addDepToggleBtn = document.getElementById('addDepToggleBtn');
+  if (addDepToggleBtn) {
+    addDepToggleBtn.addEventListener('click', () => {
+      document.getElementById('addDepForm').classList.toggle('hidden');
+    });
+  }
+  const cancelAddDepBtn = document.getElementById('cancelAddDepBtn');
+  if (cancelAddDepBtn) {
+    cancelAddDepBtn.addEventListener('click', () => {
       document.getElementById('addDepForm').classList.add('hidden');
-    }
-  });
+    });
+  }
+  const submitAddDepBtn = document.getElementById('submitAddDepBtn');
+  if (submitAddDepBtn) {
+    submitAddDepBtn.addEventListener('click', () => {
+      const depSelect = document.getElementById('newDepSelect');
+      const depId = depSelect ? depSelect.value.trim() : '';
+      if (depId && state.activeTicket) {
+        addDependency(state.activeTicket.id, depId);
+        document.getElementById('addDepForm').classList.add('hidden');
+      }
+    });
+  }
+
+  // Related links
+  const addLinkToggleBtn = document.getElementById('addLinkToggleBtn');
+  if (addLinkToggleBtn) {
+    addLinkToggleBtn.addEventListener('click', () => {
+      document.getElementById('addLinkForm').classList.toggle('hidden');
+    });
+  }
+  const cancelAddLinkBtn = document.getElementById('cancelAddLinkBtn');
+  if (cancelAddLinkBtn) {
+    cancelAddLinkBtn.addEventListener('click', () => {
+      document.getElementById('addLinkForm').classList.add('hidden');
+    });
+  }
+  const submitAddLinkBtn = document.getElementById('submitAddLinkBtn');
+  if (submitAddLinkBtn) {
+    submitAddLinkBtn.addEventListener('click', () => {
+      const linkSelect = document.getElementById('newLinkSelect');
+      const targetId = linkSelect ? linkSelect.value.trim() : '';
+      if (targetId && state.activeTicket) {
+        addTicketLink(state.activeTicket.id, targetId);
+        document.getElementById('addLinkForm').classList.add('hidden');
+      }
+    });
+  }
 
   elements.initTicketsBtn.addEventListener('click', initRepository);
 
@@ -1638,6 +2039,46 @@ function setupEventListeners() {
     if (state.activeTicket) {
       openNewTicketModal('open', state.activeTicket.id);
     }
+  });
+
+  // Tree Status Multi-Select Filter (tic-s0le)
+  function syncTreeStatusCheckboxes() {
+    if (elements.treeStatusReady) elements.treeStatusReady.checked = state.treeStatusFilter.has('ready');
+    if (elements.treeStatusInProgress) elements.treeStatusInProgress.checked = state.treeStatusFilter.has('in_progress');
+    if (elements.treeStatusBlocked) elements.treeStatusBlocked.checked = state.treeStatusFilter.has('blocked');
+    if (elements.treeStatusClosed) elements.treeStatusClosed.checked = state.treeStatusFilter.has('closed');
+    updateTreeStatusSummary();
+  }
+  syncTreeStatusCheckboxes();
+
+  elements.treeStatusFilterBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    elements.treeStatusFilterMenu?.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (elements.treeStatusFilterMenu && !elements.treeStatusFilterMenu.contains(e.target) && !elements.treeStatusFilterBtn?.contains(e.target)) {
+      elements.treeStatusFilterMenu.classList.add('hidden');
+    }
+  });
+
+  [
+    elements.treeStatusReady,
+    elements.treeStatusInProgress,
+    elements.treeStatusBlocked,
+    elements.treeStatusClosed
+  ].forEach(cb => {
+    cb?.addEventListener('change', () => {
+      const val = cb.value;
+      if (cb.checked) {
+        state.treeStatusFilter.add(val);
+      } else {
+        state.treeStatusFilter.delete(val);
+      }
+      localStorage.setItem('tk_tree_status_filter', JSON.stringify([...state.treeStatusFilter]));
+      updateTreeStatusSummary();
+      renderTreeView();
+    });
   });
 
   // Tree Zoom Controls (tic-d04l)

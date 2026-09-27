@@ -27,7 +27,7 @@ find_tickets_dir() {
 }
 
 # Commands that can create .tickets if not found
-WRITE_COMMANDS="create"
+WRITE_COMMANDS="create init"
 
 # Initialize TICKETS_DIR based on command type
 init_tickets_dir() {
@@ -51,7 +51,7 @@ init_tickets_dir() {
     fi
 
     echo "Error: no .tickets directory found (searched parent directories)" >&2
-    echo "Run 'tk create' to initialize, or set TICKETS_DIR env var" >&2
+    echo "Run 'tk init' or 'tk create' to initialize, or set TICKETS_DIR env var" >&2
     return 1
 }
 
@@ -154,7 +154,95 @@ ${field}: ${value}
     fi
 }
 
+# Remove YAML field
+remove_yaml_field() {
+    local file="$1"
+    local field="$2"
+    _sed_i "$file" "/^${field}:/d"
+}
+
+cmd_init() {
+    local target_dir="${1:-.}"
+    if [[ "$target_dir" == *"/.tickets" ]]; then
+        target_dir="${target_dir%/.tickets}"
+    elif [[ "$target_dir" == ".tickets" ]]; then
+        target_dir="."
+    fi
+
+    local abs_dir
+    abs_dir=$(cd "$target_dir" 2>/dev/null && pwd || echo "$target_dir")
+    local folder_name
+    folder_name=$(basename "$abs_dir")
+    local tickets_path="$abs_dir/.tickets"
+
+    local is_reinit=0
+    if [[ -d "$tickets_path" ]]; then
+        is_reinit=1
+    else
+        mkdir -p "$tickets_path"
+    fi
+
+    TICKETS_DIR="$tickets_path"
+
+    # Check if any tickets already exist
+    local ticket_count
+    ticket_count=$(find "$tickets_path" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+
+    if [[ $ticket_count -eq 0 ]]; then
+        local id
+        id=$(generate_id)
+        local file="$tickets_path/${id}.md"
+        local now
+        now=$(_iso_date)
+        local assignee
+        assignee=$(git config user.name 2>/dev/null || true)
+
+        {
+            echo "---"
+            echo "id: $id"
+            echo "status: closed"
+            echo "deps: []"
+            echo "links: []"
+            echo "created: $now"
+            echo "type: task"
+            echo "priority: 2"
+            [[ -n "$assignee" ]] && echo "assignee: $assignee"
+            echo "---"
+            echo "# Setup ticket in $folder_name folder"
+            echo ""
+            echo "Initialized ticket repository in $folder_name."
+            echo ""
+        } > "$file"
+
+        if [[ $is_reinit -eq 1 ]]; then
+            echo "Reinitialized ticket repository in $tickets_path"
+        else
+            echo "Initialized ticket repository in $tickets_path"
+        fi
+        echo "Created initial setup ticket $id (closed)"
+    else
+        echo "Ticket repository already initialized in $tickets_path ($ticket_count tickets)"
+    fi
+}
+
 cmd_create() {
+    local needs_init=0
+    if [[ ! -d "$TICKETS_DIR" ]]; then
+        needs_init=1
+    elif [[ $(find "$TICKETS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ') -eq 0 ]]; then
+        needs_init=1
+    fi
+
+    if [[ $needs_init -eq 1 ]]; then
+        local target_dir="."
+        if [[ "$TICKETS_DIR" == *"/.tickets" ]]; then
+            target_dir="${TICKETS_DIR%/.tickets}"
+        elif [[ "$TICKETS_DIR" == ".tickets" ]]; then
+            target_dir="."
+        fi
+        cmd_init "$target_dir" >/dev/null 2>&1
+    fi
+
     ensure_dir
 
     local title="" description="" design="" acceptance=""
@@ -386,7 +474,7 @@ cmd_update() {
 
     local new_title="" new_desc="" new_prio="" new_type="" new_assignee=""
     local new_tags="" new_design="" new_accept="" new_parent="" new_extref=""
-    local has_title=0 has_desc=0 has_design=0 has_accept=0
+    local has_title=0 has_desc=0 has_design=0 has_accept=0 has_parent=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -398,7 +486,7 @@ cmd_update() {
             --tags) new_tags="$2"; shift 2 ;;
             --design) new_design="$2"; has_design=1; shift 2 ;;
             --acceptance) new_accept="$2"; has_accept=1; shift 2 ;;
-            --parent) new_parent="$2"; shift 2 ;;
+            --parent) new_parent="$2"; has_parent=1; shift 2 ;;
             --external-ref) new_extref="$2"; shift 2 ;;
             *) echo "Unknown option: $1" >&2; return 1 ;;
         esac
@@ -409,12 +497,16 @@ cmd_update() {
     [[ -n "$new_type" ]] && update_yaml_field "$file" "type" "$new_type"
     [[ -n "$new_assignee" ]] && update_yaml_field "$file" "assignee" "$new_assignee"
     [[ -n "$new_extref" ]] && update_yaml_field "$file" "external-ref" "$new_extref"
-    if [[ -n "$new_parent" ]]; then
-        local parent_file
-        parent_file=$(ticket_path "$new_parent") || return 1
-        local pid
-        pid=$(basename "$parent_file" .md)
-        update_yaml_field "$file" "parent" "$pid"
+    if [[ $has_parent -eq 1 ]]; then
+        if [[ -z "$new_parent" || "$new_parent" == "none" || "$new_parent" == "null" || "$new_parent" == "-" ]]; then
+            remove_yaml_field "$file" "parent"
+        else
+            local parent_file
+            parent_file=$(ticket_path "$new_parent") || return 1
+            local pid
+            pid=$(basename "$parent_file" .md)
+            update_yaml_field "$file" "parent" "$pid"
+        fi
     fi
     if [[ -n "$new_tags" ]]; then
         update_yaml_field "$file" "tags" "[${new_tags//,/, }]"
@@ -1677,6 +1769,7 @@ License: MIT
 Usage: $cmd <command> [args]
 
 Commands:
+  init [dir]               Initialize ticket repository with initial setup task
   create [title] [options] Create ticket, prints ID
     -d, --description      Description text
     --design               Design notes
@@ -1984,6 +2077,7 @@ esac
 
 # Built-in commands
 case "${1:-help}" in
+    init)   shift; cmd_init "$@" ;;
     create) shift; cmd_create "$@" ;;
     start)  shift; cmd_start "$@" ;;
     close)  shift; cmd_close "$@" ;;

@@ -16,6 +16,7 @@ from .models import (
     TicketStatusUpdateRequest,
     TicketAddNoteRequest,
     TicketDependencyRequest,
+    TicketLinkRequest,
     DirectoryBrowseItem,
 )
 from .tk_cli import (
@@ -27,6 +28,8 @@ from .tk_cli import (
     add_note_cli,
     add_dep_cli,
     remove_dep_cli,
+    add_link_cli,
+    remove_link_cli,
     init_tickets_dir,
     browse_path,
 )
@@ -152,6 +155,22 @@ def remove_dependency(req: TicketDependencyRequest):
     return {"status": "ok", "message": message}
 
 
+@app.post("/api/tickets/links")
+def add_ticket_link(req: TicketLinkRequest):
+    success, message = add_link_cli(req.directory, req.ticket_id, req.target_id)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "ok", "message": message}
+
+
+@app.delete("/api/tickets/links")
+def remove_ticket_link(req: TicketLinkRequest):
+    success, message = remove_link_cli(req.directory, req.ticket_id, req.target_id)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "ok", "message": message}
+
+
 @app.post("/api/init")
 def initialize_tickets(directory: str = Body(..., embed=True)):
     success, result = init_tickets_dir(directory)
@@ -162,6 +181,14 @@ def initialize_tickets(directory: str = Body(..., embed=True)):
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/favicon.ico")
+def serve_favicon():
+    favicon_file = STATIC_DIR / "favicon.svg"
+    if favicon_file.exists():
+        return FileResponse(favicon_file, media_type="image/svg+xml")
+    return JSONResponse({"message": "Favicon not found"}, status_code=404)
 
 
 @app.get("/")
