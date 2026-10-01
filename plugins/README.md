@@ -12,6 +12,7 @@ All plugins follow the [Plugin Specification (PLUGIN_SPEC.md)](../docs/PLUGIN_SP
 | :--- | :--- | :--- | :--- |
 | [`webui/`](../tk_webui) | `tk webui` | [WEBUI-SPEC.md](../tk_webui/WEBUI-SPEC.md) | Full-featured Kanban, Table, Mind Map DAG, and Timeline dashboard |
 | [`github/`](github/) | `tk github` | [GITHUB-SPEC.md](github/GITHUB-SPEC.md) | Sync GitHub issues & pull requests into local tickets |
+| [`scion-taskforce/`](scion-taskforce/) | `tk scion-taskforce` | [SCION-TASKFORCE-SPEC.md](scion-taskforce/SCION-TASKFORCE-SPEC.md) | Multi-project autonomous worker orchestration with SCION & OpenTelemetry |
 
 > [!NOTE]
 > Utility commands like `ls`, `list`, `edit`, `query`, and `find` are natively built into core `tk`.

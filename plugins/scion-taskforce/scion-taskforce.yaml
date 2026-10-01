@@ -1,0 +1,29 @@
+# scion-taskforce.yaml — Scion Task Force Configuration
+tags:
+  claim: taskforce                              # Tag added when tk-scion-taskforce claims a ticket
+  review: waiting-for-review                    # Tag added when worker finishes and pauses for review
+  ignore:                                       # Opt-out tags that prevent picking up a ticket
+    - no-taskforce
+
+watcher:
+  poll_interval_seconds: 5                      # How often to check registered projects for ready tasks or feedback
+  gc_retention_days: 5                          # Days to keep paused pods after a ticket is closed
+
+provider:
+  driver: scion                                 # Active worker backend (default: scion; swappable in future)
+  scion:
+    harness: ""                                 # Optional harness override (e.g., claude, gemini, codex)
+    template: default                           # SCION agent template (-t)
+    model: ""                                   # Optional model alias or ID (e.g., large)
+    preserve_branch_on_gc: true                 # Pass --preserve-branch on scion delete
+
+telemetry:
+  enabled: true                                 # Enable OpenTelemetry tracing, metrics & structured logs
+  log_dir: ~/.local/state/tk/scion-taskforce/logs # Local directory for OTel JSONL traces, metrics & worker logs
+  mirror_to_project: true                       # Also symlink/write logs under <project>/.tickets/.scion-taskforce-logs
+  otlp_endpoint: ""                             # Optional remote OTLP endpoint (e.g., http://localhost:4318)
+  rotation:
+    retention_days: 30                          # Delete rotated log/OTel files older than N days (default: 30)
+    rotate_at: midnight                         # Daily time-based rotation (daemon.log, otel-*.jsonl, workers/*.log)
+    max_file_size_mb: 100                       # Also rotate early if a single file exceeds this size
+    compress: true                              # gzip rotated files (e.g., otel-traces.jsonl.2026-10-01.gz)
