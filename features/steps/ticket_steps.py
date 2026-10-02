@@ -108,6 +108,31 @@ def step_ticket_has_status(context, ticket_id, status):
     ticket_path.write_text(content)
 
 
+@given(r'ticket "(?P<ticket_id>[^"]+)" has tags "(?P<tags>[^"]+)"')
+def step_ticket_has_tags(context, ticket_id, tags):
+    """Set ticket tags in frontmatter."""
+    ticket_path = Path(context.test_dir) / '.tickets' / f'{ticket_id}.md'
+    content = ticket_path.read_text()
+    tag_list = ', '.join(t.strip() for t in tags.split(',') if t.strip())
+    if re.search(r'^tags: \[.*?\]', content, flags=re.MULTILINE):
+        content = re.sub(r'^tags: \[.*?\]', f'tags: [{tag_list}]', content, flags=re.MULTILINE)
+    else:
+        content = re.sub(r'^status: (\w+)', f'status: \\1\ntags: [{tag_list}]', content, flags=re.MULTILINE)
+    ticket_path.write_text(content)
+
+
+@given(r'ticket "(?P<ticket_id>[^"]+)" has external ref "(?P<ref>[^"]+)"')
+def step_ticket_has_external_ref(context, ticket_id, ref):
+    """Set/replace the external-ref frontmatter field (as written by tk --external-ref)."""
+    ticket_path = Path(context.test_dir) / '.tickets' / f'{ticket_id}.md'
+    content = ticket_path.read_text()
+    if re.search(r'^external[-_]ref: .*$', content, flags=re.MULTILINE):
+        content = re.sub(r'^external[-_]ref: .*$', f'external-ref: {ref}', content, flags=re.MULTILINE)
+    else:
+        content = re.sub(r'^status: (\w+)', f'status: \\1\nexternal-ref: {ref}', content, flags=re.MULTILINE)
+    ticket_path.write_text(content)
+
+
 @given(r'ticket "(?P<ticket_id>[^"]+)" depends on "(?P<dep_id>[^"]+)"')
 def step_ticket_depends_on(context, ticket_id, dep_id):
     """Add dependency to ticket."""
@@ -525,6 +550,23 @@ def step_ticket_contains(context, ticket_id, text):
     assert text in content, f"Ticket does not contain '{text}'\nContent: {content}"
 
 
+@then(r'ticket "(?P<ticket_id>[^"]+)" should not contain "(?P<text>[^"]+)"')
+def step_ticket_not_contains(context, ticket_id, text):
+    """Assert ticket file does not contain text."""
+    ticket_path = Path(context.test_dir) / '.tickets' / f'{ticket_id}.md'
+    content = ticket_path.read_text()
+    assert text not in content, f"Ticket should not contain '{text}'\nContent: {content}"
+
+
+@then(r'the file "(?P<rel_path>[^"]+)" should contain "(?P<text>[^"]+)"')
+def step_file_contains(context, rel_path, text):
+    """Assert a file relative to test_dir contains text."""
+    fpath = Path(context.test_dir) / rel_path
+    assert fpath.exists(), f"File {fpath} does not exist"
+    content = fpath.read_text()
+    assert text in content, f"File {rel_path} does not contain '{text}'\nContent: {content}"
+
+
 @then(r'ticket "(?P<ticket_id>[^"]+)" should contain a timestamp in notes')
 def step_ticket_has_timestamp_in_notes(context, ticket_id):
     """Assert ticket has a timestamp in notes section."""
@@ -739,3 +781,185 @@ exec "$TK_SCRIPT" super create "$@"
 def step_run_with_plugins(context, command):
     """Run a command with plugins in PATH."""
     run_with_plugin_path(context, command)
+
+
+# ============================================================================
+# SCION Task Force Steps (fake `scion` runtime)
+# ============================================================================
+
+FAKE_SCION_SCRIPT = '''#!/usr/bin/env python3
+"""Fake `scion` CLI for tests. Modes (FAKE_SCION_MODE): ok | fail | silent."""
+import json, os, sys
+state_file = os.environ["FAKE_SCION_STATE"]
+mode = os.environ.get("FAKE_SCION_MODE", "ok")
+args = sys.argv[1:]
+pos, skip = [], False
+for a in args:
+    if skip:
+        skip = False
+        continue
+    if a in ("--project", "--format", "--branch", "--profile", "--harness-config", "--template", "--model"):
+        skip = True
+        continue
+    if a.startswith("-"):
+        continue
+    pos.append(a)
+cmd = pos[0] if pos else ""
+name = pos[1] if len(pos) > 1 else ""
+def load():
+    return json.load(open(state_file)) if os.path.exists(state_file) else {}
+def save(d):
+    json.dump(d, open(state_file, "w"))
+if mode == "fail":
+    print("Error: podman ps failed: exit status 125", file=sys.stderr)
+    sys.exit(125)
+d = load()
+if cmd == "start":
+    if mode != "silent":
+        d[name] = "running"
+    save(d)
+    prompts_file = state_file + ".prompts"
+    prompts = json.load(open(prompts_file)) if os.path.exists(prompts_file) else {}
+    prompts[name] = pos[2] if len(pos) > 2 else ""
+    json.dump(prompts, open(prompts_file, "w"))
+    print(f"started {name}"); sys.exit(0)
+if cmd in ("list", "ls"):
+    print(json.dumps([{"name": k, "phase": v} for k, v in d.items()])); sys.exit(0)
+if cmd in ("suspend", "stop"):
+    d[name] = "stopped"; save(d); sys.exit(0)
+if cmd in ("message", "resume"):
+    d[name] = "running"; save(d); sys.exit(0)
+if cmd == "delete":
+    d.pop(name, None); save(d); sys.exit(0)
+if cmd == "logs":
+    print(f"logs {name}"); sys.exit(0)
+sys.exit(0)
+'''
+
+
+@given(r'a fake "scion" runtime in mode "(?P<mode>ok|fail|silent)"')
+def step_fake_scion(context, mode):
+    """Install a fake scion binary on PATH that simulates the runtime."""
+    create_plugin(context, 'scion', FAKE_SCION_SCRIPT)
+    os.environ['FAKE_SCION_STATE'] = str(Path(context.test_dir) / 'fake_scion_state.json')
+    os.environ['FAKE_SCION_MODE'] = mode
+
+
+@given(r'the scion-taskforce setting "(?P<key>[^"]+)" is "(?P<value>[^"]+)"')
+def step_taskforce_setting(context, key, value):
+    """Write a dotted key (e.g. watcher.max_concurrent_per_project) into .tickets/scion-taskforce.yaml."""
+    cfg_path = Path(context.test_dir) / '.tickets' / 'scion-taskforce.yaml'
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = getattr(context, 'taskforce_settings', {})
+    settings[key] = value
+    context.taskforce_settings = settings
+    tree = {}
+    for dotted, val in settings.items():
+        node = tree
+        parts = dotted.split('.')
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        node[parts[-1]] = val
+    def dump(node, indent=0):
+        out = ''
+        for k, v in node.items():
+            if isinstance(v, dict):
+                out += ' ' * indent + f'{k}:\n' + dump(v, indent + 2)
+            else:
+                out += ' ' * indent + f'{k}: {v}\n'
+        return out
+    cfg_path.write_text(dump(tree))
+
+
+@then(r'the fake scion runtime should have (?P<count>\d+) pod\(s\)')
+def step_fake_scion_pod_count(context, count):
+    """Assert number of pods the fake runtime knows about."""
+    state_file = Path(os.environ['FAKE_SCION_STATE'])
+    pods = json.loads(state_file.read_text()) if state_file.exists() else {}
+    assert len(pods) == int(count), f"Expected {count} pods but fake runtime has {len(pods)}: {pods}"
+
+
+# ============================================================================
+# Installer (install.sh) steps — sandboxed: BIN_DIR and HOME live in test_dir
+# ============================================================================
+
+@when(r'I run the installer with "(?P<args>[^"]*)"')
+def step_run_installer(context, args):
+    """Run the repo-level install.sh with BIN_DIR/HOME redirected into the sandbox.
+
+    Only --core/--github/--scion-taskforce/--skill/--help/bad flags are exercised;
+    --webui is avoided because it would build a Python venv.
+    """
+    repo_root = Path(get_ticket_script(context)).resolve().parent
+    bin_dir = Path(context.test_dir) / 'bin'
+    home_dir = Path(context.test_dir) / 'home'
+    home_dir.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env['BIN_DIR'] = str(bin_dir)
+    env['HOME'] = str(home_dir)
+
+    result = subprocess.run(
+        f'bash "{repo_root / "install.sh"}" {args}',
+        shell=True,
+        cwd=context.test_dir,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        env=env,
+    )
+    context.result = result
+    context.stdout = result.stdout.strip()
+    context.stderr = result.stderr.strip()
+    context.returncode = result.returncode
+    context.last_command = f'install.sh {args}'
+
+
+@then(r'the installed executable "(?P<name>[^"]+)" should exist')
+def step_installed_exec_exists(context, name):
+    """Assert an executable was placed in the sandbox BIN_DIR."""
+    path = Path(context.test_dir) / 'bin' / name
+    assert path.exists(), f"Expected {path} to exist; bin contains: {sorted(p.name for p in path.parent.glob('*')) if path.parent.exists() else 'nothing'}"
+    assert os.access(path, os.X_OK), f"{path} is not executable"
+
+
+@then(r'the installed executable "(?P<name>[^"]+)" should not exist')
+def step_installed_exec_missing(context, name):
+    """Assert an executable was NOT placed in the sandbox BIN_DIR."""
+    path = Path(context.test_dir) / 'bin' / name
+    assert not path.exists(), f"Did not expect {path} to exist"
+
+
+@given(r'the fake scion pod "(?P<pod>[^"]+)" is in state "(?P<pod_state>[^"]+)"')
+def step_fake_scion_set_pod_state(context, pod, pod_state):
+    """Simulate a pod crash/stop/exit outside the orchestrator's control."""
+    state_file = Path(os.environ['FAKE_SCION_STATE'])
+    pods = json.loads(state_file.read_text()) if state_file.exists() else {}
+    assert pod in pods, f"Fake runtime has no pod {pod!r}; known: {sorted(pods)}"
+    pods[pod] = pod_state
+    state_file.write_text(json.dumps(pods))
+
+
+@then(r'the fake scion prompt for "(?P<pod>[^"]+)" should contain "(?P<text>[^"]+)"')
+def step_fake_scion_prompt_contains(context, pod, text):
+    """Assert on the brief the orchestrator handed to `scion start`."""
+    prompts_file = Path(os.environ['FAKE_SCION_STATE'] + '.prompts')
+    prompts = json.loads(prompts_file.read_text()) if prompts_file.exists() else {}
+    prompt = prompts.get(pod, '')
+    assert text in prompt, f"Expected prompt for {pod} to contain {text!r}.\nPrompt was:\n{prompt}"
+
+
+@then(r'the fake scion prompt for "(?P<pod>[^"]+)" should not contain "(?P<text>[^"]+)"')
+def step_fake_scion_prompt_not_contains(context, pod, text):
+    prompts_file = Path(os.environ['FAKE_SCION_STATE'] + '.prompts')
+    prompts = json.loads(prompts_file.read_text()) if prompts_file.exists() else {}
+    prompt = prompts.get(pod, '')
+    assert text not in prompt, f"Did not expect prompt for {pod} to contain {text!r}.\nPrompt was:\n{prompt}"
+
+
+@given(r'a file "(?P<rel_path>[^"]+)" with content "(?P<content>[^"]+)"')
+def step_file_with_content(context, rel_path, content):
+    """Create an arbitrary file inside the scenario sandbox."""
+    path = Path(context.test_dir) / rel_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content + "\n")

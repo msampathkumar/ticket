@@ -7,8 +7,8 @@ Thank you for your interest in contributing to `tk`! We welcome bug reports, fea
 ## 🏗️ Architecture & Philosophy
 
 1. **Zero Mandatory Dependencies for Core**: The core `ticket` executable must remain pure POSIX Bash using standard Unix tools (`awk`, `sed`). No runtime dependencies (Python, Node, Go) are required for base ticket tracking.
-2. **Decoupled Plugins**: Extended functionality (such as the interactive Web UI and GitHub sync) resides in modular plugins discovered via `$PATH`.
-3. **Spec-Driven**: Feature changes must follow and update specifications in `docs/SPEC.md` and `tk_webui/WEBUI-SPEC.md`.
+2. **Decoupled, Optional Plugins**: Extended functionality (the interactive Web UI, GitHub sync, SCION Task Force orchestration) resides in modular plugins under `plugins/<name>/`, discovered via `$PATH` and listed automatically by `tk help`. The core script must never depend on, import, or special-case a plugin. Optional plugins are installed only on request (`./install.sh --<plugin>` or `--all`), never by the default `--full` bundle.
+3. **Spec-Driven**: Feature changes must follow and update the relevant specification: `docs/SPEC.md` (core), `docs/PLUGIN_SPEC.md` (plugin standard), and the plugin's own `<PLUGIN-NAME>-SPEC.md` (e.g. `tk_webui/WEBUI-SPEC.md`, `plugins/github/GITHUB-SPEC.md`, `plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md`).
 
 ---
 

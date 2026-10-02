@@ -1981,6 +1981,11 @@ tk github list                 # List synced GitHub tickets
 tk github unsync -y            # Remove synced tickets
 ```
 
+### 5. Other Optional Plugins
+Plugins are discovered automatically: `tk help` lists every installed `tk-<name>` with a one-line description, so check it before assuming a command exists.
+
+- **`tk scion-taskforce`** (optional): a daemon that launches an autonomous SCION coding worker for each ticket a *human* has tagged `taskforce`. **Agents must not add the `taskforce` tag themselves.** If you are the worker, finish by `tk add-note <id> "..."` and tag the ticket `waiting-for-review`; use `tk scion-taskforce status` to inspect the pool.
+
 ## Agent Best Practices
 
 1. **Check `tk ready` before picking up work**:

@@ -4,6 +4,7 @@
 
 ### Changed
 - Extracted `edit`, `ls`, `query`, and `migrate-beads` commands to plugins (ticket-extras)
+- `install.sh`: flags now accumulate (`./install.sh --core --github`), `--help` lists targets, unknown flags fail instead of silently defaulting to `--full`, and the summary reports which optional plugins were skipped. Optional plugin targets delegate to the plugin's own installer when one exists.
 
 ### Added
 - Plugin system: executables named `tk-<cmd>` or `ticket-<cmd>` in PATH are invoked automatically
@@ -13,6 +14,8 @@
 - Plugin metadata: `# tk-plugin:` comment for scripts, `--tk-describe` flag for binaries
 - Multi-package distribution: `ticket-core`, `ticket-extras`, and individual plugin packages
 - CI scripts for publishing to Homebrew tap and AUR
+- Optional `tk github` plugin (`./install.sh --github`): sync GitHub issues & PRs into `.tickets/`
+- Optional `tk scion-taskforce` plugin (`./install.sh --scion-taskforce`): single global daemon that spawns a SCION worker per ticket tagged `taskforce`, verifies launch, pauses on `waiting-for-review`, detects lost/crashed pods, PR-review vs implementation worker briefs (`worker.prompt_file` override), 1 worker/project by default (hub-mode pods share the checkout), isolated-worktree support for `scion init` projects (ticket mirrored in, notes + review tag merged back), auto-accepts the Claude "trust this folder" prompt that otherwise stalls project-local pods, OpenTelemetry logs with 30-day rotation
 
 ### Plugins
 - ticket-edit 1.0.0: Open ticket in $EDITOR (extracted from core)

@@ -21,6 +21,10 @@ def before_scenario(context, scenario):
     """Create a fresh temporary directory for each scenario."""
     # Create a temporary directory for this scenario
     context.test_dir = tempfile.mkdtemp(prefix='ticket_test_')
+    os.environ['TK_SCION_TASKFORCE_STATE_DIR'] = str(Path(context.test_dir) / '.state')
+    os.environ['TK_SCION_TASKFORCE_LOG_DIR'] = str(Path(context.test_dir) / '.state' / 'logs')
+    # Isolate from the developer's real ~/.config/tk/scion-taskforce.yaml
+    os.environ['XDG_CONFIG_HOME'] = str(Path(context.test_dir) / '.config')
 
     # Initialize tracking
     context.tickets = {}
@@ -36,6 +40,8 @@ def after_scenario(context, scenario):
         shutil.rmtree(context.test_dir)
     if hasattr(context, 'plugin_dir') and os.path.exists(context.plugin_dir):
         shutil.rmtree(context.plugin_dir)
+    for var in ('FAKE_SCION_STATE', 'FAKE_SCION_MODE', 'XDG_CONFIG_HOME'):
+        os.environ.pop(var, None)
 
 
 def before_feature(context, feature):

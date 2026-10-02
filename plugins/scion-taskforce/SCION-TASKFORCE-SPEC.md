@@ -6,7 +6,7 @@
 - **Default Worker Provider**: [SCION (`GoogleCloudPlatform/scion`)](https://github.com/GoogleCloudPlatform/scion) *(pluggable driver architecture)*
 - **Daemon Model**: Single global multi-project instance (`~/.local/state/tk/scion-taskforce.json`), matching `tk-webui`
 - **Version**: `0.1.0`
-- **Status**: Design Specification (`tic-822k`)
+- **Status**: Implemented — Standalone Optional Plugin (`tic-822k`)
 
 ---
 
@@ -18,7 +18,7 @@
 
 Just like `tk-webui`, **only one `tk-scion-taskforce` daemon instance runs on the host** (`~/.local/state/tk/scion-taskforce.json`) and works across **multiple projects** simultaneously:
 1. Continuously watches `.tickets/` directories across all registered projects for newly created or unblocked (`ready`) tickets.
-2. Respects opt-out tags (`no-taskforce`) and tags claimed tickets with `taskforce` (user-configurable via `scion-taskforce.yaml`) before transitioning them to `in_progress`.
+2. **Opt-in**: only picks up ready tickets that the *user* tagged `taskforce` (`tags.claim`, configurable); `no-taskforce` (`tags.ignore`) is a hard override. The daemon never adds the opt-in tag itself.
 3. Spawns a dedicated SCION worker container/pod **on the specific project where the task was created**, with the **worker/container ID matching the exact ticket ID** (e.g., `tic-822k`).
 4. Instructs the SCION worker agent to complete the task, report progress back via the `tk` CLI, keep the ticket `in_progress` with the label `waiting-for-review` (`waiting for review`), and **pause (`suspend`)** the worker instance.
 5. Monitors reviewed tickets across projects for human feedback (new notes/comments) and automatically wakes the paused worker instance with the feedback (`scion message <id> --wake`), while also allowing users to manually unpause and attach (`tk scion-taskforce attach <id>`) for deeper interactive conversations.
@@ -102,7 +102,24 @@ class WorkerProvider(ABC):
     @abstractmethod
     def stream_logs(self, project_dir: Path, ticket_id: str, follow: bool = False) -> Iterator[str]:
         """Retrieve or stream stdout/stderr logs from worker <ticket_id>."""
+
+    # Optional hooks (no-op defaults) — override when the backend isolates workspaces or
+    # needs help getting past interactive harness start-up prompts.
+    def workspace_path(self, project_dir: str, worker_id: str) -> Path | None:
+        """Host path of the worker's *isolated* checkout, or None when it shares the project dir."""
+        return None
+
+    def post_spawn(self, project_dir: str, worker_id: str, timeout_seconds: int = 40) -> str | None:
+        """Run right after the pod is verified running (e.g. auto-accept a trust dialog)."""
+        return None
 ```
+
+The SCION implementation of the hooks:
+
+| Hook | SCION behaviour |
+| :--- | :--- |
+| `workspace_path` | Returns `<project>/.scion/agents/<id>/workspace` when the project was initialised with `scion init` (project-local mode → one git worktree per agent on branch `<id>`); returns `None` for hub/external projects where the live checkout is mounted at `/workspace`. |
+| `post_spawn` | Looks up the container via `scion list --format json`, then for up to `watcher.spawn_prompt_unblock_seconds` runs `podman exec -u <container_user> <cid> tmux capture-pane -p -t <tmux_session>`; when the pane shows one of `provider.scion.auto_accept_prompt_patterns` (default *"Yes, I trust this folder"*) it sends `tmux send-keys Enter`, and stops as soon as a `harness_ready_patterns` entry appears. Disabled with `auto_accept_prompts: false`. |
 
 ### 2.4 Plugin Directory Layout
 
@@ -183,7 +200,9 @@ stateDiagram-v2
     Open --> Blocked: Unresolved dependencies in deps[]
     Blocked --> Open: Upstream dependencies closed
 
-    Open --> InProgress_Working: tk-scion-taskforce claims ticket\n+ adds tag 'taskforce' (configurable)\n+ runs 'tk start <id>'\n+ spawns worker on that project ('scion -g <proj> start <id>')
+    Open --> Launching: User tags ticket 'taskforce' (opt-in)\n+ deps closed ('tk ready')\n+ provider preflight OK
+    Launching --> Open: spawn rejected OR pod never reports 'running'\n(ticket left untouched, error logged, project dispatch paused this pass)
+    Launching --> InProgress_Working: pod verified running\n-> status: in_progress
 
     InProgress_Working --> InProgress_Review: Worker finishes task\n+ runs 'tk add-note <id>'\n+ adds tag 'waiting-for-review'\n+ worker pauses ('scion -g <proj> suspend <id>')
 
@@ -203,28 +222,34 @@ stateDiagram-v2
 
 ## 4. Detailed Operational Workflows
 
-### 4.1 Multi-Project Ticket Selection & Opt-Out Filtering (`no-taskforce`)
-The singleton `tk-scion-taskforce` daemon iterates through all registered project directories in `~/.local/state/tk/scion-taskforce.json` on file-change events (or every `poll_interval_seconds`, default 5s):
+### 4.1 Multi-Project Ticket Selection — Opt-In (`taskforce`) & Opt-Out (`no-taskforce`)
+The singleton `tk-scion-taskforce` daemon iterates through all registered project directories in `~/.local/state/tk/scion-taskforce.json` every `poll_interval_seconds` (default 15s):
 
-1. **Dependency Check**: For each project directory, runs `TICKETS_DIR="<project>/.tickets" "$TK_SCRIPT" super ready` to identify all `open` tickets whose dependencies (`deps: [...]`) are all `closed`.
-2. **Opt-Out Tag Check**: Reads the `tags` frontmatter field of each candidate ticket. If the ticket carries any tag listed in `tags.ignore` (default: `no-taskforce`, matched case-insensitively), `tk-scion-taskforce` **skips** the ticket.
-3. **Idempotency Check**: Calls `provider.get_status(project_dir, ticket_id)` (for SCION: `scion --project <project_dir> list --format json`) to verify whether a worker named `<ticket-id>` already exists.
+1. **Dependency Check**: For each project directory, identifies all `open` tickets whose dependencies (`deps: [...]`) are all `closed` (equivalent to `tk ready`).
+2. **Opt-In Tag Check**: A ticket is a candidate **only if the user added** the `tags.claim` tag (default: `taskforce`). The daemon never adds this tag itself — hand a ticket to the task force with `tk update <id> --tags <existing>,taskforce` (or from the Web UI).
+3. **Opt-Out Tag Check**: If the ticket also carries any `tags.ignore` tag (default: `no-taskforce`) or is already `waiting-for-review`, it is **skipped**.
+4. **Provider Pre-flight (once per project per pass)**: Calls `provider.preflight(project_dir)` (for SCION: `scion --project <project_dir> list --format json`). If the runtime (podman/docker/k8s) is unreachable, dispatch for that project is paused for this pass, a single `ERROR` is logged on the health transition, and `tk scion-taskforce status` shows ❌ next to the project.
+5. **Concurrency Gate**: Stops dispatching when `watcher.max_concurrent_per_project` (default **1**) workers are running in the project, or `watcher.max_concurrent` (default 10) globally. As soon as a working task finishes (`waiting-for-review` or `closed`), the next opted-in ready ticket is started on the following pass.
+   > [!WARNING]
+   > **Why 1 per project by default.** SCION has two project modes and the safe limit depends on which one your repo is in:
+   >
+   > | Mode | How you get it | What each pod sees | Safe `max_concurrent_per_project` |
+   > | :--- | :--- | :--- | :--- |
+   > | **Hub / external** | repo has no `.scion/` directory | the *live* checkout mounted at `/workspace` — every worker shares one working tree and will switch branches, stash and rebase under each other (observed in the field: 10 concurrent workers left a repo on a worker branch with 5 stray stashes and swallowed the untracked `.tickets/` directory) | **1** |
+   > | **Project-local** | you ran `scion init` once in the repo (creates `.scion/` and ignores `.scion/agents/`) | its own git worktree at `<repo>/.scion/agents/<id>/workspace` on branch `<id>`; the daemon mirrors the ticket file in and merges notes/review tag back (§4.3) | can be raised (e.g. 3–5) |
+   >
+   > Different projects are always independent and run in parallel up to `max_concurrent`. **Recommended:** run `scion init` in every repo you hand to the task force (see §10).
+6. **Liveness Sweep (every pass)**: For each tracked `running` worker without the review tag, `provider.health()` is consulted. If the pod is gone, stopped or crashed (e.g. container exit 137/255), the worker is marked `error`, a `worker.lost` span + `ERROR` log is emitted, and a triage note is appended to the ticket (which stays `in_progress`). The slot is freed immediately. `tk reopen <id>` (keeping the `taskforce` tag) makes the daemon delete the dead pod (`--preserve-branch`) and relaunch.
+7. **Idempotency Check**: Calls `provider.health(project_dir, ticket_id)` to see whether a worker named `<ticket-id>` already exists (a running one is adopted; a stopped one is reported and left for `attach`).
 
-### 4.2 Claiming & Spawning the SCION Worker (`1:1 ID Mapping`)
-When an eligible `open` ticket `<id>` (e.g., `tic-822k`) is found in `<project_dir>`:
+### 4.2 Verified Spawn & Claim (`1:1 ID Mapping`, never fire-and-forget)
+When an eligible opted-in `open` ticket `<id>` (e.g., `tic-822k`) is found in `<project_dir>`, the daemon follows a **launch → verify → claim** sequence. The ticket is **not** modified until the worker pod is confirmed running:
 
 1. **Initialize OpenTelemetry Root Trace**:
-   `tk-scion-taskforce` generates a W3C `trace_id` and `span_id` (`TRACEPARENT="00-<trace_id>-<span_id>-01"`) for the ticket lifecycle and writes a `ticket.claim` span to `otel-traces.jsonl`.
-2. **Tag with `taskforce` (or configured `tags.claim`)**:
-   `tk-scion-taskforce` appends the configured claim tag (default: `taskforce`) to the ticket's existing `tags` list:
-   ```bash
-   TICKETS_DIR="<project_dir>/.tickets" tk update <id> --tags "<existing-tags>,taskforce"
-   ```
-3. **Transition Status to `in_progress`**:
-   ```bash
-   TICKETS_DIR="<project_dir>/.tickets" tk start <id>
-   ```
-4. **Provision & Launch Worker on Target Project**:
+   `tk-scion-taskforce` generates a W3C `trace_id` and `span_id` (`TRACEPARENT="00-<trace_id>-<span_id>-01"`) for the ticket lifecycle.
+2. **Launch** (`provider.spawn`): see step 4 below. If the provider rejects the request (non-zero exit, e.g. `podman ps failed`), the stderr is logged as an `ERROR` span/log line, the ticket stays `open`, and no further tickets are dispatched in that project during this pass.
+3. **Verify** (`provider.wait_until_running`): polls `provider.health(project_dir, <id>)` every `watcher.spawn_verify_poll_seconds` (2s) until the pod reports `running`, for at most `watcher.spawn_verify_timeout_seconds` (30s). If it never does, the ticket stays `open`, the worker is recorded with state `error` in `scion-taskforce.json` (visible in `tk scion-taskforce list`) so it is not blindly re-spawned, and the failure is traced.
+4. **Provision & Launch Worker on Target Project** (the actual `spawn` call):
    Using the default `scion` provider, `tk-scion-taskforce` launches a SCION worker container scoped to `<project_dir>`, using the **exact `<ticket-id>`** as the worker name and enabling telemetry:
    ```bash
    scion --project "<project_dir>" start "<id>" \
@@ -236,21 +261,38 @@ When an eligible `open` ticket `<id>` (e.g., `tic-822k`) is found in `<project_d
      --label "trace-id=<trace_id>" \
      --non-interactive
    ```
-5. **Record Dispatch Audit State & Start Local Log Sink**:
+5. **Claim (only after verification)**: transition the ticket to `in_progress`. The user's opt-in tag is left exactly as they set it:
+   ```bash
+   TICKETS_DIR="<project_dir>/.tickets" tk start <id>
+   ```
+5a. **Post-spawn unblock** (`provider.post_spawn`): a verified-running pod can still be stuck on an interactive harness dialog. In project-local SCION mode Claude Code's trust is seeded for the *host* path and `/workspace`, but the worktree is mounted at `/repo-root/.scion/agents/<id>/workspace`, so every worker sat on *"Yes, I trust this folder"* forever (idle pods, exit 255 on suspend). The daemon now watches the pod's tmux pane for up to `watcher.spawn_prompt_unblock_seconds` (40s) and presses Enter on known prompts, logging `auto-accepted harness prompt`.
+5b. **Workspace mirror**: when `provider.workspace_path()` reports an isolated worktree, the daemon copies `.tickets/<id>.md` into `<workspace>/.tickets/` if it is missing (`.tickets/` is often untracked and therefore absent from a fresh worktree), so the brief's *"edit `.tickets/<id>.md`"* instruction works. The log line `isolated workspace <path>; ticket edits will be merged back` confirms the mode.
+6. **Record Dispatch Audit State & Start Local Log Sink**:
    `tk-scion-taskforce` records a state snapshot in `~/.local/state/tk/scion-taskforce/state/<project_slug>/<id>.json` and streams worker container output to `~/.local/state/tk/scion-taskforce/logs/workers/<project_slug>/<id>.log` (and optionally symlinks/mirrors to `<project_dir>/.tickets/.scion-taskforce-logs/`).
 
 ### 4.3 Task Completion, Reporting & Auto-Pause (`waiting for review`)
+
+#### Worker brief (what the pod is told)
+`build_worker_prompt()` hands every pod a brief with the full `tk show <id>` output plus a job section chosen by `classify_work_type()`:
+
+| Work type | Trigger | Job section |
+| :--- | :--- | :--- |
+| `review` | any tag in `worker.review_tags` (default `pr`, `review`) **or** `external-ref` starting with a `worker.review_ref_prefixes` entry (default `gh-pr-`) — i.e. tickets created by `tk github sync --prs` | Fetch the PR (`gh pr checkout <n>` / `git fetch origin pull/<n>/head`), review the diff (correctness, tests, security, spec compatibility, docs), run the suite, write **Summary / Blocking issues / Suggestions / Verdict** with `path:line` findings; may post the same text as a PR comment if `gh` is authenticated; never approve/merge. |
+| `implement` | everything else | Implement on branch `<id>`, run tests/lints, commit, write **Summary / Files touched / Verification / Open questions**. |
+
+Both briefs end with the same **Reporting Back** protocol, written for a pod where `tk` is **not** installed: edit `.tickets/<id>.md` directly (append a `**<UTC ts>**` note block under `## Notes`, set `tags: [taskforce, waiting-for-review]`, keep `status: in_progress`), never close the ticket, never push/merge/rebase/stash (shared checkout). A fully custom brief can be supplied via `worker.prompt_file` (placeholders `{ticket_id} {ticket_title} {project_dir} {branch} {work_type} {claim_tag} {review_tag} {external_ref} {ticket_details}`).
+
+#### Isolated-workspace merge-back (project-local SCION)
+When the worker edits its *own copy* of the ticket inside a worktree, the project's `.tickets/<id>.md` would never see it. Step 0 of every reconcile pass therefore calls `merge_worker_ticket_copy()` for each `running`/`paused` worker with a workspace. The merge is **additive only**: notes the main ticket does not already have (matched by timestamp + text) are appended and the `waiting-for-review` tag is copied over. Status, title, body and any other tag changes made by the worker are ignored — a worker can never close or rewrite a ticket. Log line: `<id>: merged N note(s) and the 'waiting-for-review' tag from the worker workspace`. The auto-pause below then fires on the same pass.
+
 When the worker agent finishes executing the task:
 
-1. **Report Back via `tk`**:
-   The agent appends a structured completion report to the ticket:
-   ```bash
-   tk add-note <id> "Completed implementation and verified tests. Ready for human review."
-   ```
+1. **Report Back**:
+   The agent appends a structured completion report to the ticket, via `tk add-note <id> "..."` when `tk` is available in the pod, otherwise by editing `.tickets/<id>.md` directly as instructed in the brief.
 2. **Keep Status `in_progress` with Review Label**:
    The ticket remains in `status: in_progress` and is tagged with `waiting-for-review` (displayed in UI/CLI as `waiting for review`):
    ```bash
-   tk update <id> --tags "taskforce,waiting-for-review"
+   tk update <id> --tags "taskforce,waiting-for-review"     # or edit the frontmatter directly
    ```
 3. **Pause (`suspend`) the Worker Instance**:
    When `tk-scion-taskforce` detects the `waiting-for-review` tag (or the worker enters `waiting_for_input`/`idle`), it calls `provider.suspend(project_dir, id)` and emits a `worker.suspend` OTel span:
@@ -312,7 +354,7 @@ Users can customize tags, polling intervals, retention windows, the active worke
 Configuration resolution order (allowing global defaults with optional per-project overrides):
 1. Explicit CLI flag: `--config <path>`
 2. Project-level override: `<project_dir>/.tickets/scion-taskforce.yaml`
-3. Global user config: `~/.config/tk/scion-taskforce.yaml`
+3. Global user config: `$XDG_CONFIG_HOME/tk/scion-taskforce.yaml` (default `~/.config/tk/scion-taskforce.yaml`; `tk scion-taskforce init --global --force` regenerates it after upgrades)
 4. Built-in defaults (`plugins/scion-taskforce/scion-taskforce.yaml`)
 
 Running `tk scion-taskforce init [--global]` generates a starter `scion-taskforce.yaml`:
@@ -320,14 +362,23 @@ Running `tk scion-taskforce init [--global]` generates a starter `scion-taskforc
 ```yaml
 # scion-taskforce.yaml — Scion Task Force Configuration
 tags:
-  claim: taskforce                              # Tag added when tk-scion-taskforce claims a ticket
+  claim: taskforce                              # OPT-IN tag the USER adds to hand a ticket to the task force (never auto-added)
   review: waiting-for-review                    # Tag added when worker finishes and pauses for review
-  ignore:                                       # Opt-out tags that prevent picking up a ticket
-    - no-taskforce
+  ignore: no-taskforce                          # Opt-out tag that always prevents picking up a ticket
 
 watcher:
-  poll_interval_seconds: 5                      # How often to check registered projects for ready tasks or feedback
+  poll_interval_seconds: 15                     # How often to check registered projects for ready tasks or feedback
+  max_concurrent: 10                            # Max running workers across all projects
+  max_concurrent_per_project: 1                 # Max working tasks per project (see §4.1 warning: pods share the checkout)
+  spawn_verify_timeout_seconds: 30              # Wait up to N s for a spawned pod to report 'running' before claiming
+  spawn_verify_poll_seconds: 2                  # Poll interval while verifying a freshly spawned pod
+  spawn_prompt_unblock_seconds: 40              # After launch, watch the pod up to N s for interactive harness prompts
   gc_retention_days: 5                          # Days to keep paused pods after a ticket is closed
+
+worker:
+  prompt_file: ""                               # Optional custom brief template (see §4.3 for placeholders)
+  review_tags: [pr, review]                     # Tickets with these tags get the pull-request REVIEW brief
+  review_ref_prefixes: [gh-pr-]                 # ...or whose external-ref starts with one of these
 
 provider:
   driver: scion                                 # Active worker backend (default: scion; swappable in future)
@@ -336,6 +387,11 @@ provider:
     template: default                           # SCION agent template (-t)
     model: ""                                   # Optional model alias or ID (e.g., large)
     preserve_branch_on_gc: true                 # Pass --preserve-branch on scion delete
+    auto_accept_prompts: true                   # Press Enter on known harness start-up prompts inside the pod
+    auto_accept_prompt_patterns: ["Yes, I trust this folder"]
+    harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
+    container_user: scion                       # User owning the tmux session inside the pod
+    tmux_session: scion                         # tmux session name used by the scion image
 
 telemetry:
   enabled: true                                 # Enable OpenTelemetry tracing, metrics & structured logs
@@ -411,10 +467,12 @@ Each ticket gets a root W3C `trace_id` when first discovered by `tk-scion-taskfo
 | Span Name | Emitted When | Key Events / Attributes |
 | :--- | :--- | :--- |
 | `ticket.lifecycle` | Root span covering ticket claim through closure | `ticket.id`, `project.path`, `taskforce.provider` |
-| `ticket.claim` | `tk-scion-taskforce` tags ticket `taskforce` & runs `tk start <id>` | `tags.added=taskforce` |
+| `ticket.claimed` (event on `ticket.lifecycle`) | Pod verified running → `tk start <id>` | `opt_in_tag=taskforce`, `status=in_progress` |
+| `worker.spawn` (`status=ERROR`) | Spawn rejected or pod never reached `running` within `spawn_verify_timeout_seconds` | `error.message`, `worker.state` |
 | `worker.start` | `provider.start(project_dir, <id>)` is invoked | `taskforce.provider`, `worker.harness`, `worker.model` |
 | `worker.complete_for_review` | Worker adds completion note & `waiting-for-review` tag | `note.length`, `status=in_progress` |
 | `worker.suspend` | `provider.suspend(project_dir, <id>)` pauses the container | `reason=waiting_for_review \| ticket_closed` |
+| `worker.lost` (`status=ERROR`) | Liveness sweep found a tracked running pod gone/stopped/crashed without a report | `worker.observed_state`, triage note appended to ticket |
 | `worker.feedback_wake` | User feedback wakes worker via `provider.wake_with_feedback()` | `feedback.preview`, `feedback.cycle_number` |
 | `worker.interactive_attach` | User runs `tk scion-taskforce attach <id>` | `attach.duration_ms`, `user.name` |
 | `worker.gc_delete` | Closed ticket > 5 days removed via `provider.delete(project_dir, <id>)` | `closed.age_days`, `logs.archived_path` |
@@ -507,15 +565,17 @@ tk scion-taskforce server status
 tk scion-taskforce server stop
 tk scion-taskforce server restart [directory]
 
-# Direct shortcuts (identical to tk webui start|status|stop|restart)
-tk scion-taskforce start [directory]
-tk scion-taskforce status
-tk scion-taskforce stop
+# Per-project start/stop (the daemon is shared; projects are registered on it)
+tk scion-taskforce start [directory]            # Start the task force for a project (boots daemon if needed)
+tk scion-taskforce stop [directory]             # Stop the task force for ONE project: pause its running
+                                                #   workers, unregister it; daemon exits when no projects remain
+tk scion-taskforce stop --all                   # Stop everything (whole daemon)
+tk scion-taskforce status                       # Daemon state, watched projects (✅/❌ provider health), workers
 tk scion-taskforce restart [directory]
 
 # Multi-project management on the singleton daemon
 tk scion-taskforce project add [directory]      # Register a project with the running daemon
-tk scion-taskforce project remove [directory]   # Unregister a project from the daemon
+tk scion-taskforce project stop|remove [dir]    # Same as 'stop [directory]'
 tk scion-taskforce project list                 # List all projects watched by the singleton daemon
 ```
 
@@ -541,7 +601,7 @@ tk scion-taskforce project list                 # List all projects watched by t
 - `-c, --config <path>`: Path to YAML configuration file (default: `.tickets/scion-taskforce.yaml` or `~/.config/tk/scion-taskforce.yaml`).
 - `-a, --all`: Show workers or run GC across all registered projects.
 - `--provider <driver>`: Override the worker backend driver (default: `scion`).
-- `--claim-tag <tag>`: Override the tag applied when claiming a ticket (default: `taskforce`).
+- `tags.claim` (config): The opt-in tag the user applies to hand a ticket to the task force (default: `taskforce`).
 - `--interval <seconds>`: Polling interval for the watcher loop (default: `5`).
 - `--retention-days <days>`: Number of days to retain paused pods for `closed` tickets before deletion (default: `5`).
 - `--log-retention-days <days>`: Number of days to keep rotated log/OTel files before deletion (default: `30`).
@@ -561,8 +621,8 @@ tk scion-taskforce project list                 # List all projects watched by t
 
 | Tag (Default) | Config Key | Applied By | Meaning |
 | :--- | :--- | :--- | :--- |
-| `no-taskforce` | `tags.ignore` | User | **Opt-Out**: Prevents `tk-scion-taskforce` from claiming the ticket or spawning a worker. |
-| `taskforce` | `tags.claim` | `tk-scion-taskforce` | **Claimed**: Added automatically before `tk-scion-taskforce` starts working on an unblocked ticket. |
+| `taskforce` | `tags.claim` | **User** | **Opt-In**: Hands a ready ticket to the task force. Never added automatically; a worker is only launched for tickets carrying this tag. |
+| `no-taskforce` | `tags.ignore` | User | **Opt-Out / safety override**: Prevents `tk-scion-taskforce` from spawning a worker even if `taskforce` is present. |
 | `waiting-for-review` | `tags.review` | Worker / `tk-scion-taskforce` | **Review Gate**: Indicates the worker has completed the task, reported back via `tk add-note`, and paused (`suspended`) awaiting human review while `status` remains `in_progress`. |
 
 ### 8.2 Example Ticket in `waiting-for-review` State (`.tickets/tic-822k.md`)
@@ -628,6 +688,28 @@ To reliably detect new feedback notes, correlate OpenTelemetry spans, and track 
 ./install.sh --scion-taskforce
 # Or manually symlink plugins/scion-taskforce/ticket-scion-taskforce and plugins/scion-taskforce/tk-scion-taskforce into ~/.local/bin/
 ```
+
+### Onboarding a project (do this once per repo)
+```bash
+cd ~/github/my-repo
+scion init                     # project-local mode: one git worktree per worker (see §4.1 table)
+git add .gitignore .scion && git commit -m "chore: scion project config"
+git add .tickets && git commit -m "chore: track tickets"   # recommended: worktrees only see committed files
+tk github sync --prs           # optional: creates PR tickets tagged github-sync,pr (→ review brief)
+tk update <id> --tags <existing>,taskforce                  # opt a ticket in
+tk scion-taskforce start .     # register the project on the singleton daemon
+tk scion-taskforce status; tk scion-taskforce list; tk scion-taskforce logs -f
+```
+Without `scion init` the project runs in hub/external mode: workers share the live checkout, so keep `max_concurrent_per_project: 1`. If `scion start` fails with *"'agents/' must be in .gitignore"* the daemon prints the `scion init` hint.
+
+### Known SCION quirks the plugin works around (report upstream)
+| Symptom | Cause | Plugin mitigation |
+| :--- | :--- | :--- |
+| Pod idle forever / `Exited (255)` on suspend | Claude trust seeded for host path and `/workspace`, not `/repo-root/...` worktree mount | `post_spawn` auto-accepts *"Yes, I trust this folder"* via `tmux send-keys` |
+| `scion message <id> "1"` does not confirm menus | text is typed but no Enter reaches the dialog | same as above |
+| `scion logs <id>` fails for project-local agents | looks for `.scion/agents/<id>/home/agent.log`; real log is `/home/scion/agent.log` inside the container | `tk scion-taskforce logs` reads the daemon's own sink; use `podman exec` for the harness log |
+| `scion --project <repo> list` returns `[]` while pods exist | hub projects live under `~/.scion/project-configs/<slug>__<uuid>/.scion` | use `scion list --all` to find and delete strays |
+| Agent names are lower-cased | `scion` normalises names | `health()` matches case-insensitively |
 
 ### Uninstallation
 ```bash

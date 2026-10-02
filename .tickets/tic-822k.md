@@ -7,7 +7,7 @@ created: 2026-10-01T09:58:53Z
 type: task
 priority: 1
 assignee: Sampath Kumar
-tags: [taskforce, waiting-for-review]
+tags: []
 ---
 # Scion Task Force
 
@@ -54,3 +54,29 @@ Standardized plugin naming to 'scion-taskforce' (plugins/scion-taskforce/SCION-T
 **2026-10-01T12:08:45Z**
 
 Added 30-day log rotation (telemetry.rotation: retention_days 30, midnight rotation, 100MB size cap, gzip) to SCION-TASKFORCE-SPEC.md Section 6.6 and scion-taskforce.yaml; registered plugin in plugins/README.md and AGENTS.md.
+
+**2026-10-01T12:37:21Z**
+
+## Task Force Implementation Report
+- Implemented standalone optional `tk-scion-taskforce` / `ticket-scion-taskforce` plugin under `plugins/scion-taskforce/`.
+- Added singleton multi-project daemon manager (`server.py`, `daemon.py`) storing global state at `~/.local/state/tk/scion-taskforce.json`.
+- Implemented pluggable `WorkerProvider` ABC and `ScionProvider` (`providers/`).
+- Implemented OpenTelemetry trace/metric/log emitter with 30-day automatic `.gz` log rotation (`telemetry.py`).
+- Added optional installer flags (`./install.sh --scion-taskforce` and `./plugins/scion-taskforce/install.sh`) while keeping `--full` default unchanged.
+- Added Behave BDD acceptance test suite in `features/scion_taskforce_plugin.feature` (all 13 features / 131 scenarios pass).
+
+**2026-10-01T14:27:40Z**
+
+hi
+
+**2026-10-01T14:27:59Z**
+
+Nice idea
+
+**2026-10-01T14:45:57Z**
+
+Fix pass: (1) taskforce tag is now user opt-in only (never auto-added); (2) spawn is launch -> verify pod running -> claim, with provider preflight, stderr capture, per-project abort and 'error' worker state instead of fire-and-forget; (3) per-project 'tk scion-taskforce stop [dir]'; (4) daemon loop survives reconcile exceptions; (5) status shows provider health. 68 falsely-claimed tickets in A2A-Official and 2 here were reverted to open.
+
+**2026-10-02T15:28:06Z**
+
+Readiness pass for PR-review use case: liveness sweep (lost pods → error state + triage note, slot freed, tk reopen relaunches), PR-review vs implementation worker briefs (worker.review_tags / external-ref gh-pr-*, worker.prompt_file override), per-project concurrency default 1, provider hooks workspace_path/post_spawn (scion init worktrees: ticket mirrored in, notes + waiting-for-review merged back additively; Claude 'trust this folder' prompt auto-accepted via tmux), stale-pod replacement, error-message hints, XDG_CONFIG_HOME-aware global config, installer sweep (--help, accumulating flags, plugin delegation, installer.feature). 148 BDD scenarios green; e2e verified in a sandbox repo with real scion+podman.

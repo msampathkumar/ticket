@@ -27,7 +27,7 @@ ticket/
 │   └── WEBUI-SPEC.md        # Web UI specification
 ├── plugins/                 # Modular extension directory
 │   ├── github/              # Bi-directional GitHub issue & PR sync ('tk github')
-│   ├── scion-taskforce/     # Autonomous worker orchestration design spec ('tk scion-taskforce')
+│   ├── scion-taskforce/     # Optional autonomous worker orchestration plugin ('tk scion-taskforce')
 │   └── README.md            # Plugin catalog and integration standard
 ├── docs/                    # Specifications & deep guides
 │   ├── SPEC.md              # Core system & data model specification
@@ -35,7 +35,7 @@ ticket/
 │   └── AGENTS.md            # Detailed agent integration guide
 ├── skills/tk/SKILL.md       # Reusable agent skill (installable to ~/.agents/skills/tk/)
 ├── features/                # Behave BDD acceptance test suite ('make test')
-├── install.sh               # Modular installer script (--core, --full, --all, --github, --skill)
+├── install.sh               # Modular installer; flags accumulate (--core, --webui, --skill, --github, --scion-taskforce, --full [default], --all, --help)
 └── run.sh                   # Local zero-install runner for Web UI
 ```
 
@@ -48,8 +48,8 @@ ticket/
    - Features: 4-lane drag-and-drop Kanban, DAG Dependency & Mind Map canvas, multi-project switcher, theme customization (default: Indigo), and background daemon management (`tk webui server start|status|stop`).
 3. **GitHub Sync Plugin (`plugins/github`)**:
    - Syncs GitHub issues and pull requests into local `.tickets/` markdown files.
-4. **Scion Task Force Plugin (`plugins/scion-taskforce`, design spec)**:
-   - Single global daemon that watches `tk ready` tickets across projects, spawns SCION workers (1:1 ticket-ID mapping), pauses for `waiting-for-review`, relays feedback, and emits OpenTelemetry to local rotating logs (30-day retention).
+4. **Scion Task Force Plugin (`plugins/scion-taskforce`, standalone optional plugin)**:
+   - Single global daemon (`~/.local/state/tk/scion-taskforce.json`) that watches `tk ready` tickets across projects, spawns SCION workers (1:1 ticket-ID mapping), pauses for `waiting-for-review`, relays feedback, and emits OpenTelemetry to local rotating logs (30-day retention). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
 
 ---
 

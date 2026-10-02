@@ -61,26 +61,31 @@ tk-webui 0.2.0
 
 ## 4. Modularity & Optional Installation
 
-Plugins must be **strictly optional**. Users who only need the zero-dependency Bash CLI should never be required to install Python, Node.js, or external runtimes.
+Plugins must be **strictly optional**. Users who only need the zero-dependency Bash CLI should never be required to install Python, Node.js, or external runtimes. The core `tk` script has no hard-coded knowledge of any plugin: whatever is installed in `$PATH` is auto-discovered and listed by `tk help` with its one-line `# tk-plugin:` description.
 
-In `install.sh`, provide modular targets:
+`install.sh` exposes one target per component; flags accumulate, so any combination works (e.g. `./install.sh --core --github`):
 - `--core`: Installs only `tk` CLI.
 - `--webui`: Installs only the Web UI plugin.
 - `--skill`: Installs the agent skill.
 - `--github`: Installs the optional GitHub sync plugin (`tk-github`).
-- `--full`: Installs CLI, Web UI, and Agent Skill.
-- `--all`: Installs all plugins and skills.
+- `--scion-taskforce`: Installs the optional SCION Task Force orchestrator (`tk-scion-taskforce`).
+- `--full` (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are **not** included; the installer prints how to add them.
+- `--all`: Installs everything, including optional plugins.
+- `--help`: Lists all targets.
+
+A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside `plugins/<name>/`. When it does, the top-level `install.sh` target must delegate to it so install logic lives in exactly one place (see `plugins/scion-taskforce/install.sh`).
 
 ---
 
 ## 5. Official Plugins
 
 - **`tk webui` (`tk-webui`)**: Full-featured interactive Kanban, Table, DAG Mind Map, and Timeline review dashboard.
-- **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing.
+- **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
+- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Single global daemon that launches a SCION coding worker for each ticket explicitly tagged `taskforce`, verifies the worker actually started, pauses it on `waiting-for-review`, and emits OpenTelemetry to local rotating logs. *(optional; requires Python 3.9+ and the `scion` CLI)*
 
 ---
 
-## 5. Example Plugin: `tk-stats`
+## 6. Example Plugin: `tk-stats`
 
 Here is a minimal plugin example (`~/.local/bin/tk-stats`):
 

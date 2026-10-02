@@ -13,3 +13,6 @@ build/
 .vscode/
 .idea/
 *.swp
+
+# Task Force local log symlink
+.tickets/.scion-taskforce-logs

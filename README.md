@@ -20,7 +20,7 @@ Install the zero-dependency Bash CLI or the full suite with the interactive Web 
 git clone https://github.com/msampathkumar/ticket.git
 cd ticket
 
-# Full Suite (CLI + Web UI + Agent Skill)
+# Full Suite (CLI + Web UI + Agent Skill) — default
 ./install.sh --full
 
 # Core CLI Only (Pure Bash, zero Python dependencies)
@@ -28,9 +28,15 @@ cd ticket
 
 # Web UI Plugin Only
 ./install.sh --webui
+
+# Optional plugins (not part of --full; combine flags freely)
+./install.sh --github               # GitHub issue & PR sync
+./install.sh --scion-taskforce      # SCION Task Force worker orchestrator
+./install.sh --all                  # Everything, including optional plugins
+./install.sh --help                 # All targets
 ```
 
-Binaries install to `~/.local/bin/` (`tk` and `tk-webui`). Ensure `~/.local/bin` is in `$PATH`.
+Binaries install to `~/.local/bin/` (`tk`, `tk-webui`, plus any optional `tk-<plugin>`). Ensure `~/.local/bin` is in `$PATH`. Installed plugins are discovered automatically and listed by `tk help`.
 
 ### Launching Web UI & Background Server
 
@@ -154,27 +160,37 @@ Plugins (tk-<cmd> or ticket-<cmd> in PATH or plugins/<cmd>/):
 
 ## 🔌 Plugins System
 
-Plugins are organized into self-contained directories under `plugins/<plugin-name>/`, each containing their executable, symlinks, and a dedicated specification (`<PLUGIN-NAME>-SPEC.md`). Except for the Web UI (`tk-webui`), all plugins are strictly **optional** to install.
+Plugins are organized into self-contained directories under `plugins/<plugin-name>/`, each containing their executable, symlinks, and a dedicated specification (`<PLUGIN-NAME>-SPEC.md`). Except for the Web UI (`tk-webui`), all plugins are strictly **optional** to install. Whatever is installed is auto-discovered from `$PATH` and listed with a one-line description by `tk help` — the core CLI has no hard-coded knowledge of any plugin.
 
-| Plugin | Directory | Specification | Description |
-| :--- | :--- | :--- | :--- |
-| **`webui`** | [`tk_webui/`](tk_webui/) / [`plugins/webui/`](plugins/webui/) | [`WEBUI-SPEC.md`](tk_webui/WEBUI-SPEC.md) | Interactive Kanban & Review Dashboard |
-| **`github`** | [`plugins/github/`](plugins/github/) | [`GITHUB-SPEC.md`](plugins/github/GITHUB-SPEC.md) | Sync GitHub issues and pull requests |
+| Plugin | Directory | Specification | Installed by | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`webui`** | [`tk_webui/`](tk_webui/) / [`plugins/webui/`](plugins/webui/) | [`WEBUI-SPEC.md`](tk_webui/WEBUI-SPEC.md) | `--full`, `--webui` | Interactive Kanban & Review Dashboard |
+| **`github`** | [`plugins/github/`](plugins/github/) | [`GITHUB-SPEC.md`](plugins/github/GITHUB-SPEC.md) | `--github` (optional) | Sync GitHub issues and pull requests |
+| **`scion-taskforce`** | [`plugins/scion-taskforce/`](plugins/scion-taskforce/) | [`SCION-TASKFORCE-SPEC.md`](plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md) | `--scion-taskforce` (optional) | Opt-in (`taskforce` tag) orchestration of SCION coding workers across projects — run `scion init` in each repo first (see spec §10) |
 
 ### Modular Installation Options
+
+Flags accumulate, so any combination works:
 
 ```bash
 # Core CLI Only (Includes create, show, ls, edit, query, find, etc.)
 ./install.sh --core
 
-# Core + Web UI (Full default suite)
+# Core + Web UI + Agent Skill (default)
 ./install.sh --full
 
-# Install Everything (Core + Web UI + GitHub Plugin + Agent Skill)
+# Install Everything (Core + Web UI + Agent Skill + GitHub + SCION Task Force)
 ./install.sh --all
 
-# Selectively install plugins
-./install.sh --github --skill
+# Selectively add optional plugins on top of any bundle
+./install.sh --full --github
+./install.sh --core --scion-taskforce
+
+# Plugins may ship a standalone installer/uninstaller (scion-taskforce does):
+./plugins/scion-taskforce/install.sh            # install
+./plugins/scion-taskforce/install.sh --uninstall
+
+./install.sh --help
 ```
 
 ---

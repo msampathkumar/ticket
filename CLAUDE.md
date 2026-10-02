@@ -27,21 +27,34 @@ Dependencies: bash, sed, awk, find. Optional: ripgrep (faster grep).
 
 ### Directory Structure
 
+Each plugin is isolated in its own folder (see `docs/PLUGIN_SPEC.md`):
+
 ```
 plugins/
-├── README.md              # Plugin conventions documentation
-├── ticket-query           # Extracted from core (requires jq)
-├── ticket-migrate-beads   # Extracted from core (requires jq)
-└── ...
+├── README.md                    # Plugin catalog & conventions
+├── github/                      # tk github  (optional, bash + gh)
+│   ├── GITHUB-SPEC.md
+│   ├── ticket-github
+│   └── tk-github -> ticket-github
+├── scion-taskforce/             # tk scion-taskforce  (optional, Python 3.9+ + scion CLI)
+│   ├── SCION-TASKFORCE-SPEC.md
+│   ├── install.sh               # standalone installer (--uninstall)
+│   ├── ticket-scion-taskforce   # thin bash entrypoint
+│   ├── tk-scion-taskforce -> ticket-scion-taskforce
+│   └── tk_scion_taskforce/      # plugin-private Python package
+└── webui/
+    └── WEBUI-SPEC.md -> ../../tk_webui/WEBUI-SPEC.md   # tk webui lives in tk_webui/
 
 pkg/
 ├── extras.txt             # Curated list for ticket-extras meta-package
 └── aur/                   # PKGBUILD templates
 ```
 
+Plugins are **optional and isolated**: the core `ticket` script never references them. `tk help` discovers whatever `tk-*`/`ticket-*` is in `$PATH` and prints its `# tk-plugin:` one-liner, so there is nothing to register in core when adding a plugin.
+
 ### Plugin File Conventions
 
-Plugins in this repo use `ticket-` prefix (matching the script name). Both `tk-*` and `ticket-*` work at runtime.
+Plugins in this repo use `ticket-` prefix (matching the script name) with a `tk-` symlink. Both work at runtime.
 
 Required metadata in first 10 lines:
 ```bash
@@ -53,7 +66,7 @@ Required metadata in first 10 lines:
 ### Extracting Commands to Plugins
 
 When moving a command from core to a plugin:
-1. Create `plugins/ticket-<name>` with the extracted logic
+1. Create `plugins/<name>/ticket-<name>` with the extracted logic
 2. Add metadata comments (`tk-plugin:`, `tk-plugin-version:`)
 3. Remove `cmd_<name>()` from core script
 4. Remove from dispatch case statement
@@ -64,10 +77,12 @@ When moving a command from core to a plugin:
 ### Creating New Plugins
 
 For new functionality (not extracted from core):
-1. Create `plugins/ticket-<name>`
+1. Create `plugins/<name>/` with `ticket-<name>`, `tk-<name>` symlink, and `<NAME>-SPEC.md`
 2. Add metadata comments
 3. Do NOT add to `pkg/extras.txt` (only core extractions go there)
-4. Document in plugins/README.md if it's an official plugin
+4. Add an `install.sh` target `--<name>` (and include it in `--all`, **not** `--full`); if the plugin ships its own `install.sh`, delegate to it
+5. Document in `plugins/README.md`, `README.md` (Plugins table), `docs/PLUGINS.md`, `CHANGELOG.md`
+6. Add a `features/<name>_plugin.feature` BDD scenario set; if Python, add the path to the Ruff step in `.github/workflows/lint.yml`
 
 ## Testing
 

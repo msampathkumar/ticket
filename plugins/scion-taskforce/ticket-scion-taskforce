@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# tk-plugin: Autonomous SCION task force orchestrator
+# tk-plugin-version: 0.1.0
+set -e
+
+resolve_script_dir() {
+    local src="${BASH_SOURCE[0]}"
+    while [ -L "$src" ]; do
+        local dir
+        dir="$(cd -P "$(dirname "$src")" >/dev/null 2>&1 && pwd)"
+        src="$(readlink "$src")"
+        [[ "$src" != /* ]] && src="$dir/$src"
+    done
+    cd -P "$(dirname "$src")" >/dev/null 2>&1 && pwd
+}
+
+PLUGIN_DIR="${TK_SCION_TASKFORCE_HOME:-$(resolve_script_dir)}"
+REPO_ROOT="$(cd "$PLUGIN_DIR/../.." >/dev/null 2>&1 && pwd || echo "")"
+
+export PYTHONPATH="${PLUGIN_DIR}${PYTHONPATH:+:$PYTHONPATH}"
+
+if [ -n "$REPO_ROOT" ] && [ -x "$REPO_ROOT/.venv/bin/python3" ]; then
+    exec "$REPO_ROOT/.venv/bin/python3" -m tk_scion_taskforce.cli "$@"
+elif command -v python3 >/dev/null 2>&1; then
+    exec python3 -m tk_scion_taskforce.cli "$@"
+else
+    echo "Error: python3 is required to run tk-scion-taskforce." >&2
+    exit 1
+fi

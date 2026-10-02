@@ -1,29 +1,74 @@
-# scion-taskforce.yaml — Scion Task Force Configuration
+# scion-taskforce.yaml — Configuration for tk-scion-taskforce
+# Place in:
+#   - .tickets/scion-taskforce.yaml          (project-level overrides)
+#   - ~/.config/tk/scion-taskforce.yaml      (global defaults)
+
+version: 1
+
+# 1. Ticket Tags (customizable)
+#    The task force is OPT-IN: it only picks up ready (unblocked, open) tickets that
+#    *you* tagged with `tags.claim`. It never adds that tag on its own.
 tags:
-  claim: taskforce                              # Tag added when tk-scion-taskforce claims a ticket
-  review: waiting-for-review                    # Tag added when worker finishes and pauses for review
-  ignore:                                       # Opt-out tags that prevent picking up a ticket
-    - no-taskforce
+  claim: taskforce                # Opt-in tag the USER adds to hand a ticket to the task force
+  ignore: no-taskforce            # Tickets with this tag are never picked up (safety override)
+  review: waiting-for-review      # Added by the worker when it finishes and pauses for review
 
+# 2. Global Daemon & Concurrency Settings
 watcher:
-  poll_interval_seconds: 5                      # How often to check registered projects for ready tasks or feedback
-  gc_retention_days: 5                          # Days to keep paused pods after a ticket is closed
+  poll_interval_seconds: 15       # Reconcile interval across registered projects (seconds)
+  max_concurrent: 10              # Maximum total running workers across all projects
+  max_concurrent_per_project: 1   # Max working tasks per project; next one starts when one finishes.
+                                  # SAFETY: SCION mounts the project checkout directly into each pod
+                                  # (no per-worker worktree), so concurrent workers in ONE project share
+                                  # a working tree and will fight over branches/stashes. Raise above 1
+                                  # only if your runtime isolates workspaces.
+  spawn_verify_timeout_seconds: 30 # Wait up to N s for a spawned pod to report 'running' before claiming
+  spawn_verify_poll_seconds: 2    # Poll interval while verifying a freshly spawned pod
+  spawn_prompt_unblock_seconds: 40 # After launch, watch the pod up to N s for interactive harness
+                                  # prompts (e.g. Claude's "trust this folder?") and auto-accept them
+  gc_retention_days: 5            # Days to retain paused pods after ticket status == closed
+  auto_pause_on_review: true      # Automatically pause worker when waiting-for-review is set
+  auto_wake_on_feedback: true     # Automatically wake worker when a new review note is added
 
+# 3. Worker Prompt Settings
+#    Workers get an auto-generated brief: "implement" for normal tickets, "review" for
+#    pull-request tickets (e.g. synced by `tk github sync --prs`). Both explain how to
+#    report back even when `tk` is not installed inside the pod.
+worker:
+  prompt_file: ""                 # Optional path to a custom prompt template. Placeholders:
+                                  # {ticket_id} {project_dir} {branch} {ticket_details} {work_type}
+                                  # {claim_tag} {review_tag} {external_ref} {ticket_title}
+  review_tags: [pr, review]       # A ticket with any of these tags gets the REVIEW brief
+  review_ref_prefixes: [gh-pr-]   # ...or whose external-ref starts with one of these prefixes
+
+# 4. Worker Provider Settings (pluggable runtime)
 provider:
-  driver: scion                                 # Active worker backend (default: scion; swappable in future)
-  scion:
-    harness: ""                                 # Optional harness override (e.g., claude, gemini, codex)
-    template: default                           # SCION agent template (-t)
-    model: ""                                   # Optional model alias or ID (e.g., large)
-    preserve_branch_on_gc: true                 # Pass --preserve-branch on scion delete
+  driver: scion                   # Orchestrator backend ('scion' today; extensible)
+  binary: scion                   # Path or command name for the provider CLI
+  profile: ""                     # Optional SCION runtime profile (--profile)
+  harness_config: ""              # Optional SCION harness config (--harness-config)
+  branch_prefix: ""               # Optional git branch prefix (default: <ticket-id>)
+  extra_start_args: []            # Additional flags passed to 'scion start'
+  extra_resume_args: []           # Additional flags passed to 'scion resume'
+  auto_accept_prompts: true       # Press Enter on known harness start-up prompts inside the pod
+  auto_accept_prompt_patterns: ["Yes, I trust this folder"]
+  harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
+  container_user: scion           # User owning the tmux session inside the pod
+  tmux_session: scion             # tmux session name used by the scion image
 
+# 5. OpenTelemetry & Local Log Rotation Settings
 telemetry:
-  enabled: true                                 # Enable OpenTelemetry tracing, metrics & structured logs
-  log_dir: ~/.local/state/tk/scion-taskforce/logs # Local directory for OTel JSONL traces, metrics & worker logs
-  mirror_to_project: true                       # Also symlink/write logs under <project>/.tickets/.scion-taskforce-logs
-  otlp_endpoint: ""                             # Optional remote OTLP endpoint (e.g., http://localhost:4318)
+  enabled: true
+  log_dir: ~/.local/state/tk/scion-taskforce/logs
+  project_log_symlink: true       # Symlink <project>/.tickets/.scion-taskforce-logs -> global log dir
+  traces_file: otel-traces.jsonl
+  metrics_file: otel-metrics.jsonl
+  daemon_log_file: daemon.log
+  worker_logs_dir: workers
+  otlp_endpoint: ""               # Optional OTLP HTTP/gRPC collector endpoint
   rotation:
-    retention_days: 30                          # Delete rotated log/OTel files older than N days (default: 30)
-    rotate_at: midnight                         # Daily time-based rotation (daemon.log, otel-*.jsonl, workers/*.log)
-    max_file_size_mb: 100                       # Also rotate early if a single file exceeds this size
-    compress: true                              # gzip rotated files (e.g., otel-traces.jsonl.2026-10-01.gz)
+    enabled: true
+    when: midnight                # Rotate logs daily at midnight
+    max_bytes: 104857600          # Also rotate if active log exceeds 100 MB
+    retention_days: 30            # Keep 30 days of rotated logs before automatic deletion
+    compress: true                # Gzip rotated log files (.gz)
