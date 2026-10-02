@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- Core: `update_yaml_field` used GNU-only `0,/re/` sed addressing; on macOS (BSD sed) adding a field that did not exist yet (e.g. `tk update <id> --tags ...` on a ticket without `tags:`) silently did nothing. Now inserts portably via awk.
+- `tk github sync`: existing synced tickets now get `github-sync,pr|issue` + GitHub labels (re)applied on every sync, additively (user tags such as `taskforce` are kept); summary reports `N re-tagged`.
+
 ### Changed
 - Extracted `edit`, `ls`, `query`, and `migrate-beads` commands to plugins (ticket-extras)
 - `install.sh`: flags now accumulate (`./install.sh --core --github`), `--help` lists targets, unknown flags fail instead of silently defaulting to `--full`, and the summary reports which optional plugins were skipped. Optional plugin targets delegate to the plugin's own installer when one exists.

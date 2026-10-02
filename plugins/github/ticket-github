@@ -115,6 +115,29 @@ find_local_ticket_status() {
     fi
 }
 
+# Ensure an existing synced ticket carries the sync tags (github-sync, pr|issue, GitHub labels).
+# Additive only: tags the user added locally (e.g. `taskforce`) are preserved.
+# Prints "updated" when the ticket was changed so callers can count it.
+ensure_ticket_tags() {
+    local tid="$1" wanted_csv="$2"
+    local file="$TICKETS_DIR/$tid.md"
+    [[ -f "$file" ]] || return 0
+    local current_csv
+    current_csv=$(awk '/^---$/{c++; next} c==1 && /^tags:/{sub(/^tags:[ ]*\[/, ""); sub(/\][ ]*$/, ""); gsub(/ /, ""); print; exit}' "$file")
+    local merged="$current_csv" missing=0 t
+    IFS=',' read -ra wanted <<< "$wanted_csv"
+    for t in "${wanted[@]}"; do
+        [[ -z "$t" ]] && continue
+        if [[ ",$merged," != *",$t,"* ]]; then
+            merged="${merged:+$merged,}$t"
+            missing=1
+        fi
+    done
+    if [[ "$missing" == 1 ]]; then
+        "$TK_SCRIPT" super update "$tid" --tags "$merged" >/dev/null && echo "updated"
+    fi
+}
+
 cmd_sync() {
     check_gh_cli
     mkdir -p "$TICKETS_DIR"
@@ -141,6 +164,7 @@ cmd_sync() {
     local created_count=0
     local closed_count=0
     local existing_count=0
+    local retagged_count=0
 
     # 1. Sync Issues
     if [[ $sync_issues -eq 1 ]]; then
@@ -161,10 +185,17 @@ cmd_sync() {
             labels_str=$(echo "$issues_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
 
             ext_ref="gh-issue-$num"
+            local tags="github-sync,issue"
+            [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
             local local_id
             if local_id=$(find_local_ticket_by_ref "$ext_ref"); then
                 local local_status
                 local_status=$(find_local_ticket_status "$local_id")
+                # Always (re)apply sync tags + labels so edited/stripped tickets are repaired on re-sync.
+                if [[ -n "$(ensure_ticket_tags "$local_id" "$tags")" ]]; then
+                    echo "  🏷️  Re-tagged local ticket $local_id (Issue #$num) with $tags"
+                    ((retagged_count++))
+                fi
                 if [[ "$state" == "CLOSED" && "$local_status" != "closed" ]]; then
                     "$TK_SCRIPT" super close "$local_id" >/dev/null
                     echo "  ✅ Closed local ticket $local_id (Issue #$num closed on GitHub)"
@@ -174,9 +205,6 @@ cmd_sync() {
                 fi
             else
                 if [[ "$state" == "OPEN" ]]; then
-                    local tags="github-sync,issue"
-                    [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
-                    
                     local desc_body="$body"
                     if [[ -z "${desc_body// /}" ]]; then
                         desc_body="*(No description provided on GitHub)*"
@@ -210,10 +238,17 @@ cmd_sync() {
             labels_str=$(echo "$prs_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
 
             ext_ref="gh-pr-$num"
+            local tags="github-sync,pr"
+            [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
             local local_id
             if local_id=$(find_local_ticket_by_ref "$ext_ref"); then
                 local local_status
                 local_status=$(find_local_ticket_status "$local_id")
+                # Always (re)apply sync tags + labels so edited/stripped tickets are repaired on re-sync.
+                if [[ -n "$(ensure_ticket_tags "$local_id" "$tags")" ]]; then
+                    echo "  🏷️  Re-tagged local ticket $local_id (PR #$num) with $tags"
+                    ((retagged_count++))
+                fi
                 if [[ ("$state" == "MERGED" || "$state" == "CLOSED") && "$local_status" != "closed" ]]; then
                     "$TK_SCRIPT" super close "$local_id" >/dev/null
                     echo "  ✅ Closed local ticket $local_id (PR #$num $state on GitHub)"
@@ -223,9 +258,6 @@ cmd_sync() {
                 fi
             else
                 if [[ "$state" == "OPEN" ]]; then
-                    local tags="github-sync,pr"
-                    [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
-                    
                     local desc_body="$body"
                     if [[ -z "${desc_body// /}" ]]; then
                         desc_body="*(No description provided on GitHub)*"
@@ -241,7 +273,7 @@ cmd_sync() {
     fi
 
     echo ""
-    echo "🎉 Sync finished: $created_count created, $closed_count closed, $existing_count up to date."
+    echo "🎉 Sync finished: $created_count created, $closed_count closed, $retagged_count re-tagged, $existing_count up to date."
 }
 
 cmd_unsync() {
