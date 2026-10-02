@@ -1,6 +1,6 @@
 ---
 id: tic-c7wt
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-01T14:18:07Z
@@ -22,3 +22,9 @@ In the `tk-webui` ticket detail side panel, provide a way for users to add a new
 
 1. Ticket detail side panel displays existing tags and an input/button to add a new tag.
 2. Submitting a new tag updates the ticket frontmatter `tags` list and refreshes the UI immediately.
+
+## Notes
+
+**2026-10-02T22:58:39Z**
+
+Implemented interactive tag adding/removing in Web UI side panel, matching badge colors/priorities, and collapsible sections.
