@@ -264,7 +264,11 @@ def resolve_config_path(
         if candidate.exists():
             return candidate
     if project_dir is not None:
-        proj_cfg = Path(project_dir).expanduser().resolve() / ".tickets" / "scion-taskforce.yaml"
+        p = Path(project_dir).expanduser().resolve()
+        scion_proj_cfg = p / ".scion-taskforce" / "scion-taskforce.yaml"
+        if scion_proj_cfg.exists():
+            return scion_proj_cfg
+        proj_cfg = p / ".tickets" / "scion-taskforce.yaml"
         if proj_cfg.exists():
             return proj_cfg
     global_cfg = global_config_path()
@@ -285,9 +289,13 @@ def load_config(
         cfg = _deep_merge(cfg, load_yaml_file(global_cfg))
 
     if project_dir is not None:
-        proj_cfg = Path(project_dir).expanduser().resolve() / ".tickets" / "scion-taskforce.yaml"
+        p = Path(project_dir).expanduser().resolve()
+        proj_cfg = p / ".tickets" / "scion-taskforce.yaml"
         if proj_cfg.exists():
             cfg = _deep_merge(cfg, load_yaml_file(proj_cfg))
+        scion_proj_cfg = p / ".scion-taskforce" / "scion-taskforce.yaml"
+        if scion_proj_cfg.exists():
+            cfg = _deep_merge(cfg, load_yaml_file(scion_proj_cfg))
 
     env_cfg = os.environ.get("TK_SCION_TASKFORCE_CONFIG")
     if env_cfg:
@@ -308,16 +316,42 @@ def init_config(
     global_scope: bool = False,
     force: bool = False,
 ) -> Path:
-    """Write starter scion-taskforce.yaml to project .tickets/ or ~/.config/tk/."""
+    """Initialize .scion-taskforce/ directory in project or global config."""
     if global_scope:
         target = global_config_path()
-    else:
-        base_dir = Path(project_dir or Path.cwd()).expanduser().resolve()
-        target = base_dir / ".tickets" / "scion-taskforce.yaml"
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists() and not force:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists() and not force:
+            return target
+        target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
         return target
 
-    target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
-    return target
+    import time
+    base_dir = Path(project_dir or Path.cwd()).expanduser().resolve()
+    scion_dir = base_dir / ".scion-taskforce"
+    scion_dir.mkdir(parents=True, exist_ok=True)
+
+    yaml_target = scion_dir / "scion-taskforce.yaml"
+    prompt_target = scion_dir / "prompt.md"
+
+    timestamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+
+    for existing_file in [yaml_target, prompt_target]:
+        if existing_file.exists():
+            if force:
+                existing_file.unlink()
+            else:
+                old_backup = existing_file.with_name(f"{existing_file.name}.{timestamp}.old")
+                existing_file.rename(old_backup)
+
+    yaml_target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
+
+    default_prompt_content = (
+        "# Default Scion Task Force Prompt Template\n"
+        "# Placeholders: {ticket_id}, {ticket_title}, {project_dir}, {branch}, {work_type}, {ticket_details}\n\n"
+        "You are an autonomous task force worker assigned to ticket {ticket_id} ({ticket_title}).\n"
+        "Working directory: {project_dir} (branch: {branch}).\n\n"
+        "### Ticket Details\n{ticket_details}\n"
+    )
+    prompt_target.write_text(default_prompt_content, encoding="utf-8")
+
+    return yaml_target

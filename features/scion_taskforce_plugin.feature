@@ -15,11 +15,12 @@ Feature: SCION Task Force Plugin
     When I run "ticket scion-taskforce init"
     Then the command should succeed
     And the output should contain "Initialized scion-taskforce config"
-    And the file ".tickets/scion-taskforce.yaml" should contain "claim: taskforce"
-    And the file ".tickets/scion-taskforce.yaml" should contain "ignore: no-taskforce"
-    And the file ".tickets/scion-taskforce.yaml" should contain "review: waiting-for-review"
-    And the file ".tickets/scion-taskforce.yaml" should contain "max_concurrent_per_project: 1"
-    And the file ".tickets/scion-taskforce.yaml" should contain "retention_days: 30"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "claim: taskforce"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "ignore: no-taskforce"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "review: waiting-for-review"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "max_concurrent_per_project: 1"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "retention_days: 30"
+    And the file ".scion-taskforce/prompt.md" should contain "Default Scion Task Force Prompt Template"
 
   Scenario: Multi-project registration and listing
     Given a clean tickets directory

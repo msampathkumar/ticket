@@ -1,6 +1,6 @@
 ---
 id: tic-dsjl
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-02T22:34:46Z
