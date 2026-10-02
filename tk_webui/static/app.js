@@ -1039,19 +1039,43 @@ function setupDragAndDrop() {
   });
 }
 
+function toggleSection(contentId, headerEl) {
+  const content = document.getElementById(contentId);
+  const chevron = headerEl.querySelector('.section-chevron');
+  if (!content) return;
+  if (content.classList.contains('hidden')) {
+    content.classList.remove('hidden');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  } else {
+    content.classList.add('hidden');
+    if (chevron) chevron.style.transform = 'rotate(-90deg)';
+  }
+}
+
+function setSectionState(contentId, expanded) {
+  const content = document.getElementById(contentId);
+  if (!content) return;
+  const headerEl = content.previousElementSibling || (content.parentElement ? content.parentElement.querySelector('.cursor-pointer') : null);
+  const chevron = headerEl ? headerEl.querySelector('.section-chevron') : null;
+  if (expanded) {
+    content.classList.remove('hidden');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  } else {
+    content.classList.add('hidden');
+    if (chevron) chevron.style.transform = 'rotate(-90deg)';
+  }
+}
+
 // DETAIL MODAL
 function openDetailModal(ticket) {
   state.activeTicket = ticket;
 
-  document.getElementById('detailId').textContent = ticket.id;
-  
-  const typeEl = document.getElementById('detailType');
-  typeEl.textContent = ticket.type;
-  typeEl.className = `text-xs uppercase tracking-wider font-bold px-2 py-0.5 rounded ${ticket.type === 'bug' ? 'bg-rose-100 text-rose-700' : 'bg-brand-100 text-brand-700'}`;
+  const idEl = document.getElementById('detailId');
+  idEl.textContent = ticket.id;
+  idEl.className = 'font-mono text-xs font-bold text-brand-600 dark:text-brand-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg';
 
-  const prioEl = document.getElementById('detailPriority');
-  prioEl.textContent = `Priority ${ticket.priority}`;
-  prioEl.className = `text-xs font-bold px-2 py-0.5 rounded ${ticket.priority <= 1 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`;
+  document.getElementById('detailTypeContainer').innerHTML = getTypeBadge(ticket.type);
+  document.getElementById('detailPriorityContainer').innerHTML = getPriorityBadge(ticket.priority);
 
   document.getElementById('detailStatusSelect').value = ticket.status;
   document.getElementById('detailTitle').textContent = ticket.title;
@@ -1060,7 +1084,12 @@ function openDetailModal(ticket) {
 
   const tagsContainer = document.getElementById('detailTagsContainer');
   tagsContainer.innerHTML = (ticket.tags || []).map(t => 
-    `<span class="px-2 py-0.5 text-xs font-medium rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">#${t}</span>`
+    `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+       <span>#${t}</span>
+       <button onclick="removeTagFromDetail('${t}')" class="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-0.5 rounded" title="Remove tag">
+         <i data-lucide="x" class="w-3 h-3"></i>
+       </button>
+     </span>`
   ).join('');
 
   const blockedAlert = document.getElementById('detailBlockedAlert');
@@ -1075,27 +1104,37 @@ function openDetailModal(ticket) {
   const descEl = document.getElementById('detailDescription');
   descEl.innerHTML = ticket.description ? marked.parse(ticket.description) : '<p class="text-slate-400 italic">No description provided.</p>';
 
-  const designSec = document.getElementById('detailDesignSec');
   if (ticket.design) {
-    designSec.classList.remove('hidden');
     document.getElementById('detailDesign').innerHTML = marked.parse(ticket.design);
+    setSectionState('detailDesignContent', true);
   } else {
-    designSec.classList.add('hidden');
+    document.getElementById('detailDesign').innerHTML = '';
+    setSectionState('detailDesignContent', false);
   }
 
-  const acceptSec = document.getElementById('detailAcceptanceSec');
   if (ticket.acceptance) {
-    acceptSec.classList.remove('hidden');
     document.getElementById('detailAcceptance').innerHTML = marked.parse(ticket.acceptance);
+    setSectionState('detailAcceptanceContent', true);
   } else {
-    acceptSec.classList.add('hidden');
+    document.getElementById('detailAcceptance').innerHTML = '';
+    setSectionState('detailAcceptanceContent', false);
   }
 
   renderDetailParent(ticket);
+  setSectionState('detailParentContent', !!ticket.parent);
+
   renderDetailSubtasks(ticket);
+  const subtasksCount = state.tickets.filter(t => t.parent === ticket.id).length;
+  setSectionState('detailSubtasksContent', subtasksCount > 0);
+
   renderDetailDependencies(ticket);
+  setSectionState('detailDepsContent', ticket.deps && ticket.deps.length > 0);
+
   renderDetailLinks(ticket);
+  setSectionState('detailLinksContent', ticket.links && ticket.links.length > 0);
+
   renderDetailNotes(ticket);
+  setSectionState('detailNotesContent', ticket.notes && ticket.notes.length > 0);
 
   elements.detailModal.classList.remove('hidden');
   lucide.createIcons();
@@ -1589,6 +1628,58 @@ async function removeTicketLink(ticketId, targetId) {
   }
 }
 
+// TAG ACTIONS
+async function addTagToDetail() {
+  if (!state.activeTicket) return;
+  const input = document.getElementById('detailNewTagInput');
+  const newTag = input.value.trim().replace(/^#/, '');
+  if (!newTag) return;
+
+  const currentTags = state.activeTicket.tags || [];
+  if (currentTags.includes(newTag)) {
+    showToast('Tag already exists on ticket', 'info');
+    input.value = '';
+    return;
+  }
+
+  const updatedTags = [...currentTags, newTag];
+  await updateTicketTagsApi(updatedTags);
+  input.value = '';
+}
+
+async function removeTagFromDetail(tagToRemove) {
+  if (!state.activeTicket) return;
+  const currentTags = state.activeTicket.tags || [];
+  const updatedTags = currentTags.filter(t => t !== tagToRemove);
+  await updateTicketTagsApi(updatedTags);
+}
+
+async function updateTicketTagsApi(newTags) {
+  try {
+    const res = await fetch('/api/tickets', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        directory: state.currentDir,
+        ticket_id: state.activeTicket.id,
+        tags: newTags
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to update tags');
+    }
+    await fetchTickets();
+    const updated = state.tickets.find(t => t.id === state.activeTicket.id);
+    if (updated) {
+      openDetailModal(updated);
+    }
+    showToast('Tags updated successfully', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 // CREATE TICKET
 function openNewTicketModal(status = 'open', prefillParent = '') {
   elements.createTicketForm.reset();
@@ -1812,6 +1903,20 @@ function setupEventListeners() {
       submitReviewNote();
     }
   });
+
+  const detailAddTagBtn = document.getElementById('detailAddTagBtn');
+  if (detailAddTagBtn) {
+    detailAddTagBtn.addEventListener('click', addTagToDetail);
+  }
+  const detailNewTagInput = document.getElementById('detailNewTagInput');
+  if (detailNewTagInput) {
+    detailNewTagInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addTagToDetail();
+      }
+    });
+  }
 
   // Parent linking
   const detailToggleParentBtn = document.getElementById('detailToggleParentBtn');
