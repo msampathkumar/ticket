@@ -185,7 +185,7 @@ cmd_sync() {
             labels_str=$(echo "$issues_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
 
             ext_ref="gh-issue-$num"
-            local tags="github-sync,issue"
+            local tags="github-sync,github,issue,issue#$num"
             [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
             local local_id
             if local_id=$(find_local_ticket_by_ref "$ext_ref"); then
@@ -238,7 +238,7 @@ cmd_sync() {
             labels_str=$(echo "$prs_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
 
             ext_ref="gh-pr-$num"
-            local tags="github-sync,pr"
+            local tags="github-sync,github,pr,pr#$num"
             [[ -n "$labels_str" ]] && tags="$tags,$labels_str"
             local local_id
             if local_id=$(find_local_ticket_by_ref "$ext_ref"); then
