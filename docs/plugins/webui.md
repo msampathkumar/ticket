@@ -74,4 +74,4 @@ The Web UI manages its runtime state locally without requiring an external datab
 - **Default Host**: `127.0.0.1` (localhost).
 - **Daemon State File**: `~/.local/state/tk/webui.json` (records daemon PID, bound port, URL, and active project path).
 - **Daemon Logs**: `~/.local/state/tk/webui.log` (automatically rotated).
-- **Theme Engine**: Defaults to Indigo (`#6366f1`) with light/dark mode support; preferences persist in browser `localStorage`.
+- **Theme Engine**: Defaults to Indigo (`#6366f1`) with light/dark mode support; preferences persist in browser `localStorage`. In light mode, container and card borders use high-contrast slate-300 borders with dynamic brand-color hover transitions.

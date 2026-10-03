@@ -436,6 +436,19 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 
 ## [Unreleased]
 
+### Added
+- SCION Task Force: Pluggable Dual-Mode SCION Hub integration (`--project <dir>` with Hub routing, fallback to `--no-hub` offline mode).
+- SCION Task Force: Interactive setup wizard (`tk scion-taskforce init` and `tk scion-taskforce init --defaults`) with automatic project template seeding (`.scion/templates/taskforce-worker/`).
+- SCION Task Force: Verification test runner (`tk scion-taskforce test`) validating provider runtime, GCP ADC, Vertex AI Model Garden, and agent container execution.
+- SCION Task Force: Automated Google Cloud Vertex AI region injection (`GOOGLE_CLOUD_REGION=us-east5`) for Anthropic Claude models on Model Garden.
+- Agent Skill: Comprehensive developer and AI agent operational guide with full CLI reference, 5-step loop, and GitHub repository / documentation links.
+
+### Fixed
+- SCION Task Force: Cleaned up deprecated `harness` and `harness_config` schema fields in generated agent templates.
+- SCION Task Force: Enhanced Podman container discovery via suffix matching (`podman ps -q --filter name=--<id>$`).
+- SCION Task Force: Automatically strip `waiting-for-review` from both main ticket and worker workspace ticket upon wake.
+- Web UI: Increased border contrast depth in light theme (`border-slate-300`).
+
 ## [0.4.0] - 2026-10-03
 
 ### Added
@@ -524,155 +537,198 @@ Initial release.
 <file path="agent-skill/tk/SKILL.md">
 ---
 name: tk
-description: Manage local tickets, tasks, bugs, dependencies, and project planning using the tk minimal, offline task tracker with dependency intelligence and tk-webui.
+description: Minimal, dependency-aware task tracker. Built to scale agentic workflows. Manage tickets, DAG dependencies, Kanban Web UI, GitHub sync, and autonomous SCION task forces.
 ---
 
-# tk - Agent Skill Guide
+# tk - Developer & Agent Operational Guide
 
-This skill equips agents to interact with **`tk`**, a **minimal, offline task tracker with dependency intelligence** designed for AI agents and human developers.
+`tk` (`ticket`) is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
 
-## Overview
+- **Repository**: [https://github.com/msampathkumar/ticket](https://github.com/msampathkumar/ticket)
+- **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)
+- **LLM Context Endpoints**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
 
-Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` directory at the project root. All operations are local, plain-text, and trackable with git.
+---
 
-## Core Commands Reference
+## 1. Installation & Setup
 
-### 1. Ticket Lifecycle
-- **Initialize Repository**:
-  ```bash
-  tk init [directory]   # Initialize .tickets tracking repository
-  ```
+Any coding agent or developer can install `tk` directly:
 
-- **Create**:
-  ```bash
-  tk create "Feature title" -t feature -p 2 -d "Detailed description" --tags "ui,backend"
-  ```
-  Options:
-  - `-t, --type`: `bug` | `feature` | `task` | `epic` | `chore` (default: `task`)
-  - `-p, --priority`: `0` (critical) to `4` (trivial) (default: `2`)
-  - `-a, --assignee`: Assignee name / username
-  - `-d, --description`: Description text
-  - `--design`: Architecture / design notes
-  - `--acceptance`: Acceptance criteria checklist
-  - `--parent`: Parent ticket ID for subtasks (or `--parent none` to unlink)
-  - `--external-ref`: GitHub issue / PR / JIRA reference (e.g. `gh-42`)
-  - `--tags`: Comma-separated tags
-
-- **Inspect**:
-  ```bash
-  tk show <ticket-id>
-  ```
-
-- **Update**:
-  ```bash
-  tk update <ticket-id> -p 1 -a "Developer" -d "New details" --tags "urgent"
-  ```
-
-- **Status transitions**:
-  ```bash
-  tk start <ticket-id>     # In progress
-  tk close <ticket-id>     # Closed
-  tk reopen <ticket-id>    # Back to open
-  tk status <ticket-id> <open|in_progress|closed>
-  ```
-
-- **Add Review / Progress Note**:
-  ```bash
-  tk add-note <ticket-id> "Review feedback or progress update"
-  ```
-
-- **List & Filter Tickets**:
-  ```bash
-  tk ls                          # List tickets (hides closed, limit 10 by default)
-  tk ls --full                   # List all open tickets without limit
-  tk ls --status=closed          # List closed tickets
-  tk ls -a "Developer" --type bug # Filter by assignee and type
-  ```
-
-- **Search & Query**:
-  ```bash
-  tk find "search query"         # Search text across title, desc, notes
-  tk query                       # Stream tickets as JSON lines
-  tk query '.priority == "0"'    # Query with jq filter
-  tk edit <ticket-id>            # Open in $EDITOR
-  ```
-
-### 2. Dependency Management & Symmetrical Links
-- **Add dependency**:
-  ```bash
-  tk dep <ticket-id> <blocker-id>   # <ticket-id> now depends on <blocker-id>
-  ```
-- **Remove dependency**:
-  ```bash
-  tk undep <ticket-id> <blocker-id>
-  ```
-- **Link related tickets (symmetric)**:
-  ```bash
-  tk link <ticket-a> <ticket-b>     # Relates tickets without blocking semantics
-  ```
-- **Unlink related tickets**:
-  ```bash
-  tk unlink <ticket-a> <ticket-b>
-  ```
-- **Show dependency tree**:
-  ```bash
-  tk dep tree <ticket-id>
-  ```
-- **Detect dependency cycles**:
-  ```bash
-  tk dep cycle
-  ```
-- **Query Ready / Unblocked tasks**:
-  ```bash
-  tk ready       # Lists tickets whose dependencies are all closed
-  ```
-- **Query Blocked tasks**:
-  ```bash
-  tk blocked     # Lists tickets waiting on unresolved dependencies
-  ```
-- **Recently closed tasks**:
-  ```bash
-  tk closed      # Lists recently closed tickets
-  ```
-
-### 3. Interactive Web UI & Background Server
+### Option A: Install from GitHub (Zero Clone via NPX or Curl)
 ```bash
-# Foreground server on port 8475 (ASCII: T=84, K=75)
-tk webui [optional-dir]
-
-# Background daemon server management
-tk webui server start [dir]    # Start daemon in background
-tk webui server status         # Check status, URL, and PID
-tk webui server stop           # Stop background daemon
-tk webui server restart [dir]  # Restart background daemon
+# Direct agent skill installation
+npx github:msampathkumar/ticket agent-skill --install
 ```
 
-### 4. GitHub Synchronization Plugin
+### Option B: Clone & Install Full Suite
 ```bash
-tk github sync                 # Sync open GitHub issues & PRs to .tickets/
-tk github sync --issues        # Sync only issues
-tk github sync --prs           # Sync only PRs
-tk github list                 # List synced GitHub tickets
-tk github unsync -y            # Remove synced tickets
+git clone https://github.com/msampathkumar/ticket.git
+cd ticket
+
+# Full Suite: Core CLI + Web UI + Agent Skill (Default)
+./install.sh --full
+
+# Or install everything including optional plugins (GitHub & SCION Task Force):
+./install.sh --all
+
+# Or core POSIX Bash CLI only (pure Bash, zero Python/Node runtime required):
+./install.sh --core
+```
+Binaries are placed in `~/.local/bin/` (`tk`, `tk-webui`, `tk-github`, `tk-scion-taskforce`). Ensure `~/.local/bin` is in `$PATH`.
+
+---
+
+## 2. Core Concepts & Storage
+
+- **Pure Plain Text & Git-Backed**: State is stored in `.tickets/*.md` files with YAML frontmatter. Zero external databases.
+- **DAG Dependency Graph**: Native support for parent-child hierarchies (`--parent`), blocking dependencies (`tk dep`), cycle detection (`tk dep cycle`), and automated downstream unblocking upon ticket completion.
+- **Discovered Discovery**: Running `tk help` automatically lists all built-in commands and dynamically discovers installed plugins (`tk-<cmd>` or `ticket-<cmd>`).
+
+---
+
+## 3. The 5-Step Autonomous Agent Workflow Loop
+
+When operating in repositories tracked by `tk`, autonomous coding agents follow this deterministic operational loop:
+
+```mermaid
+flowchart LR
+    A["1. Query Actionable Work<br/>`tk ready`"] --> B["2. Claim Ticket<br/>`tk start <id>`"]
+    B --> C["3. Inspect & Decompose<br/>`tk show <id>`"]
+    C --> D["4. Execute & Audit<br/>`tk add-note <id> '...'`"]
+    D --> E["5. Close & Unblock<br/>`tk close <id>`"]
 ```
 
-### 5. Other Optional Plugins
-Plugins are discovered automatically: `tk help` lists every installed `tk-<name>` with a one-line description, so check it before assuming a command exists.
+1. **Discover Actionable Tasks**:
+   Run `tk ready` to list unblocked tickets whose dependencies have all been satisfied. Never pick blocked tasks out of order.
+2. **Claim the Task**:
+   Run `tk start <id>` to transition status to `in_progress`, signaling to humans and other agents that the ticket is claimed.
+3. **Inspect Requirements & Subtasks**:
+   Run `tk show <id>` to inspect design notes, acceptance criteria checklists, and parent/child hierarchies.
+   Decompose complex tasks into subtasks:
+   ```bash
+   tk create "Implement backend endpoint" --parent <epic-id> -t task
+   tk create "Build frontend UI modal" --parent <epic-id> -t task
+   tk dep <frontend-id> <backend-id>
+   ```
+4. **Implement, Verify & Record Notes**:
+   Execute the code changes, run automated tests, and append timestamped review audit notes:
+   ```bash
+   tk add-note <id> "Implemented changes and passed test suite."
+   ```
+5. **Close the Ticket**:
+   Run `tk close <id>`. This resolves the ticket and automatically unblocks all downstream dependent tickets.
 
-- **`tk scion-taskforce`** (optional): a daemon that launches an autonomous SCION coding worker for each ticket a *human* has tagged `taskforce`. **Agents must not add the `taskforce` tag themselves.** If you are the worker, finish by `tk add-note <id> "..."` and tag the ticket `waiting-for-review`; use `tk scion-taskforce status` to inspect the pool.
+---
 
-## Agent Best Practices
+## 4. Complete CLI Reference
 
-1. **Check `tk ready` before picking up work**:
-   Always run `tk ready` to find actionable, unblocked tickets rather than picking blocked ones.
-2. **Start the ticket**:
-   Run `tk start <id>` when beginning work so other team members and agents know it's in progress.
-3. **Decompose complex features**:
-   Create subtasks with `tk create "<title>" --parent <epic-id>` and wire `tk dep <child> <blocker>`.
-4. **Document review notes**:
-   Use `tk add-note <id> "..."` when submitting code for review or recording architectural findings.
-5. **Close upon completion**:
-   Run `tk close <id>` when verification and tests pass.
+### Repository & Ticket Management
+```bash
+# Initialize tracking in current repository
+tk init [directory]
+
+# Create a ticket
+tk create "Title" -t feature -p 1 -d "Description" --tags "backend,auth"
+# Options:
+#   -t, --type: bug | feature | task | epic | chore (default: task)
+#   -p, --priority: 0 (critical) to 4 (trivial) (default: 2)
+#   -a, --assignee: Name or username
+#   -d, --description: Description text
+#   --design: Architecture / design notes
+#   --acceptance: Acceptance criteria checklist
+#   --parent: Parent ticket ID (or 'none' to unlink)
+#   --external-ref: External reference (e.g. gh-42, JIRA-101)
+#   --tags: Comma-separated tags
+
+# Inspect ticket
+tk show <ticket-id>
+
+# Update ticket fields
+tk update <ticket-id> -p 1 -a "Developer" --tags "urgent"
+
+# Status changes
+tk start <ticket-id>                       # Mark in_progress
+tk close <ticket-id>                       # Mark closed
+tk reopen <ticket-id>                      # Reopen ticket
+tk status <ticket-id> <open|in_progress|closed>
+
+# Append audit notes
+tk add-note <ticket-id> "Progress update or review feedback"
+
+# Listings & Search
+tk ls                                      # List tickets (hides closed, limit 10)
+tk ls --full                               # List all open tickets without limit
+tk ls --status=closed                      # List closed tickets
+tk ls -a "Developer" --type bug            # Filter by assignee and type
+tk find "search query"                     # Search across titles, body, and notes
+tk query                                   # Stream tickets as JSON lines
+tk query '.priority == "0"'                # Query via jq filter
+tk edit <ticket-id>                        # Open ticket in $EDITOR
+```
+
+### Dependency Management & DAG Queries
+```bash
+tk dep <child-id> <blocker-id>             # <child-id> now depends on <blocker-id>
+tk undep <child-id> <blocker-id>           # Remove dependency
+tk link <ticket-a> <ticket-b>              # Symmetrical link without blocking semantics
+tk unlink <ticket-a> <ticket-b>            # Remove symmetrical link
+tk dep tree <ticket-id>                    # Show dependency tree
+tk dep cycle                               # Detect dependency cycles in open tickets
+tk ready                                   # Query actionable tickets (all deps closed)
+tk blocked                                 # Query blocked tickets (waiting on deps)
+tk closed                                  # List recently closed tickets
+```
+
+---
+
+## 5. Official Plugins Reference
+
+Plugins are discovered automatically from `$PATH` matching `tk-<name>` or `ticket-<name>`. Use `tk super <command>` to bypass plugins and run built-in commands directly.
+
+### 5.1 Interactive Web UI (`tk webui`)
+Interactive 4-lane drag-and-drop Kanban board, live DAG Mind Map graph, table view, and project switcher on default **port `8475`** (ASCII `T=84`, `K=75`):
+```bash
+# Foreground launch
+tk webui [dir]
+
+# Background singleton daemon management
+tk webui server start [dir]                # Start daemon in background
+tk webui server status                     # Check URL, PID, and active project
+tk webui server stop                       # Stop background daemon
+tk webui server restart [dir]              # Restart background daemon
+```
+
+### 5.2 GitHub Issue & PR Sync (`tk github`)
+Bi-directional sync between local `.tickets/` markdown files and GitHub issues/pull requests:
+```bash
+tk github sync                             # Sync issues and PRs
+tk github sync --issues                    # Sync only issues
+tk github sync --prs                       # Sync only pull requests
+tk github list                             # List synced GitHub tickets
+tk github unsync -y                        # Remove synced tickets
+```
+
+### 5.3 SCION Task Force (`tk scion-taskforce`)
+Autonomous multi-agent worker orchestration daemon wrapping the SCION agent runtime with human review checkpoints:
+```bash
+# Interactive project setup wizard & template seeder
+tk scion-taskforce init                    # Interactive setup (wizard)
+tk scion-taskforce init --defaults         # Non-interactive with sensible defaults
+
+# Verification test run
+tk scion-taskforce test                    # Verifies provider, model garden, and agent container
+
+# Global daemon management
+tk scion-taskforce server start [dir]      # Start daemon for project
+tk scion-taskforce status                  # Inspect worker pool and project status
+tk scion-taskforce server stop             # Stop taskforce daemon
+tk scion-taskforce attach <id>             # Attach to an active worker session
+```
+
+> **Rules for Task Force**:
+> - Only tickets tagged `taskforce` by human operators are claimed by autonomous workers.
+> - Workers keep the ticket `in_progress` with the label `waiting-for-review`, record progress via `tk add-note`, and pause.
+> - When feedback is added via `tk add-note`, the daemon wakes the worker to iterate.
 </file>
 
 <file path="tk_webui/WEBUI-SPEC.md">
@@ -2338,7 +2394,7 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 
 - **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
 - **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
-- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Single global daemon that launches a SCION coding worker for each ticket explicitly tagged `taskforce`, verifies the worker actually started, pauses it on `waiting-for-review`, and emits OpenTelemetry to local rotating logs. *(optional; requires Python 3.9+ and the `scion` CLI)*
+- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Autonomous worker orchestrator wrapping SCION Hub (`http://127.0.0.1:8080`). Features an interactive setup wizard (`tk scion-taskforce init`), automated test runner (`tk scion-taskforce test`), project worker templates (`.scion/templates/taskforce-worker`), Vertex AI Model Garden integration, and OpenTelemetry logging. *(optional; requires Python 3.9+ and the `scion` CLI)*
 
 ---
 
@@ -2527,24 +2583,29 @@ description: Autonomous multi-agent worker orchestration plugin for ticket.
 
 The **SCION Task Force** (`tk-scion-taskforce`) is an optional standalone orchestrator plugin that manages autonomous coding workers mapped 1:1 to tickets.
 
+It wraps directly on top of the native **SCION Hub** (`http://127.0.0.1:8080`) rather than running a parallel conflicting daemon, bridging `tk` dependency DAGs with isolated containerized agent execution.
+
 ---
 
 ## Prerequisites
 
 Before running the SCION Task Force daemon, ensure your system meets the following requirements:
 
-1. **Python 3.9+**: Required for the daemon runtime and OpenTelemetry logging.
+1. **Python 3.9+**: Required for the task force CLI and OpenTelemetry logging.
 2. **SCION CLI (`scion`)**: Must be installed and available in your `$PATH` ([GoogleCloudPlatform/scion](https://github.com/GoogleCloudPlatform/scion)):
     ```bash
     scion --version
     ```
-3. **Container Runtime**: A running container daemon (**Docker** or **Podman**). SCION uses containers to isolate each autonomous coding agent.
-4. **Project Initialization**: Each repository monitored by the task force must be initialized with SCION:
+3. **Container Runtime**: A running container daemon (**Podman** or **Docker**). SCION uses containers to isolate each autonomous coding agent.
+4. **Google Cloud ADC (Optional for Vertex AI models)**: If using Claude or Gemini models via Google Cloud Vertex AI Model Garden:
     ```bash
-    cd /path/to/project
-    scion init
+    gcloud auth application-default login
     ```
-5. **Opt-in Tag**: The daemon only claims tickets explicitly tagged with `taskforce`. Human engineers maintain full control over which tasks are delegated.
+5. **Project Initialization**: Initialize taskforce configuration and worker templates in each monitored repository:
+    ```bash
+    tk scion-taskforce init
+    ```
+6. **Opt-in Tag**: The taskforce only claims tickets explicitly tagged with `taskforce`. Human engineers maintain full control over which tasks are delegated.
 
 ---
 
@@ -2556,7 +2617,52 @@ Install the plugin via the modular installer:
 ./install.sh --scion-taskforce
 ```
 
-This installs `tk-scion-taskforce` to `~/.local/bin/` and sets up the isolated Python virtual environment.
+This installs `tk-scion-taskforce` to `~/.local/bin/`. Ensure `~/.local/bin` is in your `$PATH`.
+
+---
+
+## Setup & Verification
+
+### 1. Interactive Setup Wizard (`tk scion-taskforce init`)
+
+Run the setup wizard in your repository to configure the project orchestrator and seed the worker template:
+
+```bash
+# Interactive setup with guided prompts and defaults
+tk scion-taskforce init
+
+# Or non-interactive setup with production defaults
+tk scion-taskforce init --defaults
+
+# Force overwrite existing templates
+tk scion-taskforce init --force
+```
+
+The setup wizard configures:
+- **SCION Harness Engine**: Defaults to `claude` (Claude Code) or `opencode`.
+- **Model**: Default model ID or alias (blank for Model Garden Claude Sonnet via Vertex AI).
+- **Google Cloud Settings**: Automatically detects active `gcloud` project ID and sets default region (`us-east5` for Vertex AI Anthropic models).
+- **Project Template**: Seeds `.scion/templates/taskforce-worker/` with `scion-agent.yaml`, `agents.md`, and `system-prompt.md`.
+- **Project Configuration**: Generates `.scion-taskforce/scion-taskforce.yaml` and `.scion-taskforce/prompt.md`.
+
+### 2. End-to-End Test Worker (`tk scion-taskforce test`)
+
+Verify your SCION Hub connection, container permissions, and model authentication with a real test run:
+
+```bash
+# Run standard test worker
+tk scion-taskforce test
+
+# Or run with a custom test prompt
+tk scion-taskforce test --prompt "Create a hello.txt file and exit"
+```
+
+The test runner:
+1. Provisions an isolated test worker through the SCION Hub (`http://127.0.0.1:8080`).
+2. Automatically accepts container workspace trust prompts.
+3. Watches the agent write `poem.md` (default: 4-line poem about the latest Google Gemini model).
+4. Verifies the generated file in the local workspace.
+5. Cleans up the test worker container and temporary test artifacts.
 
 ---
 
@@ -2567,58 +2673,87 @@ sequenceDiagram
     autonumber
     actor Dev as Human Developer
     participant TK as ticket (.tickets/)
-    participant Daemon as SCION Daemon
-    participant Worker as Autonomous AI Worker
+    participant TF as Task Force Daemon
+    participant Hub as SCION Hub (:8080)
+    participant Worker as Autonomous AI Worker Pod
 
     Dev->>TK: Creates ticket & tags 'taskforce'
-    Daemon->>TK: Watches for `tk ready` with tag:taskforce
-    Daemon->>Worker: Spawns 1:1 container matching ticket ID
+    TF->>TK: Watches for `tk ready` with tag:taskforce
+    TF->>Hub: Spawns worker using 'taskforce-worker' template
+    Hub->>Worker: Starts container with workspace mount
     Worker->>TK: Claims task via `tk start (id)`
     Worker->>Worker: Writes code & executes tests
     Worker->>TK: Logs audit note & sets tag `waiting-for-review`
-    Worker->>Daemon: Pauses container execution
-    Dev->>TK: Reviews notes & code diffs in Web UI
+    Worker->>TF: Pauses container execution
+    Dev->>TK: Reviews notes & diffs in Web UI
     Dev->>TK: Approves and marks `tk close (id)`
-    Daemon->>Worker: Tears down worker container
+    TF->>Hub: Cleans up worker container
 ```
 
-1. **Singleton Daemon**: A single background daemon (`~/.local/state/tk/scion-taskforce.json`) watches `.tickets/` directories across all registered projects.
+1. **SCION Hub Wrapper**: The task force bridges `tk` tickets to the SCION daemon/Hub running on `http://127.0.0.1:8080`.
 2. **1:1 Worker Mapping**: When a ticket becomes `ready` with the `taskforce` tag, a dedicated worker container is spawned named after the ticket ID.
-3. **Review Pause**: The worker executes the task, passes local tests, logs findings with `tk add-note`, and automatically pauses on `waiting-for-review`.
-4. **Human Verification**: Human engineers review the output in the Web UI and close the ticket, which automatically cleans up the worker.
+3. **Workspace Isolation**: Workers execute inside containers mounting the repository checkout, with branch isolation per ticket.
+4. **Review Pause**: The worker passes tests, logs findings with `tk add-note`, and pauses on `waiting-for-review`.
+5. **Feedback Loop**: Engineers can send review feedback using `tk scion-taskforce feedback <id> "..."` which wakes the paused worker with your comments.
+6. **Human Verification**: Human engineers review output in the Web UI and close the ticket, triggering pod garbage collection.
 
 ---
 
-## Daemon Commands
+## Command Reference
 
-```bash
-# Start background daemon for current project
-tk scion-taskforce start
+| Command | Description |
+| :--- | :--- |
+| `tk scion-taskforce init [--defaults] [--force]` | Initialize project configuration and worker templates |
+| `tk scion-taskforce test [--prompt "<text>"]` | Run end-to-end test worker to verify SCION Hub & LLM credentials |
+| `tk scion-taskforce start [dir]` | Start task force for project (boots global daemon if not running) |
+| `tk scion-taskforce status` | Inspect daemon status, watched projects, and active workers |
+| `tk scion-taskforce stop [dir] \| --all` | Stop task force for one project or terminate global daemon (`--all`) |
+| `tk scion-taskforce dispatch [<id>]` | Claim and spawn worker for `<id>` or all ready tickets |
+| `tk scion-taskforce feedback <id> "<msg>"` | Add review feedback, remove `waiting-for-review`, and wake worker |
+| `tk scion-taskforce attach <id>` | Attach interactively to worker terminal session |
+| `tk scion-taskforce pause <id>` | Manually pause worker container |
+| `tk scion-taskforce logs [<id>]` | View OpenTelemetry daemon or worker logs (including rotated `.gz`) |
+| `tk scion-taskforce brief <id>` | Inspect generated worker brief for a ticket |
+| `tk scion-taskforce trace [<id>]` | Inspect OpenTelemetry trace spans |
+| `tk scion-taskforce gc [--force]` | Run 5-day closed pod garbage collection and 30-day log cleanup |
+| `tk scion-taskforce project list` | List all registered project directories |
 
-# Inspect running daemon, registered projects, and active worker pool
-tk scion-taskforce status
+---
 
-# Stop background daemon
-tk scion-taskforce stop
+## Configuration (`scion-taskforce.yaml`)
 
-# Attach to an active worker session for interactive debugging
-tk scion-taskforce attach <ticket-id>
+Configuration resides in `.scion-taskforce/scion-taskforce.yaml` (project overrides) or `~/.config/tk/scion-taskforce.yaml` (global defaults):
+
+```yaml
+version: 1
+
+tags:
+  claim: taskforce                # Opt-in tag required to trigger task force
+  ignore: no-taskforce            # Safety override to skip tickets
+  review: waiting-for-review      # Tag added by worker when pausing for review
+
+watcher:
+  poll_interval_seconds: 15       # Reconcile interval across projects
+  max_concurrent: 10              # Maximum workers across all projects
+  max_concurrent_per_project: 1   # Max concurrent workers per repository
+  gc_retention_days: 5            # Days to retain paused pods after ticket closed
+  auto_pause_on_review: true      # Pause pod when waiting-for-review tag is added
+  auto_wake_on_feedback: true     # Resume pod when review note is added
+
+provider:
+  driver: scion                   # Backend driver
+  binary: scion                   # Provider CLI command
+  template: taskforce-worker      # SCION template in .scion/templates/
+  harness_config: claude          # Harness engine (claude or opencode)
+  model: ""                       # Model ID (blank for Vertex AI default)
+  extra_start_args: ["--harness-auth", "vertex-ai"]
+  auto_accept_prompts: true       # Auto-confirm workspace trust prompts
+
+telemetry:
+  enabled: true
+  log_dir: ~/.local/state/tk/scion-taskforce/logs
+  retention_days: 30              # Retain rotated logs for 30 days
 ```
-
-Local rotating logs and OpenTelemetry traces are stored at `~/.local/state/tk/scion-taskforce/logs/` and `.tickets/.scion-taskforce-logs/`.
-
----
-
-## Configuration & State
-
-- **Singleton Registry**: Host-wide daemon state is tracked at `~/.local/state/tk/scion-taskforce.json` (registers active projects, workers, and PID).
-- **Dynamic Registration**: Running `tk scion-taskforce start [path]` registers any target directory into the running singleton watchlist without spawning duplicate daemons.
-- **Tag Policies**:
-  - `taskforce`: Opt-in tag required for worker execution.
-  - `no-taskforce`: Explicit override tag to ignore a task.
-  - `waiting-for-review`: Automated checkpoint tag applied upon test pass.
-- **Telemetry & Logs**: Global daemon logs and OTel traces are stored at `~/.local/state/tk/scion-taskforce/logs/` (30-day retention with local rotation), with per-project symlinks at `.tickets/.scion-taskforce-logs/`.
-- **Worker Retention**: Completed worker containers are automatically cleaned up after 5 days.
 </file>
 
 <file path="docs/plugins/webui.md">
@@ -2698,7 +2833,7 @@ The Web UI manages its runtime state locally without requiring an external datab
 - **Default Host**: `127.0.0.1` (localhost).
 - **Daemon State File**: `~/.local/state/tk/webui.json` (records daemon PID, bound port, URL, and active project path).
 - **Daemon Logs**: `~/.local/state/tk/webui.log` (automatically rotated).
-- **Theme Engine**: Defaults to Indigo (`#6366f1`) with light/dark mode support; preferences persist in browser `localStorage`.
+- **Theme Engine**: Defaults to Indigo (`#6366f1`) with light/dark mode support; preferences persist in browser `localStorage`. In light mode, container and card borders use high-contrast slate-300 borders with dynamic brand-color hover transitions.
 </file>
 
 <file path="docs/SPEC.md">
@@ -2914,7 +3049,7 @@ Any dependent tasks are automatically unblocked and immediately appear in `tk re
 <file path="docs/workflows/scion-taskforce.md">
 ---
 title: SCION Task Force Workflow
-description: Autonomous multi-agent engineering workflows with 1:1 ticket workers and human review checkpoints.
+description: Autonomous multi-agent engineering workflows with 1:1 ticket workers, SCION Hub execution, and human review checkpoints.
 ---
 
 The **SCION Task Force Workflow** allows teams to delegate actionable engineering tasks directly to autonomous coding agents while maintaining oversight through human review checkpoints.
@@ -2928,26 +3063,63 @@ sequenceDiagram
     autonumber
     actor Developer as Human Developer
     participant TK as ticket (.tickets/)
-    participant Daemon as SCION Daemon
+    participant TF as Task Force Orchestrator
+    participant Hub as SCION Hub (:8080)
     participant Worker as Autonomous AI Worker
 
+    Developer->>TF: tk scion-taskforce init (--defaults)
+    Developer->>TF: tk scion-taskforce test (Verify setup)
     Developer->>TK: Creates ticket & tags 'taskforce'
-    Daemon->>TK: Polls tk ready with tag:taskforce
-    Daemon->>Worker: Spawns 1:1 worker container
-    Worker->>TK: Runs tk start (id)
+    TF->>TK: Polls `tk ready` with tag:taskforce
+    TF->>Hub: Spawns 1:1 worker container
+    Worker->>TK: Runs `tk start <id>`
     Worker->>Worker: Writes code & executes tests
-    Worker->>TK: Runs tk add-note & sets tag waiting-for-review
-    Worker->>Daemon: Pauses execution
+    Worker->>TK: Runs `tk add-note` & sets tag `waiting-for-review`
+    Worker->>TF: Pauses execution
     Developer->>TK: Reviews notes & diffs in Web UI
-    Developer->>TK: Approves & closes ticket (tk close)
-    Daemon->>Worker: Terminates worker cleanly
+    alt Additional Changes Needed
+        Developer->>TF: tk scion-taskforce feedback <id> "..."
+        TF->>Worker: Wakes worker to continue implementation
+    else Approved
+        Developer->>TK: Approves & closes ticket (`tk close <id>`)
+        TF->>Hub: Cleans up worker container
+    end
 ```
 
 ---
 
 ## Step-by-Step Walkthrough
 
-### 1. Tag Work for Autonomous Execution
+### 1. Initialize Task Force for Your Project
+
+Run the setup wizard to configure orchestrator defaults and seed the project worker template:
+
+```bash
+# Guided interactive setup
+tk scion-taskforce init
+
+# Or 1-step non-interactive initialization
+tk scion-taskforce init --defaults
+```
+
+This creates:
+- `.scion-taskforce/scion-taskforce.yaml`: Project orchestrator configuration.
+- `.scion/templates/taskforce-worker/`: Worker template with custom instructions.
+
+### 2. Verify Hub & Model Credentials
+
+Run the end-to-end verification test before delegating real tasks:
+
+```bash
+tk scion-taskforce test
+```
+
+This verifies that:
+- Your local container runtime and SCION Hub (`http://127.0.0.1:8080`) are active.
+- Google Cloud Application Default Credentials (ADC) or API keys are valid.
+- The worker can read/write files in the mounted repository workspace.
+
+### 3. Tag Actionable Work for Autonomous Execution
 
 Delegate actionable tickets to autonomous workers by adding the `taskforce` tag:
 
@@ -2958,31 +3130,51 @@ tk create "Add input sanitization to auth endpoints" \
   --acceptance "Run make test and ensure all pass"
 ```
 
-### 2. Daemon Worker Spawning
+### 4. Background Worker Spawning
 
-The background SCION daemon detects ready tickets tagged with `taskforce` and provisions isolated worker instances:
+Start the task force daemon (or run it in the foreground for live logs):
 
 ```bash
+# Start background daemon
+tk scion-taskforce start
+
+# Check active workers and project status
 tk scion-taskforce status
 ```
 
-### 3. Review Checkpoint
+When a ticket's dependencies are satisfied (`tk ready`), the task force spawns an isolated container via the SCION Hub, moves the ticket to `in_progress`, and mounts the project directory.
+
+### 5. Review Checkpoint & Feedback
 
 When the worker finishes writing code and passing local tests:
 
 1. It records verification notes via `tk add-note <id> "..."`.
 2. It tags the ticket with `waiting-for-review`.
-3. The worker pauses execution.
+3. The worker container automatically pauses.
 
-### 4. Human Verification & Closure
-
-Review the audit trail and code diff in the Web UI (`http://localhost:8475`), then close the ticket:
+Inspect the work in the Web UI (`http://localhost:8475`) or CLI:
 
 ```bash
-tk close tic-auth1
+tk show <ticket-id>
 ```
 
-Closing the ticket automatically unblocks downstream tasks in the DAG.
+If modifications are needed, send feedback directly to the paused worker:
+
+```bash
+tk scion-taskforce feedback <ticket-id> "Fix the edge case in auth validation"
+```
+
+The worker wakes up, reads the feedback, and resumes execution.
+
+### 6. Human Approval & Ticket Closure
+
+Once satisfied with the changes and test results, close the ticket:
+
+```bash
+tk close <ticket-id>
+```
+
+Closing the ticket automatically unblocks downstream tasks in your dependency DAG and schedules the worker container for cleanup.
 </file>
 
 <file path="docs/workflows/webui-team.md">
