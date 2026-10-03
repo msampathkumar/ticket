@@ -218,7 +218,7 @@ def serve_index():
 
 
 def print_version():
-    print("""tk-webui version 0.2.0
+    print("""tk-webui version 0.4.0
 
 Interactive Kanban Web UI & PR review dashboard for tk.
 Created by Sampath Kumar & wedow contributors
@@ -229,7 +229,7 @@ Thank you for using tk! If you find it helpful, please star the repo or contribu
 
 
 def print_help(prog="tk webui"):
-    print(f"""{prog} (v0.2.0) — Interactive Kanban Web UI & PR review dashboard.
+    print(f"""{prog} (v0.4.0) — Interactive Kanban Web UI & PR review dashboard.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT

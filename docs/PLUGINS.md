@@ -40,7 +40,7 @@ Include a comment in the first 10 lines:
 ```bash
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban Web UI & PR review dashboard
-# tk-plugin-version: 0.2.0
+# tk-plugin-version: 0.4.0
 ```
 
 **Compiled Binaries**:
@@ -54,7 +54,7 @@ tk-plugin: Interactive Kanban Web UI & PR review dashboard
 All plugins should implement `--version` or `-v` flag to output their version:
 ```bash
 $ tk-webui --version
-tk-webui 0.2.0
+tk-webui 0.4.0
 ```
 
 ---

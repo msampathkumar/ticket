@@ -1810,7 +1810,7 @@ cmd_help() {
     local cmd
     cmd=$(basename "$0")
     cat << EOF
-$cmd (v0.2.0) — Minimal, offline task tracker with dependency intelligence.
+$cmd (v0.4.0) — Minimal, offline task tracker with dependency intelligence. Built to scale agentic workflows.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -1891,9 +1891,9 @@ EOF
 
 cmd_version() {
     cat << 'EOF'
-tk version 0.2.0
+tk version 0.4.0
 
-Minimal, offline task tracker with dependency intelligence.
+Minimal, offline task tracker with dependency intelligence. Built to scale agentic workflows.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT

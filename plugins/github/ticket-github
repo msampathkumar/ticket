@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # tk-plugin: Sync GitHub issues and pull requests into local tickets
-# tk-plugin-version: 0.2.0
+# tk-plugin-version: 0.4.0
 
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.4.0"
 
 # Find tk executable if TK_SCRIPT not passed
 if [[ -z "${TK_SCRIPT:-}" ]]; then

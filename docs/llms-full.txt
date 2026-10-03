@@ -210,8 +210,6 @@ Minimal, dependency-aware task tracker. Built to scale agentic workflows.
 - **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)
 - **LLM Context**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
 
-Inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html), `tk` manages and queries task dependency graphs in plain text.
-
 ---
 
 ## Terminal Demo
@@ -303,7 +301,8 @@ make docs-build  # Build production static bundle and refresh LLM files
 
 ## Credits & Acknowledgments
 
-Built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project.
+- Built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project.
+- Inspired by Joe Armstrong's concept of the [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html).
 
 ---
 
@@ -436,6 +435,16 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 # Changelog
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-10-03
+
+### Added
+- Interactive Web UI plugin (`tk-webui`): 4-lane Kanban board, interactive DAG dependency canvas, table view, timeline audit feed, and background daemon manager (`tk webui server start|status|stop`) on default port 8475.
+- Documentation portal powered by Zensical with native Mermaid diagram support and live GitHub Pages deployment.
+- Machine-readable documentation endpoints: `docs/llms.txt` index and `docs/llms-full.txt` consolidated knowledge base generated via `make docs-build`.
+- NPX support: root `package.json` enabling direct agent skill installation via `npx github:msampathkumar/ticket agent-skill --install`.
+- Animated terminal demo recording (`docs/images/demo.gif`) illustrating DAG unblocking and core CLI workflow.
+- Standardized writing style and anti-slop guidelines in `AGENTS.md` (`be-concise`, `quillscore`, and clean technical documentation standards).
 
 ### Fixed
 - Core: `update_yaml_field` used GNU-only `0,/re/` sed addressing; on macOS (BSD sed) adding a field that did not exist yet (e.g. `tk update <id> --tags ...` on a ticket without `tags:`) silently did nothing. Now inserts portably via awk.
@@ -671,7 +680,7 @@ Plugins are discovered automatically: `tk help` lists every installed `tk-<name>
 
 - **Plugin Name**: `tk-webui`
 - **Command**: `tk webui`
-- **Version**: `0.2.0`
+- **Version**: `0.4.0`
 - **Installation**: Included in Full Installation (`./install.sh --full` or `./install.sh --webui`)
 
 ---
@@ -722,7 +731,7 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `directory`: Initial directory containing `.tickets/` (default: current working directory).
 - `--host`: Host IP to bind (default: `127.0.0.1`).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
-- `--version` / `-v`: Displays version and project details (`tk-webui 0.2.0`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.4.0`).
 
 ### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash
@@ -766,7 +775,7 @@ State files and logs are managed under `~/.local/state/tk/`:
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
-- **Version**: `0.2.0`
+- **Version**: `0.4.0`
 - **Installation**: Optional (`./install.sh --github`)
 
 ---
@@ -2288,7 +2297,7 @@ Include a comment in the first 10 lines:
 ```bash
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban Web UI & PR review dashboard
-# tk-plugin-version: 0.2.0
+# tk-plugin-version: 0.4.0
 ```
 
 **Compiled Binaries**:
@@ -2302,7 +2311,7 @@ tk-plugin: Interactive Kanban Web UI & PR review dashboard
 All plugins should implement `--version` or `-v` flag to output their version:
 ```bash
 $ tk-webui --version
-tk-webui 0.2.0
+tk-webui 0.4.0
 ```
 
 ---

@@ -68,7 +68,7 @@ install_webui() {
     cat << EOF > "$BIN_DIR/tk-webui"
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban Web UI & PR review dashboard
-# tk-plugin-version: 0.2.0
+# tk-plugin-version: 0.4.0
 
 exec "$DIR/.venv/bin/python3" -m tk_webui.main "\$@"
 EOF

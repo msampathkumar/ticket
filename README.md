@@ -12,8 +12,6 @@ Minimal, dependency-aware task tracker. Built to scale agentic workflows.
 - **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)
 - **LLM Context**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
 
-Inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html), `tk` manages and queries task dependency graphs in plain text.
-
 ---
 
 ## Terminal Demo
@@ -105,7 +103,8 @@ make docs-build  # Build production static bundle and refresh LLM files
 
 ## Credits & Acknowledgments
 
-Built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project.
+- Built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project.
+- Inspired by Joe Armstrong's concept of the [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html).
 
 ---
 

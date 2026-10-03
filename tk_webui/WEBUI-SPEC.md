@@ -2,7 +2,7 @@
 
 - **Plugin Name**: `tk-webui`
 - **Command**: `tk webui`
-- **Version**: `0.2.0`
+- **Version**: `0.4.0`
 - **Installation**: Included in Full Installation (`./install.sh --full` or `./install.sh --webui`)
 
 ---
@@ -53,7 +53,7 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `directory`: Initial directory containing `.tickets/` (default: current working directory).
 - `--host`: Host IP to bind (default: `127.0.0.1`).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
-- `--version` / `-v`: Displays version and project details (`tk-webui 0.2.0`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.4.0`).
 
 ### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash

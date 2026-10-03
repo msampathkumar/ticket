@@ -1,6 +1,6 @@
 # Maintainer: wedow <wedow@users.noreply.github.com>
 pkgname=ticket-core
-pkgver=0.3.2
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="Minimal ticket tracking in bash (core only)"
 arch=('any')
