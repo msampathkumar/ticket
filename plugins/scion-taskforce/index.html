@@ -1509,7 +1509,7 @@
   <h1 id="__skip">SCION Task Force</h1>
 
 <p>The <strong>SCION Task Force</strong> (<code>tk-scion-taskforce</code>) is an optional standalone orchestrator plugin that manages autonomous coding workers mapped 1:1 to tickets.</p>
-<p>It wraps directly on top of the native <strong>SCION Hub</strong> (<code>http://127.0.0.1:8080</code>) rather than running a parallel conflicting daemon, bridging <code>tk</code> dependency DAGs with isolated containerized agent execution.</p>
+<p>It is a simple, straightforward integration tool for SCION: it bridges <code>tk</code> dependency DAGs with the native <code>scion</code> CLI, delegating container provisioning, workspace mounting, and agent lifecycles directly to SCION.</p>
 <hr />
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Before running the SCION Task Force daemon, ensure your system meets the following requirements:</p>
