@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Autonomous multi-agent engineering workflows with 1:1 ticket workers and human review checkpoints.">
+        <meta name="description" content="Autonomous multi-agent engineering workflows with 1:1 ticket workers, SCION Hub execution, and human review checkpoints.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
@@ -586,10 +586,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-tag-work-for-autonomous-execution" class="md-nav__link">
+  <a href="#1-initialize-task-force-for-your-project" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        1. Tag Work for Autonomous Execution
+        1. Initialize Task Force for Your Project
       </span>
     </span>
   </a>
@@ -597,10 +597,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-daemon-worker-spawning" class="md-nav__link">
+  <a href="#2-verify-hub-model-credentials" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        2. Daemon Worker Spawning
+        2. Verify Hub &amp; Model Credentials
       </span>
     </span>
   </a>
@@ -608,10 +608,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-review-checkpoint" class="md-nav__link">
+  <a href="#3-tag-actionable-work-for-autonomous-execution" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        3. Review Checkpoint
+        3. Tag Actionable Work for Autonomous Execution
       </span>
     </span>
   </a>
@@ -619,10 +619,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-human-verification-closure" class="md-nav__link">
+  <a href="#4-background-worker-spawning" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        4. Human Verification &amp; Closure
+        4. Background Worker Spawning
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-review-checkpoint-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Review Checkpoint &amp; Feedback
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-human-approval-ticket-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Human Approval &amp; Ticket Closure
       </span>
     </span>
   </a>
@@ -1332,10 +1354,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-tag-work-for-autonomous-execution" class="md-nav__link">
+  <a href="#1-initialize-task-force-for-your-project" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        1. Tag Work for Autonomous Execution
+        1. Initialize Task Force for Your Project
       </span>
     </span>
   </a>
@@ -1343,10 +1365,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-daemon-worker-spawning" class="md-nav__link">
+  <a href="#2-verify-hub-model-credentials" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        2. Daemon Worker Spawning
+        2. Verify Hub &amp; Model Credentials
       </span>
     </span>
   </a>
@@ -1354,10 +1376,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-review-checkpoint" class="md-nav__link">
+  <a href="#3-tag-actionable-work-for-autonomous-execution" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        3. Review Checkpoint
+        3. Tag Actionable Work for Autonomous Execution
       </span>
     </span>
   </a>
@@ -1365,10 +1387,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-human-verification-closure" class="md-nav__link">
+  <a href="#4-background-worker-spawning" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        4. Human Verification &amp; Closure
+        4. Background Worker Spawning
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-review-checkpoint-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Review Checkpoint &amp; Feedback
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-human-approval-ticket-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Human Approval &amp; Ticket Closure
       </span>
     </span>
   </a>
@@ -1469,44 +1513,83 @@
     autonumber
     actor Developer as Human Developer
     participant TK as ticket (.tickets/)
-    participant Daemon as SCION Daemon
+    participant TF as Task Force Orchestrator
+    participant Hub as SCION Hub (:8080)
     participant Worker as Autonomous AI Worker
 
+    Developer-&gt;&gt;TF: tk scion-taskforce init (--defaults)
+    Developer-&gt;&gt;TF: tk scion-taskforce test (Verify setup)
     Developer-&gt;&gt;TK: Creates ticket &amp; tags 'taskforce'
-    Daemon-&gt;&gt;TK: Polls tk ready with tag:taskforce
-    Daemon-&gt;&gt;Worker: Spawns 1:1 worker container
-    Worker-&gt;&gt;TK: Runs tk start (id)
+    TF-&gt;&gt;TK: Polls `tk ready` with tag:taskforce
+    TF-&gt;&gt;Hub: Spawns 1:1 worker container
+    Worker-&gt;&gt;TK: Runs `tk start &lt;id&gt;`
     Worker-&gt;&gt;Worker: Writes code &amp; executes tests
-    Worker-&gt;&gt;TK: Runs tk add-note &amp; sets tag waiting-for-review
-    Worker-&gt;&gt;Daemon: Pauses execution
+    Worker-&gt;&gt;TK: Runs `tk add-note` &amp; sets tag `waiting-for-review`
+    Worker-&gt;&gt;TF: Pauses execution
     Developer-&gt;&gt;TK: Reviews notes &amp; diffs in Web UI
-    Developer-&gt;&gt;TK: Approves &amp; closes ticket (tk close)
-    Daemon-&gt;&gt;Worker: Terminates worker cleanly</code></pre>
+    alt Additional Changes Needed
+        Developer-&gt;&gt;TF: tk scion-taskforce feedback &lt;id&gt; "..."
+        TF-&gt;&gt;Worker: Wakes worker to continue implementation
+    else Approved
+        Developer-&gt;&gt;TK: Approves &amp; closes ticket (`tk close &lt;id&gt;`)
+        TF-&gt;&gt;Hub: Cleans up worker container
+    end</code></pre>
 <hr />
 <h2 id="step-by-step-walkthrough">Step-by-Step Walkthrough<a class="headerlink" href="#step-by-step-walkthrough" title="Permanent link">&para;</a></h2>
-<h3 id="1-tag-work-for-autonomous-execution">1. Tag Work for Autonomous Execution<a class="headerlink" href="#1-tag-work-for-autonomous-execution" title="Permanent link">&para;</a></h3>
+<h3 id="1-initialize-task-force-for-your-project">1. Initialize Task Force for Your Project<a class="headerlink" href="#1-initialize-task-force-for-your-project" title="Permanent link">&para;</a></h3>
+<p>Run the setup wizard to configure orchestrator defaults and seed the project worker template:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Guided interactive setup</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Or 1-step non-interactive initialization</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init<span class="w"> </span>--defaults
+</span></code></pre></div>
+<p>This creates:
+- <code>.scion-taskforce/scion-taskforce.yaml</code>: Project orchestrator configuration.
+- <code>.scion/templates/taskforce-worker/</code>: Worker template with custom instructions.</p>
+<h3 id="2-verify-hub-model-credentials">2. Verify Hub &amp; Model Credentials<a class="headerlink" href="#2-verify-hub-model-credentials" title="Permanent link">&para;</a></h3>
+<p>Run the end-to-end verification test before delegating real tasks:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span><span class="nb">test</span>
+</span></code></pre></div>
+<p>This verifies that:
+- Your local container runtime and SCION Hub (<code>http://127.0.0.1:8080</code>) are active.
+- Google Cloud Application Default Credentials (ADC) or API keys are valid.
+- The worker can read/write files in the mounted repository workspace.</p>
+<h3 id="3-tag-actionable-work-for-autonomous-execution">3. Tag Actionable Work for Autonomous Execution<a class="headerlink" href="#3-tag-actionable-work-for-autonomous-execution" title="Permanent link">&para;</a></h3>
 <p>Delegate actionable tickets to autonomous workers by adding the <code>taskforce</code> tag:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add input sanitization to auth endpoints"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--tags<span class="w"> </span>backend,taskforce<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--acceptance<span class="w"> </span><span class="s2">"Run make test and ensure all pass"</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add input sanitization to auth endpoints"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--tags<span class="w"> </span>backend,taskforce<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--acceptance<span class="w"> </span><span class="s2">"Run make test and ensure all pass"</span>
 </span></code></pre></div>
-<h3 id="2-daemon-worker-spawning">2. Daemon Worker Spawning<a class="headerlink" href="#2-daemon-worker-spawning" title="Permanent link">&para;</a></h3>
-<p>The background SCION daemon detects ready tickets tagged with <code>taskforce</code> and provisions isolated worker instances:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>status
+<h3 id="4-background-worker-spawning">4. Background Worker Spawning<a class="headerlink" href="#4-background-worker-spawning" title="Permanent link">&para;</a></h3>
+<p>Start the task force daemon (or run it in the foreground for live logs):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Start background daemon</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>start
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Check active workers and project status</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>status
 </span></code></pre></div>
-<h3 id="3-review-checkpoint">3. Review Checkpoint<a class="headerlink" href="#3-review-checkpoint" title="Permanent link">&para;</a></h3>
+<p>When a ticket's dependencies are satisfied (<code>tk ready</code>), the task force spawns an isolated container via the SCION Hub, moves the ticket to <code>in_progress</code>, and mounts the project directory.</p>
+<h3 id="5-review-checkpoint-feedback">5. Review Checkpoint &amp; Feedback<a class="headerlink" href="#5-review-checkpoint-feedback" title="Permanent link">&para;</a></h3>
 <p>When the worker finishes writing code and passing local tests:</p>
 <ol>
 <li>It records verification notes via <code>tk add-note &lt;id&gt; "..."</code>.</li>
 <li>It tags the ticket with <code>waiting-for-review</code>.</li>
-<li>The worker pauses execution.</li>
+<li>The worker container automatically pauses.</li>
 </ol>
-<h3 id="4-human-verification-closure">4. Human Verification &amp; Closure<a class="headerlink" href="#4-human-verification-closure" title="Permanent link">&para;</a></h3>
-<p>Review the audit trail and code diff in the Web UI (<code>http://localhost:8475</code>), then close the ticket:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>close<span class="w"> </span>tic-auth1
+<p>Inspect the work in the Web UI (<code>http://localhost:8475</code>) or CLI:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>show<span class="w"> </span>&lt;ticket-id&gt;
 </span></code></pre></div>
-<p>Closing the ticket automatically unblocks downstream tasks in the DAG.</p>
+<p>If modifications are needed, send feedback directly to the paused worker:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>feedback<span class="w"> </span>&lt;ticket-id&gt;<span class="w"> </span><span class="s2">"Fix the edge case in auth validation"</span>
+</span></code></pre></div>
+<p>The worker wakes up, reads the feedback, and resumes execution.</p>
+<h3 id="6-human-approval-ticket-closure">6. Human Approval &amp; Ticket Closure<a class="headerlink" href="#6-human-approval-ticket-closure" title="Permanent link">&para;</a></h3>
+<p>Once satisfied with the changes and test results, close the ticket:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tk<span class="w"> </span>close<span class="w"> </span>&lt;ticket-id&gt;
+</span></code></pre></div>
+<p>Closing the ticket automatically unblocks downstream tasks in your dependency DAG and schedules the worker container for cleanup.</p>
 
 
 

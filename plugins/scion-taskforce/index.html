@@ -910,6 +910,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#setup-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Setup &amp; Verification
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setup &amp; Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-interactive-setup-wizard-tk-scion-taskforce-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Interactive Setup Wizard (<code>tk scion-taskforce init</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-end-to-end-test-worker-tk-scion-taskforce-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. End-to-End Test Worker (<code>tk scion-taskforce test</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -921,10 +960,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#daemon-commands" class="md-nav__link">
+  <a href="#command-reference" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Daemon Commands
+        Command Reference
       </span>
     </span>
   </a>
@@ -932,10 +971,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration-state" class="md-nav__link">
+  <a href="#configuration-scion-taskforceyaml" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Configuration &amp; State
+        Configuration (<code>scion-taskforce.yaml</code>)
       </span>
     </span>
   </a>
@@ -1314,6 +1353,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#setup-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Setup &amp; Verification
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setup &amp; Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-interactive-setup-wizard-tk-scion-taskforce-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Interactive Setup Wizard (<code>tk scion-taskforce init</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-end-to-end-test-worker-tk-scion-taskforce-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. End-to-End Test Worker (<code>tk scion-taskforce test</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1325,10 +1403,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#daemon-commands" class="md-nav__link">
+  <a href="#command-reference" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Daemon Commands
+        Command Reference
       </span>
     </span>
   </a>
@@ -1336,10 +1414,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration-state" class="md-nav__link">
+  <a href="#configuration-scion-taskforceyaml" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Configuration &amp; State
+        Configuration (<code>scion-taskforce.yaml</code>)
       </span>
     </span>
   </a>
@@ -1431,79 +1509,192 @@
   <h1 id="__skip">SCION Task Force</h1>
 
 <p>The <strong>SCION Task Force</strong> (<code>tk-scion-taskforce</code>) is an optional standalone orchestrator plugin that manages autonomous coding workers mapped 1:1 to tickets.</p>
+<p>It wraps directly on top of the native <strong>SCION Hub</strong> (<code>http://127.0.0.1:8080</code>) rather than running a parallel conflicting daemon, bridging <code>tk</code> dependency DAGs with isolated containerized agent execution.</p>
 <hr />
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Before running the SCION Task Force daemon, ensure your system meets the following requirements:</p>
 <ol>
-<li><strong>Python 3.9+</strong>: Required for the daemon runtime and OpenTelemetry logging.</li>
+<li><strong>Python 3.9+</strong>: Required for the task force CLI and OpenTelemetry logging.</li>
 <li><strong>SCION CLI (<code>scion</code>)</strong>: Must be installed and available in your <code>$PATH</code> (<a href="https://github.com/GoogleCloudPlatform/scion">GoogleCloudPlatform/scion</a>):
     <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>scion<span class="w"> </span>--version
 </span></code></pre></div></li>
-<li><strong>Container Runtime</strong>: A running container daemon (<strong>Docker</strong> or <strong>Podman</strong>). SCION uses containers to isolate each autonomous coding agent.</li>
-<li><strong>Project Initialization</strong>: Each repository monitored by the task force must be initialized with SCION:
-    <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/project
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>scion<span class="w"> </span>init
+<li><strong>Container Runtime</strong>: A running container daemon (<strong>Podman</strong> or <strong>Docker</strong>). SCION uses containers to isolate each autonomous coding agent.</li>
+<li><strong>Google Cloud ADC (Optional for Vertex AI models)</strong>: If using Claude or Gemini models via Google Cloud Vertex AI Model Garden:
+    <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gcloud<span class="w"> </span>auth<span class="w"> </span>application-default<span class="w"> </span>login
 </span></code></pre></div></li>
-<li><strong>Opt-in Tag</strong>: The daemon only claims tickets explicitly tagged with <code>taskforce</code>. Human engineers maintain full control over which tasks are delegated.</li>
+<li><strong>Project Initialization</strong>: Initialize taskforce configuration and worker templates in each monitored repository:
+    <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init
+</span></code></pre></div></li>
+<li><strong>Opt-in Tag</strong>: The taskforce only claims tickets explicitly tagged with <code>taskforce</code>. Human engineers maintain full control over which tasks are delegated.</li>
 </ol>
 <hr />
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <p>Install the plugin via the modular installer:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./install.sh<span class="w"> </span>--scion-taskforce
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>./install.sh<span class="w"> </span>--scion-taskforce
 </span></code></pre></div>
-<p>This installs <code>tk-scion-taskforce</code> to <code>~/.local/bin/</code> and sets up the isolated Python virtual environment.</p>
+<p>This installs <code>tk-scion-taskforce</code> to <code>~/.local/bin/</code>. Ensure <code>~/.local/bin</code> is in your <code>$PATH</code>.</p>
+<hr />
+<h2 id="setup-verification">Setup &amp; Verification<a class="headerlink" href="#setup-verification" title="Permanent link">&para;</a></h2>
+<h3 id="1-interactive-setup-wizard-tk-scion-taskforce-init">1. Interactive Setup Wizard (<code>tk scion-taskforce init</code>)<a class="headerlink" href="#1-interactive-setup-wizard-tk-scion-taskforce-init" title="Permanent link">&para;</a></h3>
+<p>Run the setup wizard in your repository to configure the project orchestrator and seed the worker template:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Interactive setup with guided prompts and defaults</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Or non-interactive setup with production defaults</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init<span class="w"> </span>--defaults
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Force overwrite existing templates</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init<span class="w"> </span>--force
+</span></code></pre></div>
+<p>The setup wizard configures:
+- <strong>SCION Harness Engine</strong>: Defaults to <code>claude</code> (Claude Code) or <code>opencode</code>.
+- <strong>Model</strong>: Default model ID or alias (blank for Model Garden Claude Sonnet via Vertex AI).
+- <strong>Google Cloud Settings</strong>: Automatically detects active <code>gcloud</code> project ID and sets default region (<code>us-east5</code> for Vertex AI Anthropic models).
+- <strong>Project Template</strong>: Seeds <code>.scion/templates/taskforce-worker/</code> with <code>scion-agent.yaml</code>, <code>agents.md</code>, and <code>system-prompt.md</code>.
+- <strong>Project Configuration</strong>: Generates <code>.scion-taskforce/scion-taskforce.yaml</code> and <code>.scion-taskforce/prompt.md</code>.</p>
+<h3 id="2-end-to-end-test-worker-tk-scion-taskforce-test">2. End-to-End Test Worker (<code>tk scion-taskforce test</code>)<a class="headerlink" href="#2-end-to-end-test-worker-tk-scion-taskforce-test" title="Permanent link">&para;</a></h3>
+<p>Verify your SCION Hub connection, container permissions, and model authentication with a real test run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Run standard test worker</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span><span class="nb">test</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Or run with a custom test prompt</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--prompt<span class="w"> </span><span class="s2">"Create a hello.txt file and exit"</span>
+</span></code></pre></div>
+<p>The test runner:
+1. Provisions an isolated test worker through the SCION Hub (<code>http://127.0.0.1:8080</code>).
+2. Automatically accepts container workspace trust prompts.
+3. Watches the agent write <code>poem.md</code> (default: 4-line poem about the latest Google Gemini model).
+4. Verifies the generated file in the local workspace.
+5. Cleans up the test worker container and temporary test artifacts.</p>
 <hr />
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>sequenceDiagram
     autonumber
     actor Dev as Human Developer
     participant TK as ticket (.tickets/)
-    participant Daemon as SCION Daemon
-    participant Worker as Autonomous AI Worker
+    participant TF as Task Force Daemon
+    participant Hub as SCION Hub (:8080)
+    participant Worker as Autonomous AI Worker Pod
 
     Dev-&gt;&gt;TK: Creates ticket &amp; tags 'taskforce'
-    Daemon-&gt;&gt;TK: Watches for `tk ready` with tag:taskforce
-    Daemon-&gt;&gt;Worker: Spawns 1:1 container matching ticket ID
+    TF-&gt;&gt;TK: Watches for `tk ready` with tag:taskforce
+    TF-&gt;&gt;Hub: Spawns worker using 'taskforce-worker' template
+    Hub-&gt;&gt;Worker: Starts container with workspace mount
     Worker-&gt;&gt;TK: Claims task via `tk start (id)`
     Worker-&gt;&gt;Worker: Writes code &amp; executes tests
     Worker-&gt;&gt;TK: Logs audit note &amp; sets tag `waiting-for-review`
-    Worker-&gt;&gt;Daemon: Pauses container execution
-    Dev-&gt;&gt;TK: Reviews notes &amp; code diffs in Web UI
+    Worker-&gt;&gt;TF: Pauses container execution
+    Dev-&gt;&gt;TK: Reviews notes &amp; diffs in Web UI
     Dev-&gt;&gt;TK: Approves and marks `tk close (id)`
-    Daemon-&gt;&gt;Worker: Tears down worker container</code></pre>
+    TF-&gt;&gt;Hub: Cleans up worker container</code></pre>
 <ol>
-<li><strong>Singleton Daemon</strong>: A single background daemon (<code>~/.local/state/tk/scion-taskforce.json</code>) watches <code>.tickets/</code> directories across all registered projects.</li>
+<li><strong>SCION Hub Wrapper</strong>: The task force bridges <code>tk</code> tickets to the SCION daemon/Hub running on <code>http://127.0.0.1:8080</code>.</li>
 <li><strong>1:1 Worker Mapping</strong>: When a ticket becomes <code>ready</code> with the <code>taskforce</code> tag, a dedicated worker container is spawned named after the ticket ID.</li>
-<li><strong>Review Pause</strong>: The worker executes the task, passes local tests, logs findings with <code>tk add-note</code>, and automatically pauses on <code>waiting-for-review</code>.</li>
-<li><strong>Human Verification</strong>: Human engineers review the output in the Web UI and close the ticket, which automatically cleans up the worker.</li>
+<li><strong>Workspace Isolation</strong>: Workers execute inside containers mounting the repository checkout, with branch isolation per ticket.</li>
+<li><strong>Review Pause</strong>: The worker passes tests, logs findings with <code>tk add-note</code>, and pauses on <code>waiting-for-review</code>.</li>
+<li><strong>Feedback Loop</strong>: Engineers can send review feedback using <code>tk scion-taskforce feedback &lt;id&gt; "..."</code> which wakes the paused worker with your comments.</li>
+<li><strong>Human Verification</strong>: Human engineers review output in the Web UI and close the ticket, triggering pod garbage collection.</li>
 </ol>
 <hr />
-<h2 id="daemon-commands">Daemon Commands<a class="headerlink" href="#daemon-commands" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Start background daemon for current project</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>start
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Inspect running daemon, registered projects, and active worker pool</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>status
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Stop background daemon</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>stop
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Attach to an active worker session for interactive debugging</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>attach<span class="w"> </span>&lt;ticket-id&gt;
-</span></code></pre></div>
-<p>Local rotating logs and OpenTelemetry traces are stored at <code>~/.local/state/tk/scion-taskforce/logs/</code> and <code>.tickets/.scion-taskforce-logs/</code>.</p>
+<h2 id="command-reference">Command Reference<a class="headerlink" href="#command-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Command</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce init [--defaults] [--force]</code></td>
+<td style="text-align: left;">Initialize project configuration and worker templates</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce test [--prompt "&lt;text&gt;"]</code></td>
+<td style="text-align: left;">Run end-to-end test worker to verify SCION Hub &amp; LLM credentials</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce start [dir]</code></td>
+<td style="text-align: left;">Start task force for project (boots global daemon if not running)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce status</code></td>
+<td style="text-align: left;">Inspect daemon status, watched projects, and active workers</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce stop [dir] \| --all</code></td>
+<td style="text-align: left;">Stop task force for one project or terminate global daemon (<code>--all</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce dispatch [&lt;id&gt;]</code></td>
+<td style="text-align: left;">Claim and spawn worker for <code>&lt;id&gt;</code> or all ready tickets</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce feedback &lt;id&gt; "&lt;msg&gt;"</code></td>
+<td style="text-align: left;">Add review feedback, remove <code>waiting-for-review</code>, and wake worker</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce attach &lt;id&gt;</code></td>
+<td style="text-align: left;">Attach interactively to worker terminal session</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce pause &lt;id&gt;</code></td>
+<td style="text-align: left;">Manually pause worker container</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce logs [&lt;id&gt;]</code></td>
+<td style="text-align: left;">View OpenTelemetry daemon or worker logs (including rotated <code>.gz</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce brief &lt;id&gt;</code></td>
+<td style="text-align: left;">Inspect generated worker brief for a ticket</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce trace [&lt;id&gt;]</code></td>
+<td style="text-align: left;">Inspect OpenTelemetry trace spans</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce gc [--force]</code></td>
+<td style="text-align: left;">Run 5-day closed pod garbage collection and 30-day log cleanup</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk scion-taskforce project list</code></td>
+<td style="text-align: left;">List all registered project directories</td>
+</tr>
+</tbody>
+</table>
 <hr />
-<h2 id="configuration-state">Configuration &amp; State<a class="headerlink" href="#configuration-state" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Singleton Registry</strong>: Host-wide daemon state is tracked at <code>~/.local/state/tk/scion-taskforce.json</code> (registers active projects, workers, and PID).</li>
-<li><strong>Dynamic Registration</strong>: Running <code>tk scion-taskforce start [path]</code> registers any target directory into the running singleton watchlist without spawning duplicate daemons.</li>
-<li><strong>Tag Policies</strong>:</li>
-<li><code>taskforce</code>: Opt-in tag required for worker execution.</li>
-<li><code>no-taskforce</code>: Explicit override tag to ignore a task.</li>
-<li><code>waiting-for-review</code>: Automated checkpoint tag applied upon test pass.</li>
-<li><strong>Telemetry &amp; Logs</strong>: Global daemon logs and OTel traces are stored at <code>~/.local/state/tk/scion-taskforce/logs/</code> (30-day retention with local rotation), with per-project symlinks at <code>.tickets/.scion-taskforce-logs/</code>.</li>
-<li><strong>Worker Retention</strong>: Completed worker containers are automatically cleaned up after 5 days.</li>
-</ul>
+<h2 id="configuration-scion-taskforceyaml">Configuration (<code>scion-taskforce.yaml</code>)<a class="headerlink" href="#configuration-scion-taskforceyaml" title="Permanent link">&para;</a></h2>
+<p>Configuration resides in <code>.scion-taskforce/scion-taskforce.yaml</code> (project overrides) or <code>~/.config/tk/scion-taskforce.yaml</code> (global defaults):</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">tags</span><span class="p">:</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">claim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">taskforce</span><span class="w">                </span><span class="c1"># Opt-in tag required to trigger task force</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">ignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">no-taskforce</span><span class="w">            </span><span class="c1"># Safety override to skip tickets</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">review</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">waiting-for-review</span><span class="w">      </span><span class="c1"># Tag added by worker when pausing for review</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="nt">watcher</span><span class="p">:</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nt">poll_interval_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span><span class="w">       </span><span class="c1"># Reconcile interval across projects</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nt">max_concurrent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w">              </span><span class="c1"># Maximum workers across all projects</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">max_concurrent_per_project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">   </span><span class="c1"># Max concurrent workers per repository</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="nt">gc_retention_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w">            </span><span class="c1"># Days to retain paused pods after ticket closed</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span><span class="nt">auto_pause_on_review</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">      </span><span class="c1"># Pause pod when waiting-for-review tag is added</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">  </span><span class="nt">auto_wake_on_feedback</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">     </span><span class="c1"># Resume pod when review note is added</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="nt">provider</span><span class="p">:</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scion</span><span class="w">                   </span><span class="c1"># Backend driver</span>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">  </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scion</span><span class="w">                   </span><span class="c1"># Provider CLI command</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">taskforce-worker</span><span class="w">      </span><span class="c1"># SCION template in .scion/templates/</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">  </span><span class="nt">harness_config</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude</span><span class="w">          </span><span class="c1"># Harness engine (claude or opencode)</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">""</span><span class="w">                       </span><span class="c1"># Model ID (blank for Vertex AI default)</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="w">  </span><span class="nt">extra_start_args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"--harness-auth"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"vertex-ai"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">  </span><span class="nt">auto_accept_prompts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">       </span><span class="c1"># Auto-confirm workspace trust prompts</span>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="nt">telemetry</span><span class="p">:</span>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="w">  </span><span class="nt">log_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/.local/state/tk/scion-taskforce/logs</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">  </span><span class="nt">retention_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">              </span><span class="c1"># Retain rotated logs for 30 days</span>
+</span></code></pre></div>
 
 
 

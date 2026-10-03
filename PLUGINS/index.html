@@ -1369,7 +1369,7 @@ Implement the <code>--tk-describe</code> flag:
 <ul>
 <li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.</li>
 <li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. <em>(optional)</em></li>
-<li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Single global daemon that launches a SCION coding worker for each ticket explicitly tagged <code>taskforce</code>, verifies the worker actually started, pauses it on <code>waiting-for-review</code>, and emits OpenTelemetry to local rotating logs. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
+<li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Autonomous worker orchestrator wrapping SCION Hub (<code>http://127.0.0.1:8080</code>). Features an interactive setup wizard (<code>tk scion-taskforce init</code>), automated test runner (<code>tk scion-taskforce test</code>), project worker templates (<code>.scion/templates/taskforce-worker</code>), Vertex AI Model Garden integration, and OpenTelemetry logging. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
 </ul>
 <hr />
 <h2 id="6-example-plugin-tk-stats">6. Example Plugin: <code>tk-stats</code><a class="headerlink" href="#6-example-plugin-tk-stats" title="Permanent link">&para;</a></h2>
