@@ -1,7 +1,6 @@
 # ticket (tk) — LLM Knowledge Base & Documentation Index
 
-> Minimal, offline task tracker with DAG dependency intelligence.
-> Built with love for both human developers and autonomous AI coding agents.
+> Minimal, dependency-aware task tracker. Built to scale agentic workflows.
 > Repository: https://github.com/msampathkumar/ticket
 
 ---
@@ -139,11 +138,11 @@ For complete and in-depth details, refer to the individual Markdown guides:
 - [SCION Task Force Workflow](workflows/scion-taskforce.md): Autonomous multi-agent engineering with human review gates.
 - [Command Reference](core-cli/commands.md): Complete reference table for all core `tk` commands.
 - [Dependency Intelligence](core-cli/dependencies.md): DAG task dependencies, blockers, and cycle detection.
-- [Web UI Overview](web-ui/overview.md): Kanban board, DAG Mind Map, and multi-view switcher.
-- [Daemon Management](web-ui/daemons.md): Running and monitoring `tk webui server start/status/stop`.
+- [Core CLI Configuration](core-cli/configuration.md): Environment variables, directory discovery logic, and schema.
 - [Plugin Architecture](plugins/architecture.md): Writing custom Bash or Python plugins with `TICKETS_DIR` and `TK_SCRIPT`.
-- [GitHub Sync Plugin](plugins/github.md): Bi-directional GitHub issue and PR sync.
-- [SCION Task Force Plugin](plugins/scion-taskforce.md): Multi-agent worker orchestration daemon.
+- [Interactive Web UI Plugin](plugins/webui.md): 4-lane Kanban board, DAG Mind Map, daemon management, and configuration.
+- [GitHub Sync Plugin](plugins/github.md): Bi-directional GitHub issue/PR sync, prerequisites, and configuration.
+- [SCION Task Force Plugin](plugins/scion-taskforce.md): Autonomous multi-agent worker orchestration daemon and configuration.
 - [Agent Execution Loop](agents/workflow.md): The deterministic 5-step operational loop for AI coding agents.
 - [Agent Skill](agents/agent-skill.md): Reusable agent skill definition and `npx` install instructions.
 - [LLM & Agent Context Guide](agents/llms-txt.md): Machine-readable documentation standards and endpoints.

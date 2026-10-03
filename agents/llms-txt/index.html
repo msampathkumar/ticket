@@ -6,19 +6,19 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Managing the background server daemon for tk webui.">
+        <meta name="description" content="Machine-readable documentation standard for AI coding agents.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
       
       
-        <link rel="canonical" href="https://msampathkumar.github.io/ticket/web-ui/daemons/">
+        <link rel="canonical" href="https://msampathkumar.github.io/ticket/agents/llms-txt/">
       
       
-        <link rel="prev" href="../overview/">
+        <link rel="prev" href="../agent-skill/">
       
       
-        <link rel="next" href="../../plugins/architecture/">
+        <link rel="next" href="../../SPEC/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Daemon Management - ticket (tk)</title>
+        <title>LLM & Agent Context (llms.txt) - ticket (tk)</title>
       
     
     
@@ -85,7 +85,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#daemon-commands" class="md-skip">
+        <a href="#how-ai-agents-use-llmstxt" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Daemon Management
+              LLM & Agent Context (llms.txt)
             
           </span>
         </div>
@@ -547,6 +547,8 @@
       
         
       
+        
+      
     
     
     
@@ -645,73 +647,6 @@
 
                 
               
-            </ul>
-          </nav>
-        
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Interactive Web UI
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_5">
-              <span class="md-nav__icon md-icon"></span>
-              
-  
-  Interactive Web UI
-
-            </label>
-            <ul class="md-nav__list" data-md-scrollfix>
-              
                 
                   
   
@@ -719,14 +654,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../core-cli/configuration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Overview & Kanban
+  Configuration
 
     
   </span>
@@ -734,87 +669,6 @@
   
 
       </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Daemon Management
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="././" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Daemon Management
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#daemon-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Daemon Commands
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -836,6 +690,8 @@
   
     
     
+      
+        
       
         
       
@@ -856,10 +712,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
@@ -877,8 +733,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_6">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -902,6 +758,33 @@
     
   
   Plugin Architecture
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/webui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Interactive Web UI
 
     
   </span>
@@ -980,8 +863,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1000,14 +885,14 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1025,8 +910,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_7">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_6">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1042,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agents/workflow/" class="md-nav__link">
+      <a href="../workflow/" class="md-nav__link">
         
   
   
@@ -1069,7 +954,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agents/agent-skill/" class="md-nav__link">
+      <a href="../agent-skill/" class="md-nav__link">
         
   
   
@@ -1093,10 +978,34 @@
                   
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../agents/llms-txt/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  LLM Context (llms.txt)
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1111,6 +1020,36 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-ai-agents-use-llmstxt" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How AI Agents Use <code>llms.txt</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1152,10 +1091,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -1173,8 +1112,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_8">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1309,10 +1248,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#daemon-commands" class="md-nav__link">
+  <a href="#how-ai-agents-use-llmstxt" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Daemon Commands
+        How AI Agents Use <code>llms.txt</code>
       </span>
     </span>
   </a>
@@ -1367,16 +1306,18 @@
       
         
       
+        
+      
     
     
     
     
       <li class="md-path__item">
-        <a href="../overview/" class="md-path__link">
+        <a href="../workflow/" class="md-path__link">
           
   
   <span class="md-ellipsis">
-    Interactive Web UI
+    AI Agent Integration
   </span>
 
         </a>
@@ -1397,24 +1338,18 @@
   
 
 
-  <h1 id="__skip">Daemon Management</h1>
+  <h1 id="__skip">LLM Context (llms.txt)</h1>
 
-<p>You can run the Web UI as a persistent background daemon so it is always ready when you need it.</p>
+<p>Inspired by <a href="https://llmstxt.org/">llmstxt.org</a> and <a href="https://modelcontextprotocol.io">Model Context Protocol</a>, <code>ticket</code> provides dedicated machine-readable documentation endpoints at root:</p>
+<ul>
+<li><a href="/llms.txt"><code>/llms.txt</code></a>: Structured table of contents linking directly to all markdown documentation files and guides with summaries.</li>
+<li><a href="/llms-full.txt"><code>/llms-full.txt</code></a>: Consolidated single-file documentation reference combining all specifications and guides into a single context-window-friendly payload.</li>
+</ul>
 <hr />
-<h3 id="daemon-commands">Daemon Commands<a class="headerlink" href="#daemon-commands" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Start background daemon on http://127.0.0.1:8475</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>start<span class="w"> </span><span class="o">[</span>optional-project-path<span class="o">]</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Inspect daemon PID, URL, and log file path</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>status
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Stop background daemon</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>stop
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Restart daemon</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>restart
-</span></code></pre></div>
-<p>Logs are automatically rotated and stored locally for debugging.</p>
+<h3 id="how-ai-agents-use-llmstxt">How AI Agents Use <code>llms.txt</code><a class="headerlink" href="#how-ai-agents-use-llmstxt" title="Permanent link">&para;</a></h3>
+<p>When an AI coding assistant or agent visits a repository or documentation site supporting <code>llms.txt</code>:
+1. It fetches <code>/llms.txt</code> to discover the exact structure and markdown URLs of all guides and specs.
+2. It fetches specific markdown files or <code>/llms-full.txt</code> to instantly load complete technical context without web crawling or HTML scraping.</p>
 
 
 
@@ -1457,7 +1392,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../overview/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview &amp; Kanban">
+          <a href="../agent-skill/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Agent Skill">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
@@ -1467,20 +1402,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Overview & Kanban
+                Agent Skill
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../plugins/architecture/" class="md-footer__link md-footer__link--next" aria-label="Next: Plugin Architecture">
+          <a href="../../SPEC/" class="md-footer__link md-footer__link--next" aria-label="Next: System Spec">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Plugin Architecture
+                System Spec
               </div>
             </div>
             <div class="md-footer__button md-icon">

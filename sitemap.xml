@@ -28,6 +28,9 @@
         <loc>https://msampathkumar.github.io/ticket/core-cli/commands/</loc>
       </url>
       <url>
+        <loc>https://msampathkumar.github.io/ticket/core-cli/configuration/</loc>
+      </url>
+      <url>
         <loc>https://msampathkumar.github.io/ticket/core-cli/dependencies/</loc>
       </url>
       <url>
@@ -46,10 +49,7 @@
         <loc>https://msampathkumar.github.io/ticket/plugins/scion-taskforce/</loc>
       </url>
       <url>
-        <loc>https://msampathkumar.github.io/ticket/web-ui/daemons/</loc>
-      </url>
-      <url>
-        <loc>https://msampathkumar.github.io/ticket/web-ui/overview/</loc>
+        <loc>https://msampathkumar.github.io/ticket/plugins/webui/</loc>
       </url>
       <url>
         <loc>https://msampathkumar.github.io/ticket/workflows/cli-solo/</loc>

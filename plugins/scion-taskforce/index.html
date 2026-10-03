@@ -6,19 +6,19 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Bi-directional synchronization between local markdown tickets and GitHub issues and pull requests.">
+        <meta name="description" content="Autonomous multi-agent worker orchestration plugin for ticket.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
       
       
-        <link rel="canonical" href="https://msampathkumar.github.io/ticket/plugins/github/">
+        <link rel="canonical" href="https://msampathkumar.github.io/ticket/plugins/scion-taskforce/">
       
       
-        <link rel="prev" href="../architecture/">
+        <link rel="prev" href="../github/">
       
       
-        <link rel="next" href="../scion-taskforce/">
+        <link rel="next" href="../../agents/workflow/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>GitHub Sync - ticket (tk)</title>
+        <title>SCION Task Force - ticket (tk)</title>
       
     
     
@@ -85,7 +85,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#features" class="md-skip">
+        <a href="#prerequisites" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GitHub Sync
+              SCION Task Force
             
           </span>
         </div>
@@ -547,6 +547,8 @@
       
         
       
+        
+      
     
     
     
@@ -645,71 +647,6 @@
 
                 
               
-            </ul>
-          </nav>
-        
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Interactive Web UI
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_5">
-              <span class="md-nav__icon md-icon"></span>
-              
-  
-  Interactive Web UI
-
-            </label>
-            <ul class="md-nav__list" data-md-scrollfix>
-              
                 
                   
   
@@ -717,41 +654,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../web-ui/overview/" class="md-nav__link">
+      <a href="../../core-cli/configuration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Overview & Kanban
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../web-ui/daemons/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Daemon Management
+  Configuration
 
     
   </span>
@@ -782,6 +692,8 @@
   
     
     
+      
+        
       
         
       
@@ -802,10 +714,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
@@ -823,8 +735,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_6">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_5">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -864,6 +776,60 @@
                   
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../webui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Interactive Web UI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../github/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  GitHub Sync
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
     
   
   
@@ -881,7 +847,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  SCION Task Force
 
     
   </span>
@@ -898,7 +864,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  SCION Task Force
 
     
   </span>
@@ -922,10 +888,115 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Features
+        Prerequisites
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-python-39" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Python 3.9+
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-scion-cli-scion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. SCION CLI (<code>scion</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-container-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Container Runtime
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-project-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Project Initialization
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-opt-in-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Opt-in Tag
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Installation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How It Works
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#daemon-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Daemon Commands
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration &amp; State
       </span>
     </span>
   </a>
@@ -936,33 +1007,6 @@
   
 </nav>
       
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../scion-taskforce/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  SCION Task Force
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -1004,10 +1048,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1025,8 +1069,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_7">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1152,10 +1196,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -1173,8 +1217,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_8">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1309,10 +1353,115 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Features
+        Prerequisites
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-python-39" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Python 3.9+
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-scion-cli-scion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. SCION CLI (<code>scion</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-container-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Container Runtime
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-project-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Project Initialization
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-opt-in-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Opt-in Tag
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Installation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How It Works
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#daemon-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Daemon Commands
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration &amp; State
       </span>
     </span>
   </a>
@@ -1369,6 +1518,8 @@
       
         
       
+        
+      
     
     
     
@@ -1399,19 +1550,85 @@
   
 
 
-  <h1 id="__skip">GitHub Sync</h1>
+  <h1 id="__skip">SCION Task Force</h1>
 
-<p>The optional GitHub plugin (<code>tk-github</code>) enables bi-directional synchronization between your local <code>.tickets/</code> markdown files and GitHub issues and pull requests.</p>
+<p>The <strong>SCION Task Force</strong> (<code>tk-scion-taskforce</code>) is an optional standalone orchestrator plugin that manages autonomous coding workers mapped 1:1 to tickets.</p>
 <hr />
-<h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>Before running the SCION Task Force daemon, ensure your system meets the following requirements:</p>
+<h3 id="1-python-39">1. Python 3.9+<a class="headerlink" href="#1-python-39" title="Permanent link">&para;</a></h3>
+<p>Required for the daemon runtime and OpenTelemetry logging.</p>
+<h3 id="2-scion-cli-scion">2. SCION CLI (<code>scion</code>)<a class="headerlink" href="#2-scion-cli-scion" title="Permanent link">&para;</a></h3>
+<p>Must be installed and available in your <code>$PATH</code> (<a href="https://github.com/GoogleCloudPlatform/scion">GoogleCloudPlatform/scion</a>):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>scion<span class="w"> </span>--version
+</span></code></pre></div>
+<h3 id="3-container-runtime">3. Container Runtime<a class="headerlink" href="#3-container-runtime" title="Permanent link">&para;</a></h3>
+<p>A running container daemon: <strong>Docker</strong> or <strong>Podman</strong>. SCION uses containers to isolate each autonomous coding agent.</p>
+<h3 id="4-project-initialization">4. Project Initialization<a class="headerlink" href="#4-project-initialization" title="Permanent link">&para;</a></h3>
+<p>Each repository monitored by the task force must be initialized with SCION:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/project
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>scion<span class="w"> </span>init
+</span></code></pre></div>
+<h3 id="5-opt-in-tag">5. Opt-in Tag<a class="headerlink" href="#5-opt-in-tag" title="Permanent link">&para;</a></h3>
+<p>The daemon only claims tickets explicitly tagged with <code>taskforce</code>. Human engineers maintain full control over which tasks are delegated.</p>
+<hr />
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<p>Install the plugin via the modular installer:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./install.sh<span class="w"> </span>--scion-taskforce
+</span></code></pre></div>
+<p>This installs <code>tk-scion-taskforce</code> to <code>~/.local/bin/</code> and sets up the isolated Python virtual environment.</p>
+<hr />
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>sequenceDiagram
+    autonumber
+    actor Dev as Human Developer
+    participant TK as ticket (.tickets/)
+    participant Daemon as SCION Daemon
+    participant Worker as Autonomous AI Worker
+
+    Dev-&gt;&gt;TK: Creates ticket &amp; tags 'taskforce'
+    Daemon-&gt;&gt;TK: Watches for `tk ready` with tag:taskforce
+    Daemon-&gt;&gt;Worker: Spawns 1:1 container matching ticket ID
+    Worker-&gt;&gt;TK: Claims task via `tk start (id)`
+    Worker-&gt;&gt;Worker: Writes code &amp; executes tests
+    Worker-&gt;&gt;TK: Logs audit note &amp; sets tag `waiting-for-review`
+    Worker-&gt;&gt;Daemon: Pauses container execution
+    Dev-&gt;&gt;TK: Reviews notes &amp; code diffs in Web UI
+    Dev-&gt;&gt;TK: Approves and marks `tk close (id)`
+    Daemon-&gt;&gt;Worker: Tears down worker container</code></pre>
+<ol>
+<li><strong>Singleton Daemon</strong>: A single background daemon (<code>~/.local/state/tk/scion-taskforce.json</code>) watches <code>.tickets/</code> directories across all registered projects.</li>
+<li><strong>1:1 Worker Mapping</strong>: When a ticket becomes <code>ready</code> with the <code>taskforce</code> tag, a dedicated worker container is spawned named after the ticket ID.</li>
+<li><strong>Review Pause</strong>: The worker executes the task, passes local tests, logs findings with <code>tk add-note</code>, and automatically pauses on <code>waiting-for-review</code>.</li>
+<li><strong>Human Verification</strong>: Human engineers review the output in the Web UI and close the ticket, which automatically cleans up the worker.</li>
+</ol>
+<hr />
+<h2 id="daemon-commands">Daemon Commands<a class="headerlink" href="#daemon-commands" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Start background daemon for current project</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>start
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Inspect running daemon, registered projects, and active worker pool</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>status
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Stop background daemon</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>stop
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Attach to an active worker session for interactive debugging</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>attach<span class="w"> </span>&lt;ticket-id&gt;
+</span></code></pre></div>
+<p>Local rotating logs and OpenTelemetry traces are stored at <code>~/.local/state/tk/scion-taskforce/logs/</code> and <code>.tickets/.scion-taskforce-logs/</code>.</p>
+<hr />
+<h2 id="configuration-state">Configuration &amp; State<a class="headerlink" href="#configuration-state" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Import GitHub Issues</strong>: Pull GitHub issues directly into local markdown tickets with correct mapping of labels, assignees, and descriptions.</li>
-<li><strong>Push &amp; Update</strong>: Push local ticket updates to GitHub or sync status changes when PRs are merged or closed.</li>
-<li><strong>Clean Unsyncing</strong>: Safely unlink and clean up external references without losing local history.</li>
+<li><strong>Singleton Registry</strong>: Host-wide daemon state is tracked at <code>~/.local/state/tk/scion-taskforce.json</code> (registers active projects, workers, and PID).</li>
+<li><strong>Dynamic Registration</strong>: Running <code>tk scion-taskforce start [path]</code> registers any target directory into the running singleton watchlist without spawning duplicate daemons.</li>
+<li><strong>Tag Policies</strong>:</li>
+<li><code>taskforce</code>: Opt-in tag required for worker execution.</li>
+<li><code>no-taskforce</code>: Explicit override tag to ignore a task.</li>
+<li><code>waiting-for-review</code>: Automated checkpoint tag applied upon test pass.</li>
+<li><strong>Telemetry &amp; Logs</strong>: Global daemon logs and OTel traces are stored at <code>~/.local/state/tk/scion-taskforce/logs/</code> (30-day retention with local rotation), with per-project symlinks at <code>.tickets/.scion-taskforce-logs/</code>.</li>
+<li><strong>Worker Retention</strong>: Completed worker containers are automatically cleaned up after 5 days.</li>
 </ul>
-<p>Install via:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>./install.sh<span class="w"> </span>--github
-</span></code></pre></div></p>
 
 
 
@@ -1454,7 +1671,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../architecture/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Plugin Architecture">
+          <a href="../github/" class="md-footer__link md-footer__link--prev" aria-label="Previous: GitHub Sync">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
@@ -1464,20 +1681,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Plugin Architecture
+                GitHub Sync
               </div>
             </div>
           </a>
         
         
           
-          <a href="../scion-taskforce/" class="md-footer__link md-footer__link--next" aria-label="Next: SCION Task Force">
+          <a href="../../agents/workflow/" class="md-footer__link md-footer__link--next" aria-label="Next: Agent Execution Loop">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                SCION Task Force
+                Agent Execution Loop
               </div>
             </div>
             <div class="md-footer__button md-icon">
