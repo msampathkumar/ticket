@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import shutil
 import subprocess
@@ -27,6 +28,41 @@ def find_tk_binary() -> str:
 
 
 TK_BIN = find_tk_binary()
+
+STATE_DIR = Path.home() / ".local" / "state" / "tk"
+PROJECTS_FILE = STATE_DIR / "projects.json"
+
+
+def get_global_projects() -> List[str]:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    if not PROJECTS_FILE.exists():
+        return []
+    try:
+        data = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+        projs = data.get("projects", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+        valid = []
+        for p in projs:
+            p_path = Path(os.path.expanduser(p)).resolve()
+            if (p_path / ".tickets").is_dir() or find_tickets_dir(str(p_path)):
+                valid.append(str(p_path))
+        return valid
+    except Exception:
+        return []
+
+
+def add_global_project(path: str) -> List[str]:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    abs_p = str(Path(os.path.expanduser(path)).resolve())
+    projs = get_global_projects()
+    if abs_p in projs:
+        projs.remove(abs_p)
+    projs.insert(0, abs_p)
+    try:
+        PROJECTS_FILE.write_text(json.dumps({"projects": projs}, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return projs
+
 
 
 def find_tickets_dir(base_dir: str) -> Optional[Path]:
@@ -345,6 +381,7 @@ def init_tickets_dir(directory: str) -> Tuple[bool, str]:
     """Initialize a .tickets repository by creating an initial setup ticket."""
     resolved = Path(os.path.expanduser(directory)).resolve()
     resolved.mkdir(parents=True, exist_ok=True)
+    add_global_project(str(resolved))
     return create_ticket_cli(
         directory=str(resolved),
         title="Initialize Project Tickets",

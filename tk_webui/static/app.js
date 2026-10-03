@@ -141,6 +141,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupDragAndDrop();
 
+  try {
+    const res = await fetch('/api/projects');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.projects && Array.isArray(data.projects)) {
+        const localRecent = JSON.parse(localStorage.getItem('tk_recent_dirs') || '[]');
+        const merged = [...new Set([...data.projects, ...localRecent])].slice(0, 8);
+        state.recentDirs = merged;
+        localStorage.setItem('tk_recent_dirs', JSON.stringify(merged));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load global projects', e);
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   const dirParam = urlParams.get('dir');
   const initialDir = dirParam || localStorage.getItem('tk_current_dir') || '.';
@@ -203,6 +218,11 @@ function addRecentDir(dir) {
   state.recentDirs = [dir, ...state.recentDirs.filter(d => d !== dir)].slice(0, 8);
   localStorage.setItem('tk_recent_dirs', JSON.stringify(state.recentDirs));
   renderRecentDirs();
+  fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: dir })
+  }).catch(() => {});
 }
 
 function renderRecentDirs() {

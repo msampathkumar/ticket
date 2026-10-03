@@ -80,6 +80,14 @@ def step_tickets_dir_not_exist(context):
         shutil.rmtree(tickets_dir)
 
 
+@then(r'the tickets directory does not exist')
+def step_tickets_dir_not_exist_then(context):
+    """Assert .tickets directory does not exist."""
+    tickets_dir = Path(context.test_dir) / '.tickets'
+    assert not tickets_dir.exists(), f"Expected .tickets directory to not exist at {tickets_dir}"
+
+
+
 @given(r'a ticket exists with ID "(?P<ticket_id>[^"]+)" and title "(?P<title>[^"]+)" with priority (?P<priority>\d+)')
 def step_ticket_exists_with_priority(context, ticket_id, title, priority):
     """Create a ticket with given ID, title, and priority."""

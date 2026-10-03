@@ -68,6 +68,7 @@ Task Force Operations:
   attach <id>                      Attach interactively to worker <id>
   pause <id>                       Manually pause worker <id>
   logs [<id>]                      View local OpenTelemetry daemon or worker logs (including .gz)
+  brief <id>                       View the persisted worker brief for worker <id>
   trace [<id>]                     Inspect OpenTelemetry trace spans (filtered by ticket <id>)
   gc [--force]                     Run 5-day closed pod GC and 30-day rotated log cleanup
   version                          Print plugin version
@@ -394,6 +395,33 @@ def cmd_logs(
     return 0
 
 
+def cmd_brief(
+    args: list[str],
+    project_dir: Path,
+    explicit_config: str | None,
+) -> int:
+    pos = [a for a in args if not a.startswith("-")]
+    if not pos:
+        print("Usage: tk scion-taskforce brief <ticket-id>", file=sys.stderr)
+        return 1
+    ticket_id = pos[0]
+    try:
+        proj, t_path = _find_ticket_across_projects(ticket_id, project_dir)
+        canonical_id = parse_ticket_file(t_path, project_dir=proj).id
+    except ValueError:
+        proj = project_dir
+        canonical_id = ticket_id
+
+    cfg = load_config(project_dir=proj, explicit_config=explicit_config)
+    telemetry = TelemetryManager(cfg)
+    brief = telemetry.read_worker_brief(proj, canonical_id)
+    if not brief:
+        print(f"No persisted worker brief found for worker {canonical_id}.", file=sys.stderr)
+        return 1
+    print(brief)
+    return 0
+
+
 def cmd_trace(
     args: list[str],
     project_dir: Path,
@@ -603,6 +631,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if subcmd == "logs":
         return cmd_logs(subargs, project_dir, explicit_config)
+
+    if subcmd == "brief":
+        return cmd_brief(subargs, project_dir, explicit_config)
 
     if subcmd == "trace":
         return cmd_trace(subargs, project_dir, explicit_config)

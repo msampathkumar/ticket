@@ -90,6 +90,27 @@ class TelemetryManager:
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / f"{safe_id}.log"
 
+    def save_worker_brief(self, project_dir: Path, ticket_id: str, brief_content: str) -> Path:
+        slug = project_slug(project_dir)
+        safe_id = re.sub(r"[^A-Za-z0-9._-]+", "_", ticket_id)
+        target_dir = (self.workers_dir / slug).resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
+        b_path = target_dir / f"{safe_id}.brief.md"
+        b_path.write_text(brief_content, encoding="utf-8")
+        return b_path
+
+    def read_worker_brief(self, project_dir: Path, ticket_id: str) -> str | None:
+        slug = project_slug(project_dir)
+        safe_id = re.sub(r"[^A-Za-z0-9._-]+", "_", ticket_id)
+        b_path = (self.workers_dir / slug / f"{safe_id}.brief.md").resolve()
+        if b_path.exists():
+            try:
+                return b_path.read_text(encoding="utf-8")
+            except OSError:
+                return None
+        return None
+
+
     def _maybe_rotate_file(self, file_path: Path) -> None:
         if not self.rotation_enabled or not file_path.exists():
             return

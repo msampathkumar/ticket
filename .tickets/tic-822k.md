@@ -1,6 +1,6 @@
 ---
 id: tic-822k
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-10-01T09:58:53Z
@@ -80,3 +80,7 @@ Fix pass: (1) taskforce tag is now user opt-in only (never auto-added); (2) spaw
 **2026-10-02T15:28:06Z**
 
 Readiness pass for PR-review use case: liveness sweep (lost pods → error state + triage note, slot freed, tk reopen relaunches), PR-review vs implementation worker briefs (worker.review_tags / external-ref gh-pr-*, worker.prompt_file override), per-project concurrency default 1, provider hooks workspace_path/post_spawn (scion init worktrees: ticket mirrored in, notes + waiting-for-review merged back additively; Claude 'trust this folder' prompt auto-accepted via tmux), stale-pod replacement, error-message hints, XDG_CONFIG_HOME-aware global config, installer sweep (--help, accumulating flags, plugin delegation, installer.feature). 148 BDD scenarios green; e2e verified in a sandbox repo with real scion+podman.
+
+**2026-10-03T00:27:28Z**
+
+Audit & closure summary: Scion Task Force fully implemented with project-scoped config, worker brief persistence, brief CLI, and worktree concurrency support. All 151 BDD test scenarios pass.

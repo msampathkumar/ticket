@@ -276,3 +276,31 @@ Feature: SCION Task Force Plugin
     And the output should contain "Worker report: diff is ready on branch tf-0090"
     When I run "ticket scion-taskforce logs"
     Then the output should contain "tf-0090: merged 1 note(s) and the 'waiting-for-review' tag from the worker workspace"
+
+  Scenario: Persisted worker brief can be viewed via tk scion-taskforce brief
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0100" and title "Brief test task"
+    And ticket "tf-0100" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0100"
+    Then the command should succeed
+    When I run "ticket scion-taskforce brief tf-0100"
+    Then the command should succeed
+    And the output should contain "You are an autonomous SCION task force worker assigned to ticket `tf-0100`"
+    And the output should contain "Brief test task"
+
+  Scenario: Project-local worktree mode (.scion/) allows higher concurrent worker execution per project
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a file ".scion/config" with content "simulated worktree project"
+    And a ticket exists with ID "tf-0101" and title "W1" with priority 1
+    And ticket "tf-0101" has tags "taskforce"
+    And a ticket exists with ID "tf-0102" and title "W2" with priority 1
+    And ticket "tf-0102" has tags "taskforce"
+    And a ticket exists with ID "tf-0103" and title "W3" with priority 1
+    And ticket "tf-0103" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch"
+    Then the command should succeed
+    And the output should contain "spawned=3"
+    And the fake scion runtime should have 3 pod(s)
+

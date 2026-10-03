@@ -26,8 +26,8 @@ find_tickets_dir() {
     return 1
 }
 
-# Commands that can create .tickets if not found
-WRITE_COMMANDS="create init"
+# Commands that can create/manage .tickets if not found
+WRITE_COMMANDS="create init uninit"
 
 # Initialize TICKETS_DIR based on command type
 init_tickets_dir() {
@@ -162,6 +162,32 @@ remove_yaml_field() {
     _sed_i "$file" "/^${field}:/d"
 }
 
+register_global_project() {
+    local proj_dir="$1"
+    python3 -c "
+import json, os
+from pathlib import Path
+state_dir = Path.home() / '.local' / 'state' / 'tk'
+state_dir.mkdir(parents=True, exist_ok=True)
+pfile = state_dir / 'projects.json'
+projs = []
+if pfile.exists():
+    try:
+        data = json.loads(pfile.read_text(encoding='utf-8'))
+        if isinstance(data, list):
+            projs = data
+        elif isinstance(data, dict):
+            projs = data.get('projects', [])
+    except Exception:
+        pass
+abs_p = str(Path('$proj_dir').expanduser().resolve())
+if abs_p in projs:
+    projs.remove(abs_p)
+projs.insert(0, abs_p)
+pfile.write_text(json.dumps({'projects': projs}, indent=2), encoding='utf-8')
+" 2>/dev/null || true
+}
+
 cmd_init() {
     local target_dir="${1:-.}"
     if [[ "$target_dir" == *"/.tickets" ]]; then
@@ -172,6 +198,7 @@ cmd_init() {
 
     local abs_dir
     abs_dir=$(cd "$target_dir" 2>/dev/null && pwd || echo "$target_dir")
+    register_global_project "$abs_dir"
     local folder_name
     folder_name=$(basename "$abs_dir")
     local tickets_path="$abs_dir/.tickets"
@@ -223,6 +250,27 @@ cmd_init() {
         echo "Created initial setup ticket $id (closed)"
     else
         echo "Ticket repository already initialized in $tickets_path ($ticket_count tickets)"
+    fi
+}
+
+cmd_uninit() {
+    local target_dir="${1:-.}"
+    if [[ "$target_dir" == *"/.tickets" ]]; then
+        target_dir="${target_dir%/.tickets}"
+    elif [[ "$target_dir" == ".tickets" ]]; then
+        target_dir="."
+    fi
+
+    local abs_dir
+    abs_dir=$(cd "$target_dir" 2>/dev/null && pwd || echo "$target_dir")
+    local tickets_path="$abs_dir/.tickets"
+
+    if [[ -d "$tickets_path" ]]; then
+        echo "🗑️ Uninitializing ticket repository at $tickets_path..."
+        rm -rf "$tickets_path"
+        echo "✅ Successfully removed $tickets_path directory."
+    else
+        echo "ℹ️ No .tickets directory found at $tickets_path."
     fi
 }
 
@@ -1771,6 +1819,7 @@ Usage: $cmd <command> [args]
 
 Commands:
   init [dir]               Initialize ticket repository with initial setup task
+  uninit [dir]             Remove .tickets repository directory
   create [title] [options] Create ticket, prints ID
     -d, --description      Description text
     --design               Design notes
@@ -2084,6 +2133,7 @@ esac
 # Built-in commands
 case "${1:-help}" in
     init)   shift; cmd_init "$@" ;;
+    uninit) shift; cmd_uninit "$@" ;;
     create) shift; cmd_create "$@" ;;
     start)  shift; cmd_start "$@" ;;
     close)  shift; cmd_close "$@" ;;

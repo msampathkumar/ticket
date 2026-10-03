@@ -313,6 +313,7 @@ def dispatch_ticket(
 
     telemetry.ensure_project_symlink(project_dir)
     prompt = build_worker_prompt(ticket, config, branch=branch)
+    telemetry.save_worker_brief(project_dir, ticket.id, prompt)
     worker_env = {
         "OTEL_EXPORTER_OTLP_TRACES_FILE": str(telemetry.traces_file),
         "OTEL_EXPORTER_OTLP_METRICS_FILE": str(telemetry.metrics_file),
@@ -875,7 +876,9 @@ def reconcile_once(
 
         proj_cfg = load_config(project_dir=proj_path, explicit_config=explicit_config)
         proj_watcher = proj_cfg.get("watcher", {})
-        max_per_proj = int(proj_watcher.get("max_concurrent_per_project", 10))
+        has_worktree = (proj_path / ".scion").is_dir()
+        configured_max = proj_watcher.get("max_concurrent_per_project", 1)
+        max_per_proj = 5 if (configured_max == 1 and has_worktree) else int(configured_max)
         auto_pause = bool(proj_watcher.get("auto_pause_on_review", True))
         auto_wake = bool(proj_watcher.get("auto_wake_on_feedback", True))
         review_tag = str(proj_cfg.get("tags", {}).get("review", "waiting-for-review"))

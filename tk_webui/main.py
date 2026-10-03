@@ -32,6 +32,8 @@ from .tk_cli import (
     remove_link_cli,
     init_tickets_dir,
     browse_path,
+    get_global_projects,
+    add_global_project,
 )
 
 app = FastAPI(title="tk Web UI", version="0.1.0")
@@ -56,6 +58,7 @@ def check_directory(path: str = Query(..., description="Directory path to inspec
     ticket_count = 0
     if has_tickets:
         ticket_count = len(list(tickets_dir.glob("*.md")))
+        add_global_project(str(p))
 
     return DirectoryCheckResponse(
         path=str(p),
@@ -64,6 +67,21 @@ def check_directory(path: str = Query(..., description="Directory path to inspec
         tickets_dir=str(tickets_dir) if tickets_dir else None,
         ticket_count=ticket_count,
     )
+
+
+@app.get("/api/projects")
+def list_global_projects():
+    return {"projects": get_global_projects()}
+
+
+@app.post("/api/projects")
+def register_global_project(req: dict = Body(...)):
+    path = req.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Path is required")
+    projs = add_global_project(path)
+    return {"status": "ok", "projects": projs}
+
 
 
 @app.get("/api/browse", response_model=List[DirectoryBrowseItem])

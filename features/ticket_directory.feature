@@ -83,3 +83,17 @@ Feature: Ticket Directory Resolution
     Then the command should succeed
     And the output should contain "Initialized ticket repository"
     And the output should contain "Created initial setup ticket"
+
+  Scenario: Uninit command removes .tickets directory when it exists
+    Given a ticket exists with ID "test-0001" and title "Test ticket"
+    When I run "ticket uninit"
+    Then the command should succeed
+    And the output should contain "Successfully removed"
+    And the tickets directory does not exist
+
+  Scenario: Uninit command handles missing .tickets directory gracefully
+    Given the tickets directory does not exist
+    When I run "ticket uninit"
+    Then the command should succeed
+    And the output should contain "No .tickets directory found"
+
