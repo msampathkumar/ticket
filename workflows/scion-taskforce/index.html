@@ -1485,26 +1485,28 @@
 <hr />
 <h2 id="step-by-step-walkthrough">Step-by-Step Walkthrough<a class="headerlink" href="#step-by-step-walkthrough" title="Permanent link">&para;</a></h2>
 <h3 id="1-tag-work-for-autonomous-execution">1. Tag Work for Autonomous Execution<a class="headerlink" href="#1-tag-work-for-autonomous-execution" title="Permanent link">&para;</a></h3>
-<p>Human engineers choose which tickets to delegate by adding the <code>taskforce</code> tag:
+<p>Delegate actionable tickets to autonomous workers by adding the <code>taskforce</code> tag:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add input sanitization to auth endpoints"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--tags<span class="w"> </span>backend,taskforce<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--acceptance<span class="w"> </span><span class="s2">"Run make test and ensure all pass"</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="2-daemon-worker-spawning">2. Daemon Worker Spawning<a class="headerlink" href="#2-daemon-worker-spawning" title="Permanent link">&para;</a></h3>
-<p>The global SCION daemon notices the ready ticket and provisions an isolated coding worker:
+<p>The background SCION daemon detects ready tickets tagged with <code>taskforce</code> and provisions isolated worker instances:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>status
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="3-review-checkpoint">3. Review Checkpoint<a class="headerlink" href="#3-review-checkpoint" title="Permanent link">&para;</a></h3>
-<p>When the worker finishes writing code and passing local tests:
-1. It records verification notes via <code>tk add-note &lt;id&gt; "..."</code>.
-2. It tags the ticket with <code>waiting-for-review</code>.
-3. The worker pauses execution.</p>
+<p>When the worker finishes writing code and passing local tests:</p>
+<ol>
+<li>It records verification notes via <code>tk add-note &lt;id&gt; "..."</code>.</li>
+<li>It tags the ticket with <code>waiting-for-review</code>.</li>
+<li>The worker pauses execution.</li>
+</ol>
 <h3 id="4-human-verification-closure">4. Human Verification &amp; Closure<a class="headerlink" href="#4-human-verification-closure" title="Permanent link">&para;</a></h3>
-<p>The developer opens the Web UI (<code>http://localhost:8475</code>), reviews the audit trail and code diff, and closes the ticket:
+<p>Review the audit trail and code diff in the Web UI (<code>http://localhost:8475</code>), then close the ticket:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>close<span class="w"> </span>tic-auth1
 </span></code></pre></div>
-Closing the ticket automatically unblocks downstream tasks in the DAG.</p>
+<p>Closing the ticket automatically unblocks downstream tasks in the DAG.</p>
 
 
 

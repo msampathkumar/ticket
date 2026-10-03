@@ -896,67 +896,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Prerequisites">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-python-39" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Python 3.9+
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-scion-cli-scion" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        2. SCION CLI (<code>scion</code>)
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-container-runtime" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        3. Container Runtime
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-project-initialization" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Project Initialization
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-opt-in-tag" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Opt-in Tag
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1361,67 +1300,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Prerequisites">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-python-39" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Python 3.9+
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-scion-cli-scion" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        2. SCION CLI (<code>scion</code>)
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-container-runtime" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        3. Container Runtime
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-project-initialization" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Project Initialization
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-opt-in-tag" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Opt-in Tag
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1556,21 +1434,18 @@
 <hr />
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Before running the SCION Task Force daemon, ensure your system meets the following requirements:</p>
-<h3 id="1-python-39">1. Python 3.9+<a class="headerlink" href="#1-python-39" title="Permanent link">&para;</a></h3>
-<p>Required for the daemon runtime and OpenTelemetry logging.</p>
-<h3 id="2-scion-cli-scion">2. SCION CLI (<code>scion</code>)<a class="headerlink" href="#2-scion-cli-scion" title="Permanent link">&para;</a></h3>
-<p>Must be installed and available in your <code>$PATH</code> (<a href="https://github.com/GoogleCloudPlatform/scion">GoogleCloudPlatform/scion</a>):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>scion<span class="w"> </span>--version
-</span></code></pre></div>
-<h3 id="3-container-runtime">3. Container Runtime<a class="headerlink" href="#3-container-runtime" title="Permanent link">&para;</a></h3>
-<p>A running container daemon: <strong>Docker</strong> or <strong>Podman</strong>. SCION uses containers to isolate each autonomous coding agent.</p>
-<h3 id="4-project-initialization">4. Project Initialization<a class="headerlink" href="#4-project-initialization" title="Permanent link">&para;</a></h3>
-<p>Each repository monitored by the task force must be initialized with SCION:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/project
+<ol>
+<li><strong>Python 3.9+</strong>: Required for the daemon runtime and OpenTelemetry logging.</li>
+<li><strong>SCION CLI (<code>scion</code>)</strong>: Must be installed and available in your <code>$PATH</code> (<a href="https://github.com/GoogleCloudPlatform/scion">GoogleCloudPlatform/scion</a>):
+    <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>scion<span class="w"> </span>--version
+</span></code></pre></div></li>
+<li><strong>Container Runtime</strong>: A running container daemon (<strong>Docker</strong> or <strong>Podman</strong>). SCION uses containers to isolate each autonomous coding agent.</li>
+<li><strong>Project Initialization</strong>: Each repository monitored by the task force must be initialized with SCION:
+    <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/project
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>scion<span class="w"> </span>init
-</span></code></pre></div>
-<h3 id="5-opt-in-tag">5. Opt-in Tag<a class="headerlink" href="#5-opt-in-tag" title="Permanent link">&para;</a></h3>
-<p>The daemon only claims tickets explicitly tagged with <code>taskforce</code>. Human engineers maintain full control over which tasks are delegated.</p>
+</span></code></pre></div></li>
+<li><strong>Opt-in Tag</strong>: The daemon only claims tickets explicitly tagged with <code>taskforce</code>. Human engineers maintain full control over which tasks are delegated.</li>
+</ol>
 <hr />
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <p>Install the plugin via the modular installer:</p>

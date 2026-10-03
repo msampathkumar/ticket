@@ -1313,7 +1313,7 @@
 
 
 <h1 id="tk-plugin-architecture-development-guide">tk - Plugin Architecture &amp; Development Guide<a class="headerlink" href="#tk-plugin-architecture-development-guide" title="Permanent link">&para;</a></h1>
-<p><code>tk</code> features an extensible, lightweight plugin system that allows extending functionality without modifying the core CLI script.</p>
+<p><code>tk</code> provides a plugin system to extend functionality without modifying the core CLI script.</p>
 <hr />
 <h2 id="1-how-plugins-work">1. How Plugins Work<a class="headerlink" href="#1-how-plugins-work" title="Permanent link">&para;</a></h2>
 <p>When you execute:
@@ -1367,7 +1367,7 @@ Implement the <code>--tk-describe</code> flag:
 <hr />
 <h2 id="5-official-plugins">5. Official Plugins<a class="headerlink" href="#5-official-plugins" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Full-featured interactive Kanban, Table, DAG Mind Map, and Timeline review dashboard.</li>
+<li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.</li>
 <li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. <em>(optional)</em></li>
 <li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Single global daemon that launches a SCION coding worker for each ticket explicitly tagged <code>taskforce</code>, verifies the worker actually started, pauses it on <code>waiting-for-review</code>, and emits OpenTelemetry to local rotating logs. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
 </ul>

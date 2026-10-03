@@ -1484,7 +1484,7 @@
 
   <h1 id="__skip">Solo CLI Workflow</h1>
 
-<p>The <strong>Solo CLI Workflow</strong> is designed for software engineers, solo founders, and terminal power users who want rapid, offline task tracking without leaving their shell.</p>
+<p>The <strong>Solo CLI Workflow</strong> provides rapid, offline task tracking for individual developers and terminal power users directly in the shell.</p>
 <hr />
 <h2 id="lifecycle-overview">Lifecycle Overview<a class="headerlink" href="#lifecycle-overview" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart LR
@@ -1503,28 +1503,28 @@
 <hr />
 <h2 id="step-by-step-walkthrough">Step-by-Step Walkthrough<a class="headerlink" href="#step-by-step-walkthrough" title="Permanent link">&para;</a></h2>
 <h3 id="1-initialize-once">1. Initialize Once<a class="headerlink" href="#1-initialize-once" title="Permanent link">&para;</a></h3>
-<p>Inside your Git project root:
+<p>Inside your Git project root:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>init
 </span></code></pre></div>
-This creates <code>.tickets/</code>. All task metadata is versioned directly with your code.</p>
+<p>This creates <code>.tickets/</code>. All task metadata is versioned directly with your code.</p>
 <h3 id="2-rapid-task-creation">2. Rapid Task Creation<a class="headerlink" href="#2-rapid-task-creation" title="Permanent link">&para;</a></h3>
-<p>Create tickets on the fly without breaking your flow:
+<p>Create tasks with priority, type, and tags directly from the shell:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add SQLite caching layer"</span><span class="w"> </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span>-t<span class="w"> </span>feature<span class="w"> </span>--tags<span class="w"> </span>database,performance
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="3-check-ready-tasks">3. Check Ready Tasks<a class="headerlink" href="#3-check-ready-tasks" title="Permanent link">&para;</a></h3>
-<p>Instead of scanning endless lists, let <code>tk</code> compute what is actionable right now:
+<p>Query actionable tasks whose dependencies are satisfied:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>ready
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="4-work-add-notes">4. Work &amp; Add Notes<a class="headerlink" href="#4-work-add-notes" title="Permanent link">&para;</a></h3>
-<p>Mark your ticket in progress and record design thoughts:
+<p>Mark the task in progress and record design decisions or progress notes:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>start<span class="w"> </span>tic-10a
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>add-note<span class="w"> </span>tic-10a<span class="w"> </span><span class="s2">"Evaluated in-memory cache vs WAL mode; choosing WAL mode."</span>
-</span></code></pre></div></p>
+</span></code></pre></div>
 <h3 id="5-close-and-unblock">5. Close and Unblock<a class="headerlink" href="#5-close-and-unblock" title="Permanent link">&para;</a></h3>
-<p>When complete, close the task:
+<p>When work is complete, close the task:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>close<span class="w"> </span>tic-10a
 </span></code></pre></div>
-Any dependent tasks are automatically unblocked and immediately appear in <code>tk ready</code>.</p>
+<p>Any dependent tasks are automatically unblocked and immediately appear in <code>tk ready</code>.</p>
 
 
 

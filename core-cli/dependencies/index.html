@@ -1420,20 +1420,20 @@
 
 <p><code>ticket</code> (<code>tk</code>) treats task dependencies as a <strong>Directed Acyclic Graph (DAG)</strong>. This ensures tasks are completed in the correct logical sequence without circular deadlocks.</p>
 <hr />
-<h3 id="how-dependencies-work">How Dependencies Work<a class="headerlink" href="#how-dependencies-work" title="Permanent link">&para;</a></h3>
+<h2 id="how-dependencies-work">How Dependencies Work<a class="headerlink" href="#how-dependencies-work" title="Permanent link">&para;</a></h2>
 <p>When task <code>B</code> depends on task <code>A</code>:
 1. <code>B</code> is considered <strong>blocked</strong> until <code>A</code> is closed.
 2. <code>tk ready</code> will only show <code>B</code> after <code>A</code> transitions to <code>closed</code>.
 3. Closing <code>A</code> automatically unblocks <code>B</code>.</p>
-<h4 id="adding-dependencies">Adding Dependencies<a class="headerlink" href="#adding-dependencies" title="Permanent link">&para;</a></h4>
+<h3 id="adding-dependencies">Adding Dependencies<a class="headerlink" href="#adding-dependencies" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># tic-backend-api must finish before tic-frontend-ui can start</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>dep<span class="w"> </span>tic-frontend-ui<span class="w"> </span>tic-backend-api
 </span></code></pre></div>
-<h4 id="cycle-detection">Cycle Detection<a class="headerlink" href="#cycle-detection" title="Permanent link">&para;</a></h4>
+<h3 id="cycle-detection">Cycle Detection<a class="headerlink" href="#cycle-detection" title="Permanent link">&para;</a></h3>
 <p>To prevent circular deadlocks (e.g., A depends on B, B depends on A), <code>tk</code> includes native cycle detection:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>cycle
 </span></code></pre></div></p>
-<h4 id="viewing-dependency-trees">Viewing Dependency Trees<a class="headerlink" href="#viewing-dependency-trees" title="Permanent link">&para;</a></h4>
+<h3 id="viewing-dependency-trees">Viewing Dependency Trees<a class="headerlink" href="#viewing-dependency-trees" title="Permanent link">&para;</a></h3>
 <p>Inspect recursive upstream and downstream relationships:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>tic-frontend-ui
 </span></code></pre></div></p>

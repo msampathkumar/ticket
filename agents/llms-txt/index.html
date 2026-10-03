@@ -1340,16 +1340,16 @@
 
   <h1 id="__skip">LLM Context (llms.txt)</h1>
 
-<p>Inspired by <a href="https://llmstxt.org/">llmstxt.org</a> and <a href="https://modelcontextprotocol.io">Model Context Protocol</a>, <code>ticket</code> provides dedicated machine-readable documentation endpoints at root:</p>
+<p>Following the <a href="https://llmstxt.org/">llms.txt</a> standard, <code>ticket</code> provides machine-readable documentation endpoints at root:</p>
 <ul>
-<li><a href="/llms.txt"><code>/llms.txt</code></a>: Structured table of contents linking directly to all markdown documentation files and guides with summaries.</li>
-<li><a href="/llms-full.txt"><code>/llms-full.txt</code></a>: Consolidated single-file documentation reference combining all specifications and guides into a single context-window-friendly payload.</li>
+<li><a href="/llms.txt"><code>/llms.txt</code></a>: Structured index linking to all markdown documentation files and guides with summaries.</li>
+<li><a href="/llms-full.txt"><code>/llms-full.txt</code></a>: Consolidated single-file reference combining all specifications and guides.</li>
 </ul>
 <hr />
 <h3 id="how-ai-agents-use-llmstxt">How AI Agents Use <code>llms.txt</code><a class="headerlink" href="#how-ai-agents-use-llmstxt" title="Permanent link">&para;</a></h3>
-<p>When an AI coding assistant or agent visits a repository or documentation site supporting <code>llms.txt</code>:
-1. It fetches <code>/llms.txt</code> to discover the exact structure and markdown URLs of all guides and specs.
-2. It fetches specific markdown files or <code>/llms-full.txt</code> to instantly load complete technical context without web crawling or HTML scraping.</p>
+<p>When an AI coding assistant or agent operates in a repository or documentation site supporting <code>llms.txt</code>:
+1. Fetch <code>/llms.txt</code> to discover the structure and markdown URLs of all guides and specs.
+2. Fetch specific markdown files or <code>/llms-full.txt</code> to load documentation directly without web crawling or HTML scraping.</p>
 
 
 

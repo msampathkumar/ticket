@@ -1609,7 +1609,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </blockquote>
 <hr />
 <h2 id="1-system-goals-philosophy">1. System Goals &amp; Philosophy<a class="headerlink" href="#1-system-goals-philosophy" title="Permanent link">&para;</a></h2>
-<p><code>tk</code> is a <strong>minimal, offline task tracker with dependency intelligence</strong> designed for developers and autonomous AI coding agents.</p>
+<p><code>tk</code> is a <strong>minimal, dependency-aware task tracker. Built to scale agentic workflows.</strong></p>
 <h3 id="core-principles">Core Principles<a class="headerlink" href="#core-principles" title="Permanent link">&para;</a></h3>
 <ol>
 <li><strong>Zero Database</strong>: State is stored locally in <code>.tickets/*.md</code>.</li>
@@ -1673,7 +1673,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <ul>
 <li><strong>Ready Queue</strong>: All non-closed tickets whose dependencies are either empty or completely satisfied by tickets in <code>status: closed</code>.</li>
 <li><strong>Blocked Queue</strong>: All non-closed tickets where at least one dependency in <code>deps</code> is in <code>status: open</code> or <code>status: in_progress</code>.</li>
-<li><strong>Cycle Detection</strong>: Depth-First Search (DFS) traversal identifying circular references (<span class="arithmatex">\(A \to B \to A\)</span>) across open tickets.</li>
+<li><strong>Cycle Detection</strong>: Depth-First Search (DFS) traversal identifying circular references (<code>A -&gt; B -&gt; A</code>) across open tickets.</li>
 </ul>
 <hr />
 <h2 id="4-cli-interface-exit-codes">4. CLI Interface &amp; Exit Codes<a class="headerlink" href="#4-cli-interface-exit-codes" title="Permanent link">&para;</a></h2>

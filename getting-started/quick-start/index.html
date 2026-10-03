@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Get up and running with ticket (tk) in 60 seconds.">
+        <meta name="description" content="Initialize a repository, create tasks, manage dependencies, and launch the Web UI.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
@@ -1448,43 +1448,43 @@
 
   <h1 id="__skip">Quick Start</h1>
 
-<p>Follow this 60-second quick start guide to initialize your first project, create tasks, manage dependencies, and launch the Web UI.</p>
+<p>Follow this quick start guide to initialize a repository, create tasks, track dependencies, and launch the Web UI.</p>
 <hr />
-<h3 id="step-1-initialize-a-project">Step 1: Initialize a Project<a class="headerlink" href="#step-1-initialize-a-project" title="Permanent link">&para;</a></h3>
-<p>Navigate to your repository and initialize <code>.tickets/</code>:
+<h2 id="step-1-initialize-a-project">Step 1: Initialize a Project<a class="headerlink" href="#step-1-initialize-a-project" title="Permanent link">&para;</a></h2>
+<p>Navigate to your repository and initialize <code>.tickets/</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>my-project
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>init
 </span></code></pre></div>
-This creates a <code>.tickets/</code> directory where all tasks are stored as plain Markdown files with YAML frontmatter.</p>
-<h3 id="step-2-create-a-task">Step 2: Create a Task<a class="headerlink" href="#step-2-create-a-task" title="Permanent link">&para;</a></h3>
-<p>Create your first task with priority and tags:
+<p>This creates a <code>.tickets/</code> directory where all tasks are stored as plain Markdown files with YAML frontmatter.</p>
+<h2 id="step-2-create-a-task">Step 2: Create a Task<a class="headerlink" href="#step-2-create-a-task" title="Permanent link">&para;</a></h2>
+<p>Create your first task with priority and tags:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Implement user authentication"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"Add JWT-based auth to FastAPI backend"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--tags<span class="w"> </span>backend,security
 </span></code></pre></div>
-<code>tk</code> prints the generated task ID (e.g., <code>tic-abc1</code>).</p>
-<h3 id="step-3-check-actionable-work-tk-ready">Step 3: Check Actionable Work (<code>tk ready</code>)<a class="headerlink" href="#step-3-check-actionable-work-tk-ready" title="Permanent link">&para;</a></h3>
-<p>Run <code>tk ready</code> to list unblocked tasks whose dependencies are fully satisfied:
+<p><code>tk</code> prints the generated task ID (e.g., <code>tic-abc1</code>).</p>
+<h2 id="step-3-check-actionable-work-tk-ready">Step 3: Check Actionable Work (<code>tk ready</code>)<a class="headerlink" href="#step-3-check-actionable-work-tk-ready" title="Permanent link">&para;</a></h2>
+<p>Run <code>tk ready</code> to list unblocked tasks whose dependencies are fully satisfied:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>ready
-</span></code></pre></div></p>
-<h3 id="step-4-claim-work-on-the-task">Step 4: Claim &amp; Work on the Task<a class="headerlink" href="#step-4-claim-work-on-the-task" title="Permanent link">&para;</a></h3>
-<p>Mark the task as in progress:
+</span></code></pre></div>
+<h2 id="step-4-claim-work-on-the-task">Step 4: Claim &amp; Work on the Task<a class="headerlink" href="#step-4-claim-work-on-the-task" title="Permanent link">&para;</a></h2>
+<p>Mark the task as in progress:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>start<span class="w"> </span>tic-abc1
 </span></code></pre></div>
-Add review notes or progress logs:
+<p>Add review notes or progress logs:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>add-note<span class="w"> </span>tic-abc1<span class="w"> </span><span class="s2">"Completed token generation logic and unit tests."</span>
-</span></code></pre></div></p>
-<h3 id="step-5-close-the-task-unblock-dependents">Step 5: Close the Task &amp; Unblock Dependents<a class="headerlink" href="#step-5-close-the-task-unblock-dependents" title="Permanent link">&para;</a></h3>
-<p>When finished, close the task:
+</span></code></pre></div>
+<h2 id="step-5-close-the-task-unblock-dependents">Step 5: Close the Task &amp; Unblock Dependents<a class="headerlink" href="#step-5-close-the-task-unblock-dependents" title="Permanent link">&para;</a></h2>
+<p>When finished, close the task:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tk<span class="w"> </span>close<span class="w"> </span>tic-abc1
 </span></code></pre></div>
-This automatically updates the status and unblocks any downstream dependent tasks.</p>
-<h3 id="step-6-launch-the-interactive-web-ui">Step 6: Launch the Interactive Web UI<a class="headerlink" href="#step-6-launch-the-interactive-web-ui" title="Permanent link">&para;</a></h3>
-<p>Launch the 4-lane Kanban board and DAG Mind Map:
+<p>This automatically updates the status and unblocks any downstream dependent tasks.</p>
+<h2 id="step-6-launch-the-interactive-web-ui">Step 6: Launch the Interactive Web UI<a class="headerlink" href="#step-6-launch-the-interactive-web-ui" title="Permanent link">&para;</a></h2>
+<p>Launch the 4-lane Kanban board and DAG Mind Map:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tk<span class="w"> </span>webui
 </span></code></pre></div>
-Open <a href="http://localhost:8475">http://localhost:8475</a> in your browser.</p>
+<p>Open <a href="http://localhost:8475">http://localhost:8475</a> in your browser.</p>
 
 
 
