@@ -125,16 +125,16 @@ generate_plugin_pkgbuild() {
 
     mkdir -p "$output_dir"
     cat > "$output_dir/PKGBUILD" << EOF
-# Maintainer: wedow <wedow@users.noreply.github.com>
+# Maintainer: Sampath Kumar <sam1990kumar@gmail.com>
 pkgname=ticket-$plugin_name
 pkgver=$pkgver
 pkgrel=1
 pkgdesc="$pkgdesc"
 arch=('any')
-url="https://github.com/wedow/ticket"
+url="https://github.com/msampathkumar/ticket"
 license=('MIT')
 depends=('ticket-core'${extra_deps:+ $extra_deps})
-source=("ticket-\$pkgver.tar.gz::https://github.com/wedow/ticket/archive/refs/tags/v\$pkgver.tar.gz")
+source=("ticket-\$pkgver.tar.gz::https://github.com/msampathkumar/ticket/archive/refs/tags/v\$pkgver.tar.gz")
 sha256sums=('$SHA256')
 
 package() {

@@ -2,8 +2,11 @@ name: Release
 
 on:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   release:
@@ -12,37 +15,82 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version and determine if release is needed
+        id: check_version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            TAG="v${VERSION}"
+            IS_TAG_PUSH=true
+          else
+            VERSION=$(grep -m1 '^version = ' pyproject.toml | cut -d '"' -f2)
+            TAG="v${VERSION}"
+            IS_TAG_PUSH=false
+          fi
+
+          echo "Detected version: $VERSION ($TAG)"
+
+          # Check if tag already exists in remote/local tags
+          if [ "$IS_TAG_PUSH" = "false" ] && git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. No new release needed."
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "is_tag_push=$IS_TAG_PUSH" >> $GITHUB_OUTPUT
+          fi
 
       - name: Extract changelog
+        if: steps.check_version.outputs.should_release == 'true'
         id: changelog
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          # Extract section between this version header and the next
+          VERSION="${{ steps.check_version.outputs.version }}"
           CONTENT=$(awk -v ver="$VERSION" '
             /^## \[/ { if (found) exit; if (index($0, "["ver"]")) found=1; next }
             found { print }
           ' CHANGELOG.md)
-          # Handle multiline output
+          if [ -z "$CONTENT" ]; then
+            CONTENT="Release $VERSION"
+          fi
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$CONTENT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create Release
+      - name: Create and push tag if triggered from branch push
+        if: steps.check_version.outputs.should_release == 'true' && steps.check_version.outputs.is_tag_push == 'false'
+        run: |
+          TAG="${{ steps.check_version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        if: steps.check_version.outputs.should_release == 'true'
         id: release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.check_version.outputs.tag }}
+          name: ${{ steps.check_version.outputs.tag }}
           body: ${{ steps.changelog.outputs.body }}
+          generate_release_notes: false
 
       - name: Get tarball SHA256
+        if: steps.check_version.outputs.should_release == 'true'
         id: sha
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          curl -sL "https://github.com/${{ github.repository }}/archive/refs/tags/${VERSION}.tar.gz" -o release.tar.gz
+          VERSION="${{ steps.check_version.outputs.version }}"
+          curl -sL "https://github.com/${{ github.repository }}/archive/refs/tags/v${VERSION}.tar.gz" -o release.tar.gz
           SHA=$(sha256sum release.tar.gz | cut -d' ' -f1)
           echo "sha256=$SHA" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Update Homebrew tap
+        if: steps.check_version.outputs.should_release == 'true' && env.TAP_GITHUB_TOKEN != ''
         env:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
@@ -50,6 +98,7 @@ jobs:
           ./scripts/publish-homebrew.sh "${{ steps.sha.outputs.version }}" "${{ steps.sha.outputs.sha256 }}"
 
       - name: Update AUR packages
+        if: steps.check_version.outputs.should_release == 'true' && env.AUR_SSH_KEY != ''
         env:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
         run: |

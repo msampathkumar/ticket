@@ -5,7 +5,7 @@ description: Autonomous multi-agent worker orchestration plugin for ticket.
 
 The **SCION Task Force** (`tk-scion-taskforce`) is an optional standalone orchestrator plugin that manages autonomous coding workers mapped 1:1 to tickets.
 
-It wraps directly on top of the native **SCION Hub** (`http://127.0.0.1:8080`) rather than running a parallel conflicting daemon, bridging `tk` dependency DAGs with isolated containerized agent execution.
+It is a simple, straightforward integration tool for SCION: it bridges `tk` dependency DAGs with the native `scion` CLI, delegating container provisioning, workspace mounting, and agent lifecycles directly to SCION.
 
 ---
 

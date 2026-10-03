@@ -2,22 +2,14 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-03
+
 ### Added
-- SCION Task Force: Pluggable Dual-Mode SCION Hub integration (`--project <dir>` with Hub routing, fallback to `--no-hub` offline mode).
+- SCION Task Force: Straightforward integration wrapping the native `scion` CLI (`--project <dir>`).
 - SCION Task Force: Interactive setup wizard (`tk scion-taskforce init` and `tk scion-taskforce init --defaults`) with automatic project template seeding (`.scion/templates/taskforce-worker/`).
 - SCION Task Force: Verification test runner (`tk scion-taskforce test`) validating provider runtime, GCP ADC, Vertex AI Model Garden, and agent container execution.
 - SCION Task Force: Automated Google Cloud Vertex AI region injection (`GOOGLE_CLOUD_REGION=us-east5`) for Anthropic Claude models on Model Garden.
 - Agent Skill: Comprehensive developer and AI agent operational guide with full CLI reference, 5-step loop, and GitHub repository / documentation links.
-
-### Fixed
-- SCION Task Force: Cleaned up deprecated `harness` and `harness_config` schema fields in generated agent templates.
-- SCION Task Force: Enhanced Podman container discovery via suffix matching (`podman ps -q --filter name=--<id>$`).
-- SCION Task Force: Automatically strip `waiting-for-review` from both main ticket and worker workspace ticket upon wake.
-- Web UI: Increased border contrast depth in light theme (`border-slate-300`).
-
-## [0.4.0] - 2026-10-03
-
-### Added
 - Interactive Web UI plugin (`tk-webui`): 4-lane Kanban board, interactive DAG dependency canvas, table view, timeline audit feed, and background daemon manager (`tk webui server start|status|stop`) on default port 8475.
 - Documentation portal powered by Zensical with native Mermaid diagram support and live GitHub Pages deployment.
 - Machine-readable documentation endpoints: `docs/llms.txt` index and `docs/llms-full.txt` consolidated knowledge base generated via `make docs-build`.
@@ -26,6 +18,10 @@
 - Standardized writing style and anti-slop guidelines in `AGENTS.md` (`be-concise`, `quillscore`, and clean technical documentation standards).
 
 ### Fixed
+- SCION Task Force: Cleaned up deprecated `harness` and `harness_config` schema fields in generated agent templates.
+- SCION Task Force: Enhanced Podman container discovery via suffix matching (`podman ps -q --filter name=--<id>$`).
+- SCION Task Force: Automatically strip `waiting-for-review` from both main ticket and worker workspace ticket upon wake.
+- Web UI: Increased border contrast depth in light theme (`border-slate-300`).
 - Core: `update_yaml_field` used GNU-only `0,/re/` sed addressing; on macOS (BSD sed) adding a field that did not exist yet (e.g. `tk update <id> --tags ...` on a ticket without `tags:`) silently did nothing. Now inserts portably via awk.
 - `tk github sync`: existing synced tickets now get `github-sync,pr|issue` + GitHub labels (re)applied on every sync, additively (user tags such as `taskforce` are kept); summary reports `N re-tagged`.
 

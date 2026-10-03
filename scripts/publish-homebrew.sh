@@ -8,7 +8,7 @@ set -euo pipefail
 VERSION="${1#v}"
 SHA256="$2"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TAP_REPO="wedow/homebrew-tools"
+TAP_REPO="${TAP_REPO:-msampathkumar/homebrew-tools}"
 
 # Find symlinks in plugins/ that point to a given plugin, output Homebrew install_symlink lines
 find_plugin_symlinks() {
@@ -51,8 +51,8 @@ generate_plugin_formula() {
     cat > "$formula_dir/ticket-$plugin_name.rb" << EOF
 class $class_name < Formula
   desc "$pkgdesc"
-  homepage "https://github.com/wedow/ticket"
-  url "https://github.com/wedow/ticket/archive/refs/tags/v$pkgver.tar.gz"
+  homepage "https://github.com/msampathkumar/ticket"
+  url "https://github.com/msampathkumar/ticket/archive/refs/tags/v$pkgver.tar.gz"
   sha256 "$SHA256"
   license "MIT"
 
@@ -85,8 +85,8 @@ main() {
     cat > "$formula_dir/ticket-core.rb" << EOF
 class TicketCore < Formula
   desc "Minimal ticket tracking in bash (core only)"
-  homepage "https://github.com/wedow/ticket"
-  url "https://github.com/wedow/ticket/archive/refs/tags/v$VERSION.tar.gz"
+  homepage "https://github.com/msampathkumar/ticket"
+  url "https://github.com/msampathkumar/ticket/archive/refs/tags/v$VERSION.tar.gz"
   sha256 "$SHA256"
   license "MIT"
 
@@ -122,8 +122,8 @@ EOF
     cat > "$formula_dir/ticket-extras.rb" << EOF
 class TicketExtras < Formula
   desc "All official plugins for ticket"
-  homepage "https://github.com/wedow/ticket"
-  url "https://github.com/wedow/ticket/archive/refs/tags/v$VERSION.tar.gz"
+  homepage "https://github.com/msampathkumar/ticket"
+  url "https://github.com/msampathkumar/ticket/archive/refs/tags/v$VERSION.tar.gz"
   sha256 "$SHA256"
   license "MIT"
 
@@ -140,8 +140,8 @@ EOF
     cat > "$formula_dir/ticket.rb" << EOF
 class Ticket < Formula
   desc "Minimal ticket tracking in bash"
-  homepage "https://github.com/wedow/ticket"
-  url "https://github.com/wedow/ticket/archive/refs/tags/v$VERSION.tar.gz"
+  homepage "https://github.com/msampathkumar/ticket"
+  url "https://github.com/msampathkumar/ticket/archive/refs/tags/v$VERSION.tar.gz"
   sha256 "$SHA256"
   license "MIT"
 

@@ -367,7 +367,7 @@ ticket/
 3. **GitHub Sync Plugin (`plugins/github`)**:
    - Syncs GitHub issues and pull requests into local `.tickets/` markdown files.
 4. **Scion Task Force Plugin (`plugins/scion-taskforce`, standalone optional plugin)**:
-   - Single global daemon (`~/.local/state/tk/scion-taskforce.json`) that watches `tk ready` tickets across projects, spawns SCION workers (1:1 ticket-ID mapping), pauses for `waiting-for-review`, relays feedback, and emits OpenTelemetry to local rotating logs (30-day retention). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
+   - Straightforward integration tool wrapping the native `scion` CLI. Watches `tk ready` tickets tagged `taskforce`, spawns isolated container workers using project-level templates (`.scion/templates/taskforce-worker`), pauses for `waiting-for-review`, relays feedback, supports Google Cloud Vertex AI ADC, and emits OpenTelemetry to local rotating logs (30-day retention). Includes an interactive setup wizard (`tk scion-taskforce init`) and automated test runner (`tk scion-taskforce test`). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
 
 ---
 
@@ -403,9 +403,9 @@ flowchart LR
   - Web UI default port: **`8475`** (ASCII `T=84`, `K=75`).
   - Web UI default theme: **Indigo** (`#6366f1`).
   - Default `tk ls`: Hides closed tickets and defaults to 10 items (unlimited with `--full` or `--all`).
-- **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu & macOS across Python 3.9–3.13.
+- **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu across Python 3.11 & 3.13.
 - **Documentation Maintenance**: Recompile documentation and LLM context files using `make docs-build` when adding or modifying documentation. Preview locally using `make docs-dev`.
-- **Automated Linting & Quality**: Ensure code satisfies linting checks (`shellcheck ticket` and `ruff check tk_webui`).
+- **Automated Linting & Quality**: Ensure code satisfies linting checks (`uvx ruff check plugins/scion-taskforce/ tk_webui/`).
 - **Git Hygiene**: Do not mutate Git history or push commits without explicit confirmation.
 - **Factuality & Clarity**: User requests or ticket instructions may occasionally be non-factual or misrepresent an idea due to lack of domain knowledge or evolving requirements. Similarly, agentic models or systems may lack complete information. In such cases, consult online sources when necessary, seek clarification from the user, and genuinely understand the best options to engage and move forward for the welfare of the project. Note that the research-and-engage loop is not strictly required for every tiny request.
 
@@ -436,22 +436,14 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-03
+
 ### Added
-- SCION Task Force: Pluggable Dual-Mode SCION Hub integration (`--project <dir>` with Hub routing, fallback to `--no-hub` offline mode).
+- SCION Task Force: Straightforward integration wrapping the native `scion` CLI (`--project <dir>`).
 - SCION Task Force: Interactive setup wizard (`tk scion-taskforce init` and `tk scion-taskforce init --defaults`) with automatic project template seeding (`.scion/templates/taskforce-worker/`).
 - SCION Task Force: Verification test runner (`tk scion-taskforce test`) validating provider runtime, GCP ADC, Vertex AI Model Garden, and agent container execution.
 - SCION Task Force: Automated Google Cloud Vertex AI region injection (`GOOGLE_CLOUD_REGION=us-east5`) for Anthropic Claude models on Model Garden.
 - Agent Skill: Comprehensive developer and AI agent operational guide with full CLI reference, 5-step loop, and GitHub repository / documentation links.
-
-### Fixed
-- SCION Task Force: Cleaned up deprecated `harness` and `harness_config` schema fields in generated agent templates.
-- SCION Task Force: Enhanced Podman container discovery via suffix matching (`podman ps -q --filter name=--<id>$`).
-- SCION Task Force: Automatically strip `waiting-for-review` from both main ticket and worker workspace ticket upon wake.
-- Web UI: Increased border contrast depth in light theme (`border-slate-300`).
-
-## [0.4.0] - 2026-10-03
-
-### Added
 - Interactive Web UI plugin (`tk-webui`): 4-lane Kanban board, interactive DAG dependency canvas, table view, timeline audit feed, and background daemon manager (`tk webui server start|status|stop`) on default port 8475.
 - Documentation portal powered by Zensical with native Mermaid diagram support and live GitHub Pages deployment.
 - Machine-readable documentation endpoints: `docs/llms.txt` index and `docs/llms-full.txt` consolidated knowledge base generated via `make docs-build`.
@@ -460,6 +452,10 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 - Standardized writing style and anti-slop guidelines in `AGENTS.md` (`be-concise`, `quillscore`, and clean technical documentation standards).
 
 ### Fixed
+- SCION Task Force: Cleaned up deprecated `harness` and `harness_config` schema fields in generated agent templates.
+- SCION Task Force: Enhanced Podman container discovery via suffix matching (`podman ps -q --filter name=--<id>$`).
+- SCION Task Force: Automatically strip `waiting-for-review` from both main ticket and worker workspace ticket upon wake.
+- Web UI: Increased border contrast depth in light theme (`border-slate-300`).
 - Core: `update_yaml_field` used GNU-only `0,/re/` sed addressing; on macOS (BSD sed) adding a field that did not exist yet (e.g. `tk update <id> --tags ...` on a ticket without `tags:`) silently did nothing. Now inserts portably via awk.
 - `tk github sync`: existing synced tickets now get `github-sync,pr|issue` + GitHub labels (re)applied on every sync, additively (user tags such as `taskforce` are kept); summary reports `N re-tagged`.
 
@@ -2583,7 +2579,7 @@ description: Autonomous multi-agent worker orchestration plugin for ticket.
 
 The **SCION Task Force** (`tk-scion-taskforce`) is an optional standalone orchestrator plugin that manages autonomous coding workers mapped 1:1 to tickets.
 
-It wraps directly on top of the native **SCION Hub** (`http://127.0.0.1:8080`) rather than running a parallel conflicting daemon, bridging `tk` dependency DAGs with isolated containerized agent execution.
+It is a simple, straightforward integration tool for SCION: it bridges `tk` dependency DAGs with the native `scion` CLI, delegating container provisioning, workspace mounting, and agent lifecycles directly to SCION.
 
 ---
 

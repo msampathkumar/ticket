@@ -53,7 +53,7 @@ ticket/
 3. **GitHub Sync Plugin (`plugins/github`)**:
    - Syncs GitHub issues and pull requests into local `.tickets/` markdown files.
 4. **Scion Task Force Plugin (`plugins/scion-taskforce`, standalone optional plugin)**:
-   - Single global daemon (`~/.local/state/tk/scion-taskforce.json`) that watches `tk ready` tickets across projects, spawns SCION workers (1:1 ticket-ID mapping), pauses for `waiting-for-review`, relays feedback, and emits OpenTelemetry to local rotating logs (30-day retention). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
+   - Straightforward integration tool wrapping the native `scion` CLI. Watches `tk ready` tickets tagged `taskforce`, spawns isolated container workers using project-level templates (`.scion/templates/taskforce-worker`), pauses for `waiting-for-review`, relays feedback, supports Google Cloud Vertex AI ADC, and emits OpenTelemetry to local rotating logs (30-day retention). Includes an interactive setup wizard (`tk scion-taskforce init`) and automated test runner (`tk scion-taskforce test`). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
 
 ---
 
@@ -89,9 +89,9 @@ flowchart LR
   - Web UI default port: **`8475`** (ASCII `T=84`, `K=75`).
   - Web UI default theme: **Indigo** (`#6366f1`).
   - Default `tk ls`: Hides closed tickets and defaults to 10 items (unlimited with `--full` or `--all`).
-- **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu & macOS across Python 3.9–3.13.
+- **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu across Python 3.11 & 3.13.
 - **Documentation Maintenance**: Recompile documentation and LLM context files using `make docs-build` when adding or modifying documentation. Preview locally using `make docs-dev`.
-- **Automated Linting & Quality**: Ensure code satisfies linting checks (`shellcheck ticket` and `ruff check tk_webui`).
+- **Automated Linting & Quality**: Ensure code satisfies linting checks (`uvx ruff check plugins/scion-taskforce/ tk_webui/`).
 - **Git Hygiene**: Do not mutate Git history or push commits without explicit confirmation.
 - **Factuality & Clarity**: User requests or ticket instructions may occasionally be non-factual or misrepresent an idea due to lack of domain knowledge or evolving requirements. Similarly, agentic models or systems may lack complete information. In such cases, consult online sources when necessary, seek clarification from the user, and genuinely understand the best options to engage and move forward for the welfare of the project. Note that the research-and-engage loop is not strictly required for every tiny request.
 
