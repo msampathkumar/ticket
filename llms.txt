@@ -1,0 +1,153 @@
+# ticket (tk) — LLM Knowledge Base & Documentation Index
+
+> Minimal, offline task tracker with DAG dependency intelligence.
+> Built with love for both human developers and autonomous AI coding agents.
+> Repository: https://github.com/msampathkumar/ticket
+
+---
+
+## 1. System Overview & Philosophy
+
+`ticket` (`tk`) is a zero-database, offline-first task tracking system with Directed Acyclic Graph (DAG) dependency intelligence.
+
+### Key Tenets
+1. **Zero Database / Pure Plain Text**: State resides in human-readable Markdown files with YAML frontmatter inside `.tickets/*.md`. Versioned directly alongside code in Git.
+2. **DAG Dependency Intelligence**: Native support for parent-child hierarchies, blockers, cycle detection, and automatic unblocking of ready tasks.
+3. **Unix Speed**: Core CLI is implemented in portable POSIX Bash with `awk` and `sed`—zero Python, Node.js, or runtime dependencies required for base operations.
+4. **Decoupled Extensions**: Web UI (FastAPI + Tailwind Kanban & Mind Map) and GitHub Sync operate as modular plugins discovered via `$PATH`.
+
+---
+
+## 2. Agent Execution Loop (5-Step Deterministic Workflow)
+
+Autonomous AI coding agents operating inside repositories tracked by `tk` must follow this deterministic 5-step operational loop:
+
+1. **Query Actionable Work**:
+   ```bash
+   tk ready
+   ```
+   Lists open/in-progress tickets whose dependencies have all been satisfied (`closed`).
+2. **Claim the Task**:
+   ```bash
+   tk start <id>
+   ```
+   Transitions status to `in_progress`.
+3. **Inspect Requirements & Subtasks**:
+   ```bash
+   tk show <id>
+   ```
+   Displays description, design notes, acceptance criteria, and subtasks. Decompose complex tasks with:
+   ```bash
+   tk create "<subtask-title>" --parent <id>
+   tk dep <subtask-id> <dependency-id>
+   ```
+4. **Implement, Verify & Record Notes**:
+   Make code changes, execute tests (`make test`), and log review audit notes:
+   ```bash
+   tk add-note <id> "Implemented feature and verified against test suite."
+   ```
+5. **Close the Ticket**:
+   ```bash
+   tk close <id>
+   ```
+   Marks the ticket complete and automatically unblocks downstream dependent tasks.
+
+---
+
+## 3. Core CLI Command Cheat Sheet
+
+### Ticket Management & Lifecycle
+- `tk init [path]`: Initialize `.tickets` repository in current or target folder.
+- `tk create [title] [options]`: Create new ticket, prints generated ID.
+  - `-d, --description <text>`: Detailed description.
+  - `--design <notes>`: Architecture or implementation design notes.
+  - `--acceptance <criteria>`: Acceptance criteria for verification.
+  - `-t, --type <type>`: Type (`bug`|`feature`|`task`|`epic`|`chore`) [default: `task`].
+  - `-p, --priority <0-4>`: Priority (0=highest/urgent, 4=lowest) [default: 2].
+  - `-a, --assignee <name>`: Assignee name or handle.
+  - `--tags <tag1,tag2>`: Comma-separated tags.
+  - `--parent <id>`: Parent ticket ID (hierarchy).
+- `tk start <id>`: Set status to `in_progress`.
+- `tk close <id>`: Set status to `closed`.
+- `tk reopen <id>`: Set status to `open`.
+- `tk status <id> <status>`: Update status (`open`|`in_progress`|`closed`).
+- `tk update <id> [options]`: Update title, description, priority, tags, design, etc.
+- `tk show <id>`: Display full ticket details and notes.
+- `tk edit <id>`: Open ticket Markdown file in `$EDITOR`.
+- `tk add-note <id> [text]`: Append timestamped review/audit note (or pipe via stdin).
+
+### Dependency & DAG Intelligence
+- `tk dep <id> <dep-id>`: Add dependency (`id` depends on `dep-id`).
+- `tk undep <id> <dep-id>`: Remove dependency.
+- `tk dep tree <id>`: Display recursive dependency tree.
+- `tk dep cycle`: Detect dependency cycles across open tickets.
+- `tk ready`: List open/in-progress tickets with all dependencies resolved.
+- `tk blocked`: List tickets blocked by open dependencies.
+- `tk closed [--limit=N]`: List recently closed tickets.
+
+### Listing & Querying
+- `tk ls [options]`: List tickets (hides closed by default, limit 10).
+  - `-s, --status <status>`: Filter status (`open`|`in_progress`|`closed`|`all`).
+  - `-p, --priority <0-4>`: Filter priority.
+  - `-t, --type <type>`: Filter type.
+  - `-T, --tag <tag>`: Filter tag.
+  - `-a, --assignee <name>`: Filter assignee.
+  - `--all`: Show all tickets without limit.
+- `tk find <term>`: Full-text search across all ticket titles, descriptions, and notes.
+- `tk query [jq-filter]`: Output tickets as structured JSON, optionally filtered with `jq`.
+
+---
+
+## 4. Web UI & Background Server Management
+
+The Web UI (`tk webui` / `tk-webui`) is an optional dashboard running on default port **`8475`** (ASCII `T`=84, `K`=75):
+
+- **Foreground**: `tk webui [optional-path]`
+- **Background Daemon**:
+  - `tk webui server start [path]`: Starts daemon on `http://127.0.0.1:8475`.
+  - `tk webui server status`: Inspects PID, URL, and log file path.
+  - `tk webui server stop`: Stops daemon.
+  - `tk webui server restart`: Restarts daemon.
+
+---
+
+## 5. Plugin Architecture & Extensions
+
+`tk` discovers plugins named `tk-<cmd>` or `ticket-<cmd>` in system `$PATH` and `plugins/<cmd>/`.
+When launching a plugin, `tk` exports:
+- `TICKETS_DIR`: Absolute path to active `.tickets` directory.
+- `TK_SCRIPT`: Absolute path to root `tk` executable.
+Plugins can invoke core built-in commands using:
+`"$TK_SCRIPT" super <cmd> [args...]`
+
+### Official Plugins
+- `tk webui`: FastAPI + Tailwind 4-lane Kanban, Table View, and DAG Mind Map.
+- `tk github`: Bi-directional GitHub issues and PR sync (`tk github sync`).
+- `tk scion-taskforce`: Autonomous multi-agent worker orchestration daemon with OpenTelemetry logs.
+
+---
+
+## 6. Curated Documentation File Index
+
+For complete and in-depth details, refer to the individual Markdown guides:
+
+- [Overview](index.md): Introduction, core architecture, and quick installation.
+- [Installation Guide](getting-started/installation.md): Modular installation flags (`--core`, `--webui`, `--skill`, `--github`, `--scion-taskforce`, `--full`, `--all`).
+- [Quick Start](getting-started/quick-start.md): 60-second tutorial to initialize and manage tasks.
+- [Solo CLI Workflow](workflows/cli-solo.md): Terminal-first workflow for solo developers and power users.
+- [Web UI & Kanban Workflow](workflows/webui-team.md): Visual sprint planning, DAG Mind Map, and code review comments.
+- [SCION Task Force Workflow](workflows/scion-taskforce.md): Autonomous multi-agent engineering with human review gates.
+- [Command Reference](core-cli/commands.md): Complete reference table for all core `tk` commands.
+- [Dependency Intelligence](core-cli/dependencies.md): DAG task dependencies, blockers, and cycle detection.
+- [Web UI Overview](web-ui/overview.md): Kanban board, DAG Mind Map, and multi-view switcher.
+- [Daemon Management](web-ui/daemons.md): Running and monitoring `tk webui server start/status/stop`.
+- [Plugin Architecture](plugins/architecture.md): Writing custom Bash or Python plugins with `TICKETS_DIR` and `TK_SCRIPT`.
+- [GitHub Sync Plugin](plugins/github.md): Bi-directional GitHub issue and PR sync.
+- [SCION Task Force Plugin](plugins/scion-taskforce.md): Multi-agent worker orchestration daemon.
+- [Agent Execution Loop](agents/workflow.md): The deterministic 5-step operational loop for AI coding agents.
+- [Agent Skill](agents/agent-skill.md): Reusable agent skill definition and `npx` install instructions.
+- [LLM & Agent Context Guide](agents/llms-txt.md): Machine-readable documentation standards and endpoints.
+- [System Specification](SPEC.md): Core system data model and DAG semantics.
+- [Agent Integration Guide](AGENTS.md): 10,000-foot architecture and operational guide for agents.
+- [Plugin Specification](PLUGIN_SPEC.md): Official plugin standard and metadata contract.
+- [Plugin Catalog](PLUGINS.md): Overview and development guide for plugins.
