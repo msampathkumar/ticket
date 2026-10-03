@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -352,13 +351,6 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
     print(f"   • Config:   `{target}`")
     print(f"   • Template: `{project_dir / '.scion' / 'templates' / 'taskforce-worker'}` (harness={harness}, model={model})")
     print(f"   • Brief:    `{target.parent / 'prompt.md'}`")
-    if not global_scope:
-        binary = shutil.which("scion") or "scion"
-        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "link", "--yes"], capture_output=True)
-        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "enable"], capture_output=True)
-        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "env", "set", "--project", f"GOOGLE_CLOUD_PROJECT={gcp_proj}"], capture_output=True)
-        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "env", "set", "--project", f"GOOGLE_CLOUD_REGION={gcp_region}"], capture_output=True)
-
     print("✅ Initialization successful! You can now run 'tk scion-taskforce start' to launch the task force.")
 
     if is_interactive:
