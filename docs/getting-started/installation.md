@@ -3,9 +3,9 @@ title: Installation
 description: How to install ticket (tk) and its modular plugins.
 ---
 
-`ticket` (`tk`) is designed with a **zero-dependency POSIX Bash core** and **modular optional plugins**. You can install only what you need.
+`ticket` (`tk`) is designed with a zero-dependency POSIX Bash core and modular optional plugins. You can install only what you need.
 
-## ⚡ Quick Install
+## Quick Install
 
 Clone the repository and run the modular installer:
 
@@ -21,7 +21,7 @@ Binaries are installed to `~/.local/bin/` (`tk`, `tk-webui`, plus optional plugi
 
 ---
 
-## 🧩 Modular Installation Flags
+## Installation Flags
 
 The installer supports composable flags so you can install precisely the components you require:
 

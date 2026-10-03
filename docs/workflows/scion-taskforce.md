@@ -3,11 +3,11 @@ title: SCION Task Force Workflow
 description: Autonomous multi-agent engineering workflows with 1:1 ticket workers and human review checkpoints.
 ---
 
-The **SCION Task Force Workflow** empowers teams to delegate actionable engineering tasks directly to autonomous coding agents while maintaining total oversight through human-in-the-loop review checkpoints.
+The **SCION Task Force Workflow** allows teams to delegate actionable engineering tasks directly to autonomous coding agents while maintaining oversight through human review checkpoints.
 
 ---
 
-## 🧭 Visual Lifecycle
+## Lifecycle Overview
 
 ```mermaid
 sequenceDiagram
@@ -18,23 +18,23 @@ sequenceDiagram
     participant Worker as Autonomous AI Worker
 
     Developer->>TK: Creates ticket & tags 'taskforce'
-    Daemon->>TK: Polls `tk ready` with tag:taskforce
+    Daemon->>TK: Polls tk ready with tag:taskforce
     Daemon->>Worker: Spawns 1:1 worker container
-    Worker->>TK: Runs `tk start <id>`
+    Worker->>TK: Runs tk start (id)
     Worker->>Worker: Writes code & executes tests
-    Worker->>TK: Runs `tk add-note` & sets tag `waiting-for-review`
+    Worker->>TK: Runs tk add-note & sets tag waiting-for-review
     Worker->>Daemon: Pauses execution
     Developer->>TK: Reviews notes & diffs in Web UI
-    Developer->>TK: Approves & closes ticket (`tk close <id>`)
+    Developer->>TK: Approves & closes ticket (tk close)
     Daemon->>Worker: Terminates worker cleanly
 ```
 
 ---
 
-## 🛠️ Step-by-Step Walkthrough
+## Step-by-Step Walkthrough
 
 ### 1. Tag Work for Autonomous Execution
-Human engineers explicitly choose which tickets to delegate by adding the `taskforce` tag:
+Human engineers choose which tickets to delegate by adding the `taskforce` tag:
 ```bash
 tk create "Add input sanitization to auth endpoints" \
   -p 1 \
@@ -59,4 +59,4 @@ The developer opens the Web UI (`http://localhost:8475`), reviews the audit trai
 ```bash
 tk close tic-auth1
 ```
-Closing the ticket automatically unblocks any downstream tasks in the DAG!
+Closing the ticket automatically unblocks downstream tasks in the DAG.

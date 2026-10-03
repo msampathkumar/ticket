@@ -1,7 +1,7 @@
 {
   "name": "ticket",
   "version": "0.2.0",
-  "description": "Minimal, offline task tracker with dependency intelligence for humans and AI agents.",
+  "description": "Minimal, dependency-aware task tracker. Built to scale agentic workflows.",
   "bin": {
     "tk": "./ticket",
     "ticket": "./ticket"

@@ -7,16 +7,22 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg?style=flat-square)](#)
 [![Zero Dependency Core](https://img.shields.io/badge/core-POSIX%20Bash%20(Zero%20Runtime)-emerald.svg?style=flat-square)](#)
 
-Minimal, offline task tracker with dependency intelligence. Features an ultra-fast CLI and an optional modern Kanban & review dashboard.
+Minimal, dependency-aware task tracker. Built to scale agentic workflows.
 
-📖 **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)  
-🤖 **AI Agent Context**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
+- **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)
+- **LLM Context**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
 
 Inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html), `tk` manages and queries task dependency graphs in plain text.
 
 ---
 
-## ⚡ Quick Install
+## Terminal Demo
+
+![ticket CLI Demo](docs/images/demo.gif)
+
+---
+
+## Quick Install
 
 Install the zero-dependency Bash CLI or the full suite with the interactive Web UI:
 
@@ -29,218 +35,80 @@ cd ticket
 
 # Core CLI Only (Pure Bash, zero Python dependencies)
 ./install.sh --core
-
-# Web UI Plugin Only
-./install.sh --webui
-
-# Optional plugins (not part of --full; combine flags freely)
-./install.sh --github               # GitHub issue & PR sync
-./install.sh --scion-taskforce      # SCION Task Force worker orchestrator
-./install.sh --all                  # Everything, including optional plugins
-./install.sh --help                 # All targets
 ```
 
-Binaries install to `~/.local/bin/` (`tk`, `tk-webui`, plus any optional `tk-<plugin>`). Ensure `~/.local/bin` is in `$PATH`. Installed plugins are discovered automatically and listed by `tk help`.
+Binaries install to `~/.local/bin/` (`tk`, `tk-webui`, plus any optional `tk-<plugin>`). Ensure `~/.local/bin` is in `$PATH`.
 
-### 🤖 Install Agent Skill via NPX
-To instantly install the agent skill for your AI coding assistant without cloning the repo:
+### Install Agent Skill via NPX
+
+Install the agent skill for your AI coding assistant without cloning:
+
 ```bash
 npx github:msampathkumar/ticket agent-skill --install
 ```
 
-### Launching Web UI & Background Server
+---
 
-The Web UI runs on **port `8475`** (ASCII for **T** = 84, **K** = 75):
+## Architecture & Concepts
 
-```bash
-# Foreground Server
-tk webui [optional-project-path]
+- **Plain Text State**: State resides in `.tickets/*.md` files with YAML frontmatter, versioned directly in Git alongside your code.
+- **DAG Dependency Intelligence**: Track blocking relationships (`tk dep`), blockers (`tk blocked`), and unblocked work ready to execute (`tk ready`).
+- **Deterministic Agent Loop**: 5-step loop (`tk ready` -> `tk start` -> `tk show` -> `tk add-note` -> `tk close`).
+- **POSIX Core**: The root `ticket` executable is a pure POSIX Bash script with zero mandatory runtime dependencies.
 
-# Background Daemon
-tk webui server start [optional-project-path]  # Starts daemon on http://127.0.0.1:8475
-tk webui server status                         # Inspect PID, URL, and log path
-tk webui server stop                           # Stop daemon
-tk webui server restart                        # Restart daemon
-
-# Run locally without install
-./run.sh [optional-project-path]
-```
+For complete CLI command references, guides, and visual workflows, see the **[Documentation Website](https://msampathkumar.github.io/ticket/)**.
 
 ---
 
-## 🚀 Key Features
+## Official Plugins
 
-### 🖥️ Core CLI (`tk`)
-- **Git-Backed**: Tickets are stored as human-readable Markdown files with YAML frontmatter inside `.tickets/`.
-- **Project Initialization**: Seamless `tk init` command (with automatic init on `tk create`).
-- **Dependency Tracking**: Track blocking relationships (`tk dep`, `tk dep tree`, `tk blocked`, `tk ready`, `tk dep cycle`).
-- **Core Querying & Editing**: Built-in `tk ls`, `tk edit`, `tk query`, `tk find`, and `tk show`.
-- **In-Place Ticket Updates**: Update fields, design notes, and acceptance criteria on the fly with `tk update`.
-- **Symmetric Links**: Connect related tickets via `tk link` and `tk unlink`.
-- **Extensible Plugin System**: Discovers `tk-<cmd>` or `ticket-<cmd>` executables in `$PATH` automatically.
+Extend `ticket` with modular plugins discovered automatically via `$PATH`:
 
-### 🌐 Interactive Web UI (`tk webui` / `tk-webui`)
-- **Background Server Management**: One-click `tk webui server start/stop/status` daemon management on default port `8475`.
-- **4-Lane Kanban Board**: Fluid drag-and-drop between Ready, In Progress, Blocked, and Closed lanes.
-- **Mind Map & Dependency DAG**: Interactive DAG graph with multi-select status filter dropdown, top-down/left-to-right layout toggle, root node task creation, and collapsible subtrees.
-- **Parent & Child Linking**: Link or unlink parent tickets and subtasks directly in the task detail drawer.
-- **Multi-View Switcher**: Toggle instantly between **Kanban**, **Table View**, **Interactive Dependency Tree Graph**, and **Timeline/Gantt View**.
-- **In-Place Task Editing**: Edit title, description, tags, priority, assignee, design notes, and acceptance criteria directly in the browser.
-- **PR-Style Review Feedback**: Chronological audit trail for review notes and comments (`Cmd+Enter` to submit).
-- **Collapsible Completed Tasks**: Automatically cleans up closed tasks with a 1-click toggle to view older tasks.
-- **Multi-Project Switcher**: Switch between any repositories containing `.tickets/` on your system.
+- **[Web UI (`tk webui`)](https://msampathkumar.github.io/ticket/plugins/webui/)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager (`tk webui server start`).
+- **[GitHub Sync (`tk github`)](https://msampathkumar.github.io/ticket/plugins/github/)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
+- **[SCION Task Force (`tk scion-taskforce`)](https://msampathkumar.github.io/ticket/plugins/scion-taskforce/)**: Autonomous multi-agent worker orchestration daemon with human review checkpoints.
 
-### 🖼️ Web UI Showcase
-
-| 4-Lane Kanban Board | Interactive Dependency Graph |
-| :---: | :---: |
-| ![Kanban Board](docs/images/tk-kanban.png) | ![Mind Map & DAG Graph](docs/images/tk-mind-map.png) |
-
-| Table & Filter View | Create & Edit Ticket |
-| :---: | :---: |
-| ![Table View](docs/images/tk-list-view.png) | ![Create & Edit Task](docs/images/tk-create-page.png) |
-
-| Settings & Themes |
-| :---: |
-| ![Settings](docs/images/tk-settings.png) |
+To author your own plugin, see the **[Plugin Architecture Guide](https://msampathkumar.github.io/ticket/plugins/architecture/)**.
 
 ---
 
-## 📖 CLI Usage
+## Contributor & Developer Guide
 
-```bash
-tk (v0.2.0) — Minimal, offline task tracker with dependency intelligence.
-Created by Sampath Kumar & wedow contributors
-GitHub: https://github.com/msampathkumar/ticket
-License: MIT
+We welcome contributions from both human developers and autonomous AI agents.
 
-Usage: tk <command> [args]
+### Development Prerequisites
+- **Bash & POSIX utilities** (`awk`, `sed`, `grep`)
+- **Python 3.9+** and **`uv`** (for running BDD tests, Web UI, and documentation server)
 
-Commands:
-  init [path]              Initialize .tickets repository in current or target folder
-  create [title] [options] Create ticket, prints ID
-    -d, --description      Description text
-    --design               Design notes
-    --acceptance           Acceptance criteria
-    -t, --type             Type (bug|feature|task|epic|chore) [default: task]
-    -p, --priority         Priority 0-4, 0=highest [default: 2]
-    -a, --assignee         Assignee
-    --external-ref         External reference (e.g., gh-123, JIRA-456)
-    --parent               Parent ticket ID
-    --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
-  start <id>               Set status to in_progress
-  close <id>               Set status to closed
-  reopen <id>              Set status to open
-  status <id> <status>     Update status (open|in_progress|closed)
-  update <id> [options]    Update title, description, priority, tags, etc.
-  dep <id> <dep-id>        Add dependency (id depends on dep-id)
-  dep tree [--full] <id>   Show dependency tree (--full disables dedup)
-  dep cycle                Find dependency cycles in open tickets
-  undep <id> <dep-id>      Remove dependency
-  link <id> <id> [id...]   Link tickets together (symmetric)
-  unlink <id> <target-id>  Remove link between tickets
-  ready [-a X] [-T X]      List open/in-progress tickets with deps resolved
-  blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
-  closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
-  ls, list [options]       List tickets (default: hides closed, limit 10)
-    -s, --status           Filter status (open|in_progress|closed|all)
-    -a, --assignee         Filter assignee
-    -t, --type             Filter type
-    -p, --priority         Filter priority (0-4)
-    -T, --tag              Filter tag
-    -n, --limit            Limit results (default: 10)
-    --full                 Show all results (no limit)
-    --all                  Show all statuses without limit
-  edit <id>                Open ticket in $EDITOR
-  query [jq-filter]        Output tickets as JSON, optionally filtered with jq
-  find <search-term>       Search text across tickets
-  show <id>                Display ticket
-  update <id> [options]    Update title, description, priority, tags, etc.
-  add-note <id> [text]     Append timestamped note (or pipe via stdin)
-  agent-skill [options]    Display or install agent skill (--install, --path)
-  version, --version, -v   Display version, description, and license information
-  super <cmd> [args]       Bypass plugins, run built-in command directly
-
-Plugins (tk-<cmd> or ticket-<cmd> in PATH or plugins/<cmd>/):
-  webui                  Interactive Kanban Web UI & PR review dashboard
-  github                 Sync GitHub issues and pull requests into local tickets
-```
-
----
-
-## 🔌 Plugins System
-
-Plugins are organized into self-contained directories under `plugins/<plugin-name>/`, each containing their executable, symlinks, and a dedicated specification (`<PLUGIN-NAME>-SPEC.md`). Except for the Web UI (`tk-webui`), all plugins are strictly **optional** to install. Whatever is installed is auto-discovered from `$PATH` and listed with a one-line description by `tk help` — the core CLI has no hard-coded knowledge of any plugin.
-
-| Plugin | Directory | Specification | Installed by | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **`webui`** | [`tk_webui/`](tk_webui/) / [`plugins/webui/`](plugins/webui/) | [`WEBUI-SPEC.md`](tk_webui/WEBUI-SPEC.md) | `--full`, `--webui` | Interactive Kanban & Review Dashboard |
-| **`github`** | [`plugins/github/`](plugins/github/) | [`GITHUB-SPEC.md`](plugins/github/GITHUB-SPEC.md) | `--github` (optional) | Sync GitHub issues and pull requests |
-| **`scion-taskforce`** | [`plugins/scion-taskforce/`](plugins/scion-taskforce/) | [`SCION-TASKFORCE-SPEC.md`](plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md) | `--scion-taskforce` (optional) | Opt-in (`taskforce` tag) orchestration of SCION coding workers across projects — run `scion init` in each repo first (see spec §10) |
-
-### Modular Installation Options
-
-Flags accumulate, so any combination works:
-
-```bash
-# Core CLI Only (Includes create, show, ls, edit, query, find, etc.)
-./install.sh --core
-
-# Core + Web UI + Agent Skill (default)
-./install.sh --full
-
-# Install Everything (Core + Web UI + Agent Skill + GitHub + SCION Task Force)
-./install.sh --all
-
-# Selectively add optional plugins on top of any bundle
-./install.sh --full --github
-./install.sh --core --scion-taskforce
-
-# Plugins may ship a standalone installer/uninstaller (scion-taskforce does):
-./plugins/scion-taskforce/install.sh            # install
-./plugins/scion-taskforce/install.sh --uninstall
-
-./install.sh --help
-```
-
----
-
-## 📚 Documentation & Specifications
-
-- **[Live Documentation Website](https://msampathkumar.github.io/ticket/)**: Complete guides, CLI reference, and interactive developer workflows.
-- **[AI Agent Context (llms.txt)](https://msampathkumar.github.io/ticket/llms.txt)**: Curated documentation index for LLMs and AI coding assistants.
-- **[Consolidated LLM Knowledge Base (llms-full.txt)](https://msampathkumar.github.io/ticket/llms-full.txt)**: Single-file documentation compilation for instant agent context injection.
-- **[AI Agent Guide & Workflow (AGENTS.md)](AGENTS.md)**: 10,000-foot overview of architecture, goals, and autonomous agent operating workflows.
-- **[System & Data Specification (SPEC.md)](docs/SPEC.md)**: Complete schema, DAG semantics, error codes, and lifecycle specification.
-- **[Plugin Standard Specification (PLUGIN_SPEC.md)](docs/PLUGIN_SPEC.md)**: Official plugin development standard, directory convention, execution lifecycle, and metadata contracts.
-- **[Plugin Architecture & Catalog (plugins/README.md)](plugins/README.md)**: Catalog of built-in plugins with links to individual plugin specs.
-- **[Plugin Authoring Guide (PLUGINS.md)](docs/PLUGINS.md)**: Guide on writing and distributing custom plugins.
-- **[Agent Skill (SKILL.md)](agent-skill/tk/SKILL.md)**: Agent skill definition installable via `tk agent-skill --install` or instantly via `npx github:msampathkumar/ticket agent-skill --install`.
-
-### Local Documentation Server
-```bash
-make docs-dev    # Start local live-reload documentation server (port 8000)
-make docs-build  # Build production static site and update LLM files
-```
-
----
-
-## 🧪 Testing
-
-The test suite is written using [Behave](https://behave.readthedocs.io/en/latest/).
+### Running the Test Suite
+The acceptance test suite uses [Behave](https://behave.readthedocs.io/en/latest/):
 
 ```bash
 make test
 ```
 
+### Local Documentation Server
+The documentation portal is built with Zensical:
+
+```bash
+make docs-dev    # Start local live-reload documentation server (http://localhost:8000/ticket/)
+make docs-build  # Build production static bundle and refresh LLM files
+```
+
+### Contributing Principles
+1. **Preserve Zero-Dependency Core**: The core `ticket` executable must remain a portable POSIX Bash script with zero external runtime dependencies.
+2. **BDD Verification**: All new CLI commands or behavior modifications must be accompanied by Behave acceptance scenarios in `features/`.
+3. **Specification-Driven**: Review [`docs/SPEC.md`](docs/SPEC.md) for data model schemas, error codes, and lifecycle specifications before proposing major architectural changes.
+4. **Agent-Friendly**: Keep documentation and command outputs parseable, clean, and documented in `llms.txt`.
+
 ---
 
-## 🙏 Credits & Acknowledgments
+## Credits & Acknowledgments
 
-This project is built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project. We extend deep gratitude to the original author and contributors for creating such an elegant, git-backed ticket tracking foundation for developers and AI agents.
+Built upon the foundational architecture and minimal design created by [**wedow**](https://github.com/wedow) in the original [`wedow/ticket`](https://github.com/wedow/ticket) project.
 
 ---
 
-## 📝 License
+## License
 
 [MIT License](LICENSE)

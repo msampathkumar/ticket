@@ -7,7 +7,7 @@ The **Solo CLI Workflow** is designed for software engineers, solo founders, and
 
 ---
 
-## 🧭 Visual Lifecycle
+## Lifecycle Overview
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ flowchart LR
 
 ---
 
-## 🛠️ Step-by-Step Developer Walkthrough
+## Step-by-Step Walkthrough
 
 ### 1. Initialize Once
 Inside your Git project root:

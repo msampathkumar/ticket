@@ -1,16 +1,21 @@
 ---
 title: ticket (tk)
-description: Minimal, offline task tracker with dependency intelligence for humans and AI agents.
+description: Minimal, dependency-aware task tracker. Built to scale agentic workflows.
 ---
 
 # <img src="images/logo.svg" width="36" height="36" alt="tk logo" style="vertical-align: -6px; display: inline-block;" /> ticket (tk)
 
-> **Minimal, offline task tracker with DAG dependency intelligence.**  
-> Built with :heart: for both **human developers** and **autonomous AI coding agents**.
+> Minimal, dependency-aware task tracker. Built to scale agentic workflows.
 
 ---
 
-## 🎯 Architecture & Visual Workflow
+## Terminal Demo
+
+![ticket CLI Demo](images/demo.gif)
+
+---
+
+## Architecture & Workflow
 
 ```mermaid
 graph TD
@@ -26,16 +31,28 @@ graph TD
 
 ---
 
-## 💡 Key Highlights
+## Key Features
 
-- **Zero Database / Pure Plain Text**: State resides in `.tickets/*.md` files with YAML frontmatter, versioned by Git.
+- **Plain Text Storage**: Tasks reside in `.tickets/*.md` files with YAML frontmatter, versioned directly in Git alongside codebase.
 - **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, cycle detection, and automated downstream unblocking.
-- **Unix Speed**: Core CLI runs on portable POSIX Bash with zero mandatory runtime dependencies (no Python or Node required for base CLI).
-- **Built for AI Agents First**: Deterministic 5-step agent execution loop, built-in agent skill (`agent-skill/tk/SKILL.md`), and machine-readable `llms.txt` endpoints.
+- **Fast POSIX Core**: Core CLI runs on portable POSIX Bash with zero mandatory runtime dependencies (no Python or Node required for base operations).
+- **AI Agent Integration**: Deterministic 5-step operational loop, reusable agent skill (`agent-skill/tk/SKILL.md`), and machine-readable context endpoints.
 
 ---
 
-## ⚡ Quick Installation
+## Official Plugins
+
+Extend `ticket` with modular plugins discovered automatically via `$PATH`:
+
+- **[Web UI (`tk webui`)](plugins/webui.md)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.
+- **[GitHub Sync (`tk github`)](plugins/github.md)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
+- **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Autonomous multi-agent worker orchestration daemon with human review checkpoints.
+
+Learn how to write custom plugins in pure Bash or Python in the [Plugin Architecture Guide](plugins/architecture.md).
+
+---
+
+## Quick Installation
 
 Install the zero-dependency Bash CLI or the full suite with the interactive Web UI:
 
@@ -52,9 +69,9 @@ cd ticket
 
 ---
 
-## 🤖 Install Agent Skill via NPX
+## Install Agent Skill via NPX
 
-Equip your AI coding assistant with the `tk` skill in a single command without cloning:
+Install the agent skill for your AI coding assistant without cloning the repo:
 
 ```bash
 npx github:msampathkumar/ticket agent-skill --install
@@ -62,8 +79,7 @@ npx github:msampathkumar/ticket agent-skill --install
 
 ---
 
-## 🧭 Machine-Readable Agent Docs (`llms.txt`)
+## Machine-Readable Agent Documentation (llms.txt)
 
-As part of our commitment to being super agent-friendly:
-- [`/llms.txt`](llms.txt): Structured table of contents linking directly to all markdown documentation files.
+- [`/llms.txt`](llms.txt): Structured table of contents linking directly to all Markdown documentation files.
 - [`/llms-full.txt`](llms-full.txt): Consolidated single-file documentation reference combining all specifications into one payload.

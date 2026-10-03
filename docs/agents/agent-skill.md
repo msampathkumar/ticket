@@ -3,11 +3,11 @@ title: Agent Skill
 description: Autonomous AI agent integration skill for ticket (tk).
 ---
 
-`ticket` provides a native **Agent Skill** (`agent-skill/tk/SKILL.md`) designed to equip AI coding assistants with deep knowledge of `tk` task management and DAG dependency intelligence.
+`ticket` provides an **Agent Skill** (`agent-skill/tk/SKILL.md`) designed to equip AI coding assistants with knowledge of `tk` task management and DAG dependency intelligence.
 
 ---
 
-## 🤖 What is the Agent Skill?
+## Overview
 
 The agent skill instructs AI agents on:
 - **Autonomous Execution**: Following the 5-step lifecycle (`tk ready` -> `tk start` -> `tk show` -> `tk add-note` -> `tk close`).
@@ -16,9 +16,9 @@ The agent skill instructs AI agents on:
 
 ---
 
-## ⚡ Installation
+## Installation
 
-You can install the agent skill locally or via `npx` directly from GitHub:
+Install the agent skill locally or via `npx` directly from GitHub:
 
 ```bash
 # Using installed tk CLI
@@ -28,20 +28,20 @@ tk agent-skill --install
 npx github:msampathkumar/ticket agent-skill --install
 ```
 
-This installs the skill file to `~/.agents/skills/tk/SKILL.md`, making it immediately available to your AI coding agents.
+This installs the skill definition to `~/.agents/skills/tk/SKILL.md` where agents can discover and use it.
 
 ---
 
-## 📊 Skill Architecture Flow
+## Architecture Flow
 
 ```mermaid
 graph TD
     A["AI Assistant / Agent"] -->|Reads Skill| B["agent-skill/tk/SKILL.md"]
     B -->|Discovers Actions| C["1. tk ready (Discover)"]
-    B -->|Discovers Actions| D["2. tk start <id> (Claim)"]
-    B -->|Discovers Actions| E["3. tk show <id> (Inspect)"]
-    B -->|Discovers Actions| F["4. tk add-note <id> (Audit)"]
-    B -->|Discovers Actions| G["5. tk close <id> (Resolve)"]
+    B -->|Discovers Actions| D["2. tk start (id) (Claim)"]
+    B -->|Discovers Actions| E["3. tk show (id) (Inspect)"]
+    B -->|Discovers Actions| F["4. tk add-note (id) (Audit)"]
+    B -->|Discovers Actions| G["5. tk close (id) (Resolve)"]
     
     style A fill:#6366f1,stroke:#4f46e5,color:#fff
     style B fill:#a855f7,stroke:#9333ea,color:#fff
