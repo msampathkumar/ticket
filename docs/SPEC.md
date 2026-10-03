@@ -7,7 +7,7 @@
 
 ## 1. System Goals & Philosophy
 
-`tk` is a **minimal, offline task tracker with dependency intelligence** designed for developers and autonomous AI coding agents.
+`tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
 
 ### Core Principles
 1. **Zero Database**: State is stored locally in `.tickets/*.md`.
@@ -80,7 +80,7 @@ Following the frontmatter, the Markdown body contains:
 ### 3.2 State Queries
 - **Ready Queue**: All non-closed tickets whose dependencies are either empty or completely satisfied by tickets in `status: closed`.
 - **Blocked Queue**: All non-closed tickets where at least one dependency in `deps` is in `status: open` or `status: in_progress`.
-- **Cycle Detection**: Depth-First Search (DFS) traversal identifying circular references ($A \to B \to A$) across open tickets.
+- **Cycle Detection**: Depth-First Search (DFS) traversal identifying circular references (`A -> B -> A`) across open tickets.
 
 ---
 

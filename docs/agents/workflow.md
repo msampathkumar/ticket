@@ -7,10 +7,10 @@ When operating inside repositories tracked by `ticket`, autonomous AI coding age
 
 ```mermaid
 flowchart LR
-    A["1. Query Actionable Work\n`tk ready`"] --> B["2. Claim Ticket\n`tk start <id>`"]
-    B --> C["3. Inspect & Decompose\n`tk show <id>`"]
-    C --> D["4. Execute & Audit\n`tk add-note <id> '...'`"]
-    D --> E["5. Close & Unblock\n`tk close <id>`"]
+    A["1. Query Actionable Work<br/>`tk ready`"] --> B["2. Claim Ticket<br/>`tk start <id>`"]
+    B --> C["3. Inspect & Decompose<br/>`tk show <id>`"]
+    C --> D["4. Execute & Audit<br/>`tk add-note <id> '...'`"]
+    D --> E["5. Close & Unblock<br/>`tk close <id>`"]
 ```
 
 ---

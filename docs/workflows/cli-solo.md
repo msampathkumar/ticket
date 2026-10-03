@@ -3,7 +3,7 @@ title: Solo CLI Workflow
 description: Fast, offline, zero-dependency task management for individual developers and terminal power users.
 ---
 
-The **Solo CLI Workflow** is designed for software engineers, solo founders, and terminal power users who want rapid, offline task tracking without leaving their shell.
+The **Solo CLI Workflow** provides rapid, offline task tracking for individual developers and terminal power users directly in the shell.
 
 ---
 
@@ -30,34 +30,46 @@ flowchart LR
 ## Step-by-Step Walkthrough
 
 ### 1. Initialize Once
+
 Inside your Git project root:
+
 ```bash
 tk init
 ```
+
 This creates `.tickets/`. All task metadata is versioned directly with your code.
 
 ### 2. Rapid Task Creation
-Create tickets on the fly without breaking your flow:
+
+Create tasks with priority, type, and tags directly from the shell:
+
 ```bash
 tk create "Add SQLite caching layer" -p 1 -t feature --tags database,performance
 ```
 
 ### 3. Check Ready Tasks
-Instead of scanning endless lists, let `tk` compute what is actionable right now:
+
+Query actionable tasks whose dependencies are satisfied:
+
 ```bash
 tk ready
 ```
 
 ### 4. Work & Add Notes
-Mark your ticket in progress and record design thoughts:
+
+Mark the task in progress and record design decisions or progress notes:
+
 ```bash
 tk start tic-10a
 tk add-note tic-10a "Evaluated in-memory cache vs WAL mode; choosing WAL mode."
 ```
 
 ### 5. Close and Unblock
-When complete, close the task:
+
+When work is complete, close the task:
+
 ```bash
 tk close tic-10a
 ```
+
 Any dependent tasks are automatically unblocked and immediately appear in `tk ready`.

@@ -1,6 +1,6 @@
 # tk - Plugin Architecture & Development Guide
 
-`tk` features an extensible, lightweight plugin system that allows extending functionality without modifying the core CLI script.
+`tk` provides a plugin system to extend functionality without modifying the core CLI script.
 
 ---
 
@@ -79,7 +79,7 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 
 ## 5. Official Plugins
 
-- **`tk webui` (`tk-webui`)**: Full-featured interactive Kanban, Table, DAG Mind Map, and Timeline review dashboard.
+- **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
 - **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
 - **`tk scion-taskforce` (`tk-scion-taskforce`)**: Single global daemon that launches a SCION coding worker for each ticket explicitly tagged `taskforce`, verifies the worker actually started, pauses it on `waiting-for-review`, and emits OpenTelemetry to local rotating logs. *(optional; requires Python 3.9+ and the `scion` CLI)*
 

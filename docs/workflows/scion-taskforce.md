@@ -34,7 +34,9 @@ sequenceDiagram
 ## Step-by-Step Walkthrough
 
 ### 1. Tag Work for Autonomous Execution
-Human engineers choose which tickets to delegate by adding the `taskforce` tag:
+
+Delegate actionable tickets to autonomous workers by adding the `taskforce` tag:
+
 ```bash
 tk create "Add input sanitization to auth endpoints" \
   -p 1 \
@@ -43,20 +45,27 @@ tk create "Add input sanitization to auth endpoints" \
 ```
 
 ### 2. Daemon Worker Spawning
-The global SCION daemon notices the ready ticket and provisions an isolated coding worker:
+
+The background SCION daemon detects ready tickets tagged with `taskforce` and provisions isolated worker instances:
+
 ```bash
 tk scion-taskforce status
 ```
 
 ### 3. Review Checkpoint
+
 When the worker finishes writing code and passing local tests:
+
 1. It records verification notes via `tk add-note <id> "..."`.
 2. It tags the ticket with `waiting-for-review`.
 3. The worker pauses execution.
 
 ### 4. Human Verification & Closure
-The developer opens the Web UI (`http://localhost:8475`), reviews the audit trail and code diff, and closes the ticket:
+
+Review the audit trail and code diff in the Web UI (`http://localhost:8475`), then close the ticket:
+
 ```bash
 tk close tic-auth1
 ```
+
 Closing the ticket automatically unblocks downstream tasks in the DAG.

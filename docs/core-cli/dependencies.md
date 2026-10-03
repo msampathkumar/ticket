@@ -7,26 +7,26 @@ description: Understanding Directed Acyclic Graphs (DAG) and dependency tracking
 
 ---
 
-### How Dependencies Work
+## How Dependencies Work
 
 When task `B` depends on task `A`:
 1. `B` is considered **blocked** until `A` is closed.
 2. `tk ready` will only show `B` after `A` transitions to `closed`.
 3. Closing `A` automatically unblocks `B`.
 
-#### Adding Dependencies
+### Adding Dependencies
 ```bash
 # tic-backend-api must finish before tic-frontend-ui can start
 tk dep tic-frontend-ui tic-backend-api
 ```
 
-#### Cycle Detection
+### Cycle Detection
 To prevent circular deadlocks (e.g., A depends on B, B depends on A), `tk` includes native cycle detection:
 ```bash
 tk dep cycle
 ```
 
-#### Viewing Dependency Trees
+### Viewing Dependency Trees
 Inspect recursive upstream and downstream relationships:
 ```bash
 tk dep tree tic-frontend-ui

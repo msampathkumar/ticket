@@ -3,11 +3,11 @@ title: Plugin Architecture
 description: Extend ticket CLI with custom plugins in Bash or Python.
 ---
 
-`ticket` features a lightweight, zero-overhead plugin architecture based on executable discovery.
+`ticket` uses executable discovery in `$PATH` to dispatch custom plugin subcommands.
 
 ---
 
-### How Plugins Work
+## How Plugins Work
 
 When you execute:
 ```bash
@@ -19,7 +19,7 @@ To bypass plugins and run a built-in command directly, use `tk super <command>`.
 
 ---
 
-### Environment Context Passed to Plugins
+## Environment Context Passed to Plugins
 
 When `tk` launches a plugin, it exports two environment variables:
 - `TICKETS_DIR`: Absolute path to active `.tickets` directory.
@@ -27,7 +27,7 @@ When `tk` launches a plugin, it exports two environment variables:
 
 ---
 
-### Example Plugin (`tk-stats`)
+## Example Plugin (`tk-stats`)
 
 ```bash
 #!/usr/bin/env bash
@@ -47,6 +47,7 @@ fi
 
 TICKETS_DIR="${TICKETS_DIR:-.tickets}"
 open=$("$TK_SCRIPT" super ready | wc -l || echo 0)
-echo "🟢 Ready Tasks: $open"
+echo "Ready Tasks: $open"
 ```
-Place in `~/.local/bin/tk-stats` and run `tk stats`.
+
+Make the script executable, save it to `~/.local/bin/tk-stats` (or any directory in `$PATH`), and run `tk stats`.

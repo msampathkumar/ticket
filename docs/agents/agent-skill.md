@@ -3,7 +3,7 @@ title: Agent Skill
 description: Autonomous AI agent integration skill for ticket (tk).
 ---
 
-`ticket` provides an **Agent Skill** (`agent-skill/tk/SKILL.md`) designed to equip AI coding assistants with knowledge of `tk` task management and DAG dependency intelligence.
+`ticket` provides an **Agent Skill** (`agent-skill/tk/SKILL.md`) that equips AI coding assistants with `tk` task management and DAG dependency intelligence.
 
 ---
 
@@ -18,13 +18,16 @@ The agent skill instructs AI agents on:
 
 ## Installation
 
-Install the agent skill locally or via `npx` directly from GitHub:
+Inspect the skill definition or install it locally, or install directly via `npx`:
 
 ```bash
-# Using installed tk CLI
+# Inspect the skill definition
+tk agent-skill
+
+# Install to ~/.agents/skills/tk/SKILL.md using tk CLI
 tk agent-skill --install
 
-# Or directly via npx without manual cloning
+# Or install directly via npx without cloning
 npx github:msampathkumar/ticket agent-skill --install
 ```
 

@@ -11,29 +11,18 @@ The **SCION Task Force** (`tk-scion-taskforce`) is an optional standalone orches
 
 Before running the SCION Task Force daemon, ensure your system meets the following requirements:
 
-### 1. Python 3.9+
-Required for the daemon runtime and OpenTelemetry logging.
-
-### 2. SCION CLI (`scion`)
-Must be installed and available in your `$PATH` ([GoogleCloudPlatform/scion](https://github.com/GoogleCloudPlatform/scion)):
-
-```bash
-scion --version
-```
-
-### 3. Container Runtime
-A running container daemon: **Docker** or **Podman**. SCION uses containers to isolate each autonomous coding agent.
-
-### 4. Project Initialization
-Each repository monitored by the task force must be initialized with SCION:
-
-```bash
-cd /path/to/project
-scion init
-```
-
-### 5. Opt-in Tag
-The daemon only claims tickets explicitly tagged with `taskforce`. Human engineers maintain full control over which tasks are delegated.
+1. **Python 3.9+**: Required for the daemon runtime and OpenTelemetry logging.
+2. **SCION CLI (`scion`)**: Must be installed and available in your `$PATH` ([GoogleCloudPlatform/scion](https://github.com/GoogleCloudPlatform/scion)):
+    ```bash
+    scion --version
+    ```
+3. **Container Runtime**: A running container daemon (**Docker** or **Podman**). SCION uses containers to isolate each autonomous coding agent.
+4. **Project Initialization**: Each repository monitored by the task force must be initialized with SCION:
+    ```bash
+    cd /path/to/project
+    scion init
+    ```
+5. **Opt-in Tag**: The daemon only claims tickets explicitly tagged with `taskforce`. Human engineers maintain full control over which tasks are delegated.
 
 ---
 

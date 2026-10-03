@@ -11,27 +11,22 @@ The optional GitHub plugin (`tk-github`) enables bi-directional synchronization 
 
 Before using `tk github`, ensure the following tools are installed and configured:
 
-### 1. GitHub CLI (`gh`)
-Must be installed and authenticated with read/write access to your repository:
+1. **GitHub CLI (`gh`)**: Must be installed and authenticated with read/write access to your repository:
+    ```bash
+    gh auth login
+    # or export GITHUB_TOKEN="ghp_..."
+    ```
 
-```bash
-gh auth login
-# or export GITHUB_TOKEN="ghp_..."
-```
+2. **jq**: Command-line JSON processor used for parsing GitHub API payloads:
+    ```bash
+    # macOS
+    brew install jq
 
-### 2. jq
-Command-line JSON processor used for parsing GitHub API payloads:
+    # Debian / Ubuntu
+    sudo apt-get install jq
+    ```
 
-```bash
-# macOS
-brew install jq
-
-# Debian / Ubuntu
-sudo apt-get install jq
-```
-
-### 3. Git Remote
-The local repository must have a configured GitHub remote (`origin` pointing to `github.com/owner/repo`).
+3. **Git Remote**: The local repository must have a configured GitHub remote (`origin` pointing to `github.com/owner/repo`).
 
 ---
 

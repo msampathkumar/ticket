@@ -1,15 +1,15 @@
 # tk - AI Agent Guidelines & Integration Guide
 
-This document outlines best practices and rules for AI coding assistants and autonomous agents (e.g. Antigravity, Claude, Cursor, Copilot, Gemini CLI) when operating within repositories tracked by `tk`.
+`tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.** This document outlines operational standards for AI coding assistants and autonomous agents (e.g., Antigravity, Claude, Cursor, Copilot, Gemini CLI) operating within repositories tracked by `tk`.
 
 ---
 
-## 1. Why `tk` is Ideal for AI Agents
+## 1. Agent Architecture & Core Capabilities
 
-- **File-Centric State**: AI agents can read and write tickets using standard file and CLI tools without managing database connections.
-- **Topological Dependency Order**: `tk ready` prevents agents from picking up blocked tasks out of order.
-- **Audit Trails in Markdown**: Agents can record reasoning, test results, and review comments directly in the ticket file.
-- **LLM Context Endpoints**: Provides dedicated `llms.txt` and `llms-full.txt` files for instant ingestion.
+- **File-Centric State**: Agents read and write tickets using standard file and CLI tools without database drivers.
+- **Topological Dependency Order**: `tk ready` prevents agents from claiming blocked tasks out of order.
+- **Audit Trails in Markdown**: Agents record reasoning, test results, and review comments directly in ticket files.
+- **LLM Context Endpoints**: Native `llms.txt` and `llms-full.txt` files provide direct context window loading.
 
 ---
 
@@ -73,9 +73,12 @@ When an agent encounters a large epic or complex feature:
 
 ## 4. Agent Skill Installation
 
-Agents supporting custom skills can install the `tk` skill definition directly into `~/.agents/skills/tk/SKILL.md`:
+Agents supporting custom skills can inspect or install the `tk` skill definition:
 ```bash
-# Using installed tk CLI
+# Inspect the skill definition
+tk agent-skill
+
+# Install via tk CLI
 tk agent-skill --install
 
 # Or directly via npx without cloning

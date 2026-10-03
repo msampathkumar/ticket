@@ -21,12 +21,12 @@ The **Web UI** (`tk-webui`) is an official plugin providing a visual dashboard r
 
 ## Key Features
 
-- **4-Lane Kanban Board**: Fluid drag-and-drop between Ready, In Progress, Blocked, and Closed lanes.
+- **4-Lane Kanban Board**: Drag-and-drop tasks between Ready, In Progress, Blocked, and Closed lanes.
 - **Interactive Mind Map & DAG Graph**: Visualize task dependencies, filter by status, toggle top-down or left-to-right layouts, and expand/collapse subtrees.
-- **Multi-View Switcher**: Toggle instantly between **Kanban**, **Table View**, **Dependency Tree Graph**, and **Timeline/Gantt View**.
+- **Multi-View Switcher**: Switch between **Kanban**, **Table View**, **Dependency Tree Graph**, and **Timeline/Gantt View**.
 - **In-Place Task Editing**: Edit titles, descriptions, tags, priorities, assignees, design notes, and acceptance criteria directly in the browser.
 - **PR-Style Review Comments**: Chronological audit trail for review notes and comments (`Cmd+Enter` to submit).
-- **Multi-Project Switcher**: Switch between any repositories containing `.tickets/` on your system.
+- **Multi-Project Switcher**: Switch between repositories containing `.tickets/` on your system.
 
 ---
 

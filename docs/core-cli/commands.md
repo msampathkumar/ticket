@@ -3,11 +3,11 @@ title: Command Reference
 description: Comprehensive reference for all core ticket (tk) CLI commands.
 ---
 
-The `tk` CLI provides a complete suite of commands for task management and dependency intelligence.
+The `tk` CLI provides commands for task lifecycle management, dependency tracking, and querying.
 
 ---
 
-### Core CRUD & Lifecycle
+## Core CRUD & Lifecycle
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
@@ -22,7 +22,7 @@ The `tk` CLI provides a complete suite of commands for task management and depen
 
 ---
 
-### Dependency Intelligence
+## Dependency Intelligence
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ The `tk` CLI provides a complete suite of commands for task management and depen
 
 ---
 
-### Querying & Listing
+## Querying & Listing
 
 | Command | Description | Example |
 | :--- | :--- | :--- |

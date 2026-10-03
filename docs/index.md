@@ -33,7 +33,7 @@ graph TD
 
 ## Key Features
 
-- **Plain Text Storage**: Tasks reside in `.tickets/*.md` files with YAML frontmatter, versioned directly in Git alongside codebase.
+- **Plain Text Storage**: Tasks reside in `.tickets/*.md` files with YAML frontmatter, versioned directly in Git alongside the codebase.
 - **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, cycle detection, and automated downstream unblocking.
 - **Fast POSIX Core**: Core CLI runs on portable POSIX Bash with zero mandatory runtime dependencies (no Python or Node required for base operations).
 - **AI Agent Integration**: Deterministic 5-step operational loop, reusable agent skill (`agent-skill/tk/SKILL.md`), and machine-readable context endpoints.
@@ -71,7 +71,7 @@ cd ticket
 
 ## Install Agent Skill via NPX
 
-Install the agent skill for your AI coding assistant without cloning the repo:
+Install the agent skill for your AI coding assistant without cloning the repository:
 
 ```bash
 npx github:msampathkumar/ticket agent-skill --install
