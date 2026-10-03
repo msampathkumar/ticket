@@ -69,10 +69,12 @@ def load_state() -> dict[str, Any]:
 
 def save_state(state: dict[str, Any]) -> None:
     sfile = get_state_file()
+    print(f"📝 Updating global daemon state registry at `{sfile}`...")
     sfile.parent.mkdir(parents=True, exist_ok=True)
     tmp_file = sfile.with_suffix(".json.tmp")
     tmp_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     tmp_file.replace(sfile)
+    print(f"✅ State registry updated successfully (watched projects: {len(state.get('projects', []))}, active workers: {len(state.get('workers', {}))}).")
 
 
 def normalize_project_dir(directory: str | Path) -> str:

@@ -315,15 +315,16 @@ def init_config(
     project_dir: Path | None = None,
     global_scope: bool = False,
     force: bool = False,
-) -> Path:
+) -> tuple[Path, int]:
     """Initialize .scion-taskforce/ directory in project or global config."""
+    archived_count = 0
     if global_scope:
         target = global_config_path()
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists() and not force:
-            return target
+            return target, 0
         target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
-        return target
+        return target, 0
 
     import time
     base_dir = Path(project_dir or Path.cwd()).expanduser().resolve()
@@ -342,6 +343,7 @@ def init_config(
             else:
                 old_backup = existing_file.with_name(f"{existing_file.name}.{timestamp}.old")
                 existing_file.rename(old_backup)
+                archived_count += 1
 
     yaml_target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
 
@@ -354,4 +356,25 @@ def init_config(
     )
     prompt_target.write_text(default_prompt_content, encoding="utf-8")
 
-    return yaml_target
+    return yaml_target, archived_count
+
+
+def uninit_config(
+    project_dir: Path | None = None,
+    global_scope: bool = False,
+) -> tuple[bool, str]:
+    """Remove .scion-taskforce/ directory or global config file."""
+    if global_scope:
+        target = global_config_path()
+        if target.exists():
+            target.unlink()
+            return True, str(target)
+        return False, str(target)
+
+    base_dir = Path(project_dir or Path.cwd()).expanduser().resolve()
+    scion_dir = base_dir / ".scion-taskforce"
+    if scion_dir.is_dir():
+        import shutil
+        shutil.rmtree(scion_dir)
+        return True, str(scion_dir)
+    return False, str(scion_dir)

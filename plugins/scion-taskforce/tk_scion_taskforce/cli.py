@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from tk_scion_taskforce import __version__
-from tk_scion_taskforce.config import init_config, load_config, resolve_config_path
+from tk_scion_taskforce.config import init_config, load_config, resolve_config_path, uninit_config
 from tk_scion_taskforce.daemon import (
     DispatchError,
     dispatch_ticket,
@@ -26,6 +26,7 @@ from tk_scion_taskforce.server import (
     list_projects,
     load_state,
     normalize_project_dir,
+    remove_project,
     restart_server,
     start_server,
     status_server,
@@ -57,7 +58,8 @@ Opt-in model: the task force only picks up READY tickets that YOU tagged `taskfo
 ticket is moved to in_progress; failures leave the ticket untouched.
 
 Task Force Operations:
-  init [--global] [--force]        Generate a starter scion-taskforce.yaml config file
+  init [--global] [--force]        Initialize project-scoped .scion-taskforce/ directory & templates
+  uninit [--global]                Remove project-scoped .scion-taskforce/ directory & unregister project
   watch [dir] [--interval <sec>] [--max-concurrent <n>] [--once] [--dry-run]
                                    Run the task force reconciler in the foreground
   dispatch [<id>] [--dry-run]      Claim and spawn worker(s) for <id> or all ready tickets
@@ -123,8 +125,32 @@ def _extract_global_flags(argv: list[str]) -> tuple[str | None, bool, list[str]]
 def cmd_init(args: list[str], project_dir: Path) -> int:
     global_scope = "--global" in args or "-g" in args
     force = "--force" in args or "-f" in args
-    target = init_config(project_dir=project_dir, global_scope=global_scope, force=force)
-    print(f"✅ Initialized scion-taskforce config at {target}")
+    scope_desc = "global scope" if global_scope else f"project scope at `{project_dir}`"
+    print(f"🚀 Initializing SCION Task Force ({scope_desc})...")
+    target, archived_count = init_config(project_dir=project_dir, global_scope=global_scope, force=force)
+    if archived_count > 0:
+        print(f"📦 Archived {archived_count} existing configuration/prompt file(s) with timestamped .old suffixes.")
+    print(f"📁 Created/Updated configuration directory & templates:")
+    print(f"   • Path: `{target.parent}`")
+    print(f"   • `scion-taskforce.yaml` — Task force orchestrator configuration (claim tags, concurrency limits, provider rules)")
+    print(f"   • `prompt.md`           — Default customizable autonomous worker brief template")
+    print(f"✅ Initialization successful! You can now run 'tk scion-taskforce start' to launch the task force.")
+    return 0
+
+
+def cmd_uninit(args: list[str], project_dir: Path) -> int:
+    global_scope = "--global" in args or "-g" in args
+    scope_desc = "global config" if global_scope else f"project directory `{project_dir}`"
+    print(f"🗑️ Uninitializing SCION Task Force for {scope_desc}...")
+    success, path = uninit_config(project_dir=project_dir, global_scope=global_scope)
+    if success:
+        if not global_scope:
+            removed = remove_project(project_dir)
+            if removed:
+                print(f"ℹ️ Unregistered project `{project_dir}` from global daemon state registry.")
+        print(f"✅ Successfully removed `{path}`.")
+    else:
+        print(f"ℹ️ No SCION task force configuration found at `{path}`.")
     return 0
 
 
@@ -512,6 +538,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if subcmd == "init":
         return cmd_init(subargs, project_dir)
+
+    if subcmd == "uninit":
+        return cmd_uninit(subargs, project_dir)
 
     if subcmd == "project":
         return cmd_project(subargs, project_dir)

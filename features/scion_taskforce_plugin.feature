@@ -14,7 +14,7 @@ Feature: SCION Task Force Plugin
     Given a clean tickets directory
     When I run "ticket scion-taskforce init"
     Then the command should succeed
-    And the output should contain "Initialized scion-taskforce config"
+    And the output should contain "Initialization successful"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "claim: taskforce"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "ignore: no-taskforce"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "review: waiting-for-review"
