@@ -461,7 +461,7 @@ function createTicketCardElement(ticket) {
   const card = document.createElement('div');
   card.id = `card-${ticket.id}`;
   card.dataset.id = ticket.id;
-  card.className = `group bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-brand-500/50 dark:hover:border-brand-500/40 transition duration-150 cursor-pointer select-none`;
+  card.className = `group bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-brand-500/50 dark:hover:border-brand-500/40 transition duration-150 cursor-pointer select-none`;
 
   const tagsHtml = (ticket.tags || []).map(tag => 
     `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">#${tag}</span>`
@@ -880,7 +880,7 @@ function renderTreeView() {
 
     const card = document.createElement('div');
     card.id = `tree-node-${t.id}`;
-    card.className = 'graph-node-card bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md hover:border-brand-500 cursor-pointer space-y-2 select-none';
+    card.className = 'graph-node-card bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-md hover:border-brand-500 cursor-pointer space-y-2 select-none';
     card.style.left = `${pos.x}px`;
     card.style.top = `${pos.y}px`;
 
@@ -987,7 +987,7 @@ function renderTimelineView() {
 
     item.innerHTML = `
       <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full ${dotColor} ring-4 ring-white dark:ring-slate-900"></div>
-      <div class="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 group-hover:border-brand-500 transition">
+      <div class="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-300 dark:border-slate-800/80 group-hover:border-brand-500 transition">
         <div class="flex items-center justify-between text-xs text-slate-400 mb-1 font-mono">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</span>
