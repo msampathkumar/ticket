@@ -1,6 +1,6 @@
 ---
 id: tic-c83r
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-03T01:19:10Z
@@ -20,3 +20,9 @@ do mention that we have built for agent and humans with love :)
 
 do clear specificy its feature and problems it solves. also share a list of examples use cases.
 
+
+## Notes
+
+**2026-10-03T10:43:41Z**
+
+Agreed on plan to build an agent-friendly documentation portal using Astro Starlight, accompanied by llms.txt and llms-full.txt (inspired by modelcontextprotocol.io and llmstxt.org) covering core CLI, web UI, plugins, and agent execution loops.

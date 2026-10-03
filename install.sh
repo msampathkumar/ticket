@@ -80,7 +80,7 @@ EOF
 install_skill() {
     echo "🤖 Installing tk Agent Skill to $HOME/.agents/skills/tk/SKILL.md..."
     mkdir -p "$HOME/.agents/skills/tk"
-    cp -f "$DIR/skills/tk/SKILL.md" "$HOME/.agents/skills/tk/SKILL.md"
+    cp -f "$DIR/agent-skill/tk/SKILL.md" "$HOME/.agents/skills/tk/SKILL.md"
     echo "✅ Agent skill installed successfully!"
     INSTALLED+=("tk agent-skill       # Show installed agent skill")
 }

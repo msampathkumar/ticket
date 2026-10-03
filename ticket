@@ -1905,8 +1905,8 @@ EOF
 _skill_content() {
     local repo_dir
     repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [[ -f "$repo_dir/skills/tk/SKILL.md" ]]; then
-        cat "$repo_dir/skills/tk/SKILL.md"
+    if [[ -f "$repo_dir/agent-skill/tk/SKILL.md" ]]; then
+        cat "$repo_dir/agent-skill/tk/SKILL.md"
         return 0
     fi
     cat << 'EOF'

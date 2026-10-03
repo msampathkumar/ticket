@@ -1,0 +1,22 @@
+{
+  "name": "ticket",
+  "version": "0.2.0",
+  "description": "Minimal, offline task tracker with dependency intelligence for humans and AI agents.",
+  "bin": {
+    "tk": "./ticket",
+    "ticket": "./ticket"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/msampathkumar/ticket.git"
+  },
+  "keywords": [
+    "ticket",
+    "task-tracker",
+    "agent-skill",
+    "dag",
+    "cli"
+  ],
+  "author": "Sampath Kumar",
+  "license": "MIT"
+}

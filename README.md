@@ -1,12 +1,16 @@
 # <img src="docs/images/logo.svg" width="30" height="30" alt="tk logo" style="vertical-align: -4px; display: inline-block;" /> ticket (tk)
 
 [![Test Suite](https://img.shields.io/github/actions/workflow/status/msampathkumar/ticket/test.yml?branch=master&label=tests&style=flat-square)](https://github.com/msampathkumar/ticket/actions/workflows/test.yml)
+[![Documentation](https://img.shields.io/badge/docs-website-indigo.svg?style=flat-square)](https://msampathkumar.github.io/ticket/)
 [![Release](https://img.shields.io/github/v/release/msampathkumar/ticket?style=flat-square&color=6366f1)](https://github.com/msampathkumar/ticket/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg?style=flat-square)](#)
 [![Zero Dependency Core](https://img.shields.io/badge/core-POSIX%20Bash%20(Zero%20Runtime)-emerald.svg?style=flat-square)](#)
 
 Minimal, offline task tracker with dependency intelligence. Features an ultra-fast CLI and an optional modern Kanban & review dashboard.
+
+📖 **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)  
+🤖 **AI Agent Context**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
 
 Inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html), `tk` manages and queries task dependency graphs in plain text.
 
@@ -37,6 +41,12 @@ cd ticket
 ```
 
 Binaries install to `~/.local/bin/` (`tk`, `tk-webui`, plus any optional `tk-<plugin>`). Ensure `~/.local/bin` is in `$PATH`. Installed plugins are discovered automatically and listed by `tk help`.
+
+### 🤖 Install Agent Skill via NPX
+To instantly install the agent skill for your AI coding assistant without cloning the repo:
+```bash
+npx github:msampathkumar/ticket agent-skill --install
+```
 
 ### Launching Web UI & Background Server
 
@@ -197,12 +207,21 @@ Flags accumulate, so any combination works:
 
 ## 📚 Documentation & Specifications
 
+- **[Live Documentation Website](https://msampathkumar.github.io/ticket/)**: Complete guides, CLI reference, and interactive developer workflows.
+- **[AI Agent Context (llms.txt)](https://msampathkumar.github.io/ticket/llms.txt)**: Curated documentation index for LLMs and AI coding assistants.
+- **[Consolidated LLM Knowledge Base (llms-full.txt)](https://msampathkumar.github.io/ticket/llms-full.txt)**: Single-file documentation compilation for instant agent context injection.
 - **[AI Agent Guide & Workflow (AGENTS.md)](AGENTS.md)**: 10,000-foot overview of architecture, goals, and autonomous agent operating workflows.
-- **[System & Data Specification (SPEC.md)](docs/SPEC.md)**: Complete schema, DAG semantics, error codes, and lifecycle specification (spec-driven architecture).
+- **[System & Data Specification (SPEC.md)](docs/SPEC.md)**: Complete schema, DAG semantics, error codes, and lifecycle specification.
 - **[Plugin Standard Specification (PLUGIN_SPEC.md)](docs/PLUGIN_SPEC.md)**: Official plugin development standard, directory convention, execution lifecycle, and metadata contracts.
 - **[Plugin Architecture & Catalog (plugins/README.md)](plugins/README.md)**: Catalog of built-in plugins with links to individual plugin specs.
 - **[Plugin Authoring Guide (PLUGINS.md)](docs/PLUGINS.md)**: Guide on writing and distributing custom plugins.
-- **[Agent Skill (SKILL.md)](skills/tk/SKILL.md)**: Agent skill definition installable to `~/.agents/skills/tk/SKILL.md`.
+- **[Agent Skill (SKILL.md)](agent-skill/tk/SKILL.md)**: Agent skill definition installable via `tk agent-skill --install` or instantly via `npx github:msampathkumar/ticket agent-skill --install`.
+
+### Local Documentation Server
+```bash
+make docs-dev    # Start local live-reload documentation server (port 8000)
+make docs-build  # Build production static site and update LLM files
+```
 
 ---
 

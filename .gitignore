@@ -7,6 +7,10 @@ venv/
 dist/
 build/
 .Python
+.cache/
+
+# Docs build output
+site/
 
 # OS & IDEs
 .DS_Store
