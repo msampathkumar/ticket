@@ -217,6 +217,14 @@ def step_in_subdirectory(context, subdir):
     context.working_dir = str(subdir_path)
 
 
+@given(r'I am back in the root directory')
+@when(r'I am back in the root directory')
+def step_back_in_root(context):
+    """Change back to the root test directory."""
+    context.working_dir = context.test_dir
+
+
+
 @given(r'a separate tickets directory exists at "(?P<dir_path>[^"]+)" with ticket "(?P<ticket_id>[^"]+)" titled "(?P<title>[^"]+)"')
 def step_separate_tickets_dir(context, dir_path, ticket_id, title):
     """Create a separate tickets directory with a ticket."""
@@ -332,10 +340,12 @@ def step_run_command(context, command):
     # Use working_dir if set (from subdirectory step), otherwise test_dir
     cwd = getattr(context, 'working_dir', context.test_dir)
 
-    # Include plugin directory in PATH if plugins were created
+    # Include ticket and plugin directories in PATH
     env = os.environ.copy()
+    ticket_dir = os.path.dirname(os.path.abspath(ticket_script))
+    env['PATH'] = ticket_dir + ':' + env.get('PATH', '')
     if hasattr(context, 'plugin_dir'):
-        env['PATH'] = context.plugin_dir + ':' + env.get('PATH', '')
+        env['PATH'] = context.plugin_dir + ':' + env['PATH']
 
     result = subprocess.run(
         cmd,

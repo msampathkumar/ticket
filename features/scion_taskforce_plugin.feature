@@ -266,9 +266,12 @@ Feature: SCION Task Force Plugin
     Then the output should contain "spawned=1"
     When I run "ticket scion-taskforce logs"
     Then the output should contain "isolated workspace"
-    When I run "cd .scion/agents/tf-0090/workspace && ticket add-note tf-0090 'Worker report: diff is ready on branch tf-0090' && ticket update tf-0090 --tags taskforce,waiting-for-review"
+    Given I am in subdirectory ".scion/agents/tf-0090/workspace"
+    When I run "ticket add-note tf-0090 'Worker report: diff is ready on branch tf-0090'"
+    And I run "ticket update tf-0090 --tags taskforce,waiting-for-review"
     Then the command should succeed
     And ticket "tf-0090" should have field "status" with value "in_progress"
+    Given I am back in the root directory
     When I run "ticket scion-taskforce dispatch"
     Then the output should contain "paused=1"
     When I run "ticket show tf-0090"

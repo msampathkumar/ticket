@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 from tk_scion_taskforce import __version__
-from tk_scion_taskforce.config import init_config, load_config, resolve_config_path, uninit_config
+from tk_scion_taskforce.config import (
+    init_config,
+    load_config,
+    resolve_config_path,
+    uninit_config,
+)
 from tk_scion_taskforce.daemon import (
     DispatchError,
     dispatch_ticket,
@@ -58,7 +65,9 @@ Opt-in model: the task force only picks up READY tickets that YOU tagged `taskfo
 ticket is moved to in_progress; failures leave the ticket untouched.
 
 Task Force Operations:
-  init [--global] [--force]        Initialize project-scoped .scion-taskforce/ directory & templates
+  init [--global] [--force] [--defaults]
+                                   Interactive setup wizard for project config & SCION template
+  test [--prompt "<text>"]         Run an end-to-end test worker to verify SCION Hub & worker execution
   uninit [--global]                Remove project-scoped .scion-taskforce/ directory & unregister project
   watch [dir] [--interval <sec>] [--max-concurrent <n>] [--once] [--dry-run]
                                    Run the task force reconciler in the foreground
@@ -123,20 +132,245 @@ def _extract_global_flags(argv: list[str]) -> tuple[str | None, bool, list[str]]
     return explicit_config, dry_run, remaining
 
 
+def _detect_default_gcp_project() -> str:
+    env_proj = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("GCLOUD_PROJECT")
+    if env_proj:
+        return env_proj
+    try:
+        proc = subprocess.run(
+            ["gcloud", "config", "get-value", "project"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return "gemini-demo-project-4242"
+
+
+def _prompt_user(prompt: str, default: str) -> str:
+    try:
+        val = input(f"{prompt} [{default}]: ").strip()
+        return val if val else default
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return default
+
+
+def cmd_test(args: list[str], project_dir: Path) -> int:
+    """Run an end-to-end test worker to verify SCION Hub & worker execution."""
+    cfg = load_config(project_dir=project_dir)
+    provider_cfg = cfg.get("provider", {})
+    harness = str(provider_cfg.get("harness_config", "claude") or "claude")
+    model = str(provider_cfg.get("model", "") or "").strip()
+    binary = str(provider_cfg.get("binary", "scion") or "scion")
+
+    prompt = next((args[i + 1] for i, a in enumerate(args) if a in ("--prompt", "-p") and i + 1 < len(args)), None)
+    if not prompt:
+        prompt = (
+            "Write a short markdown file called poem.md with a 4-line poem about the latest "
+            "Google Gemini model. Save poem.md directly in the current repository workspace directory "
+            "and complete your job."
+        )
+
+    test_id = f"test-worker-{int(time.time()) % 10000:04d}"
+    target_file = project_dir / "poem.md"
+
+    print("=" * 60)
+    print("🧪 Running SCION Task Force Test Worker")
+    print("=" * 60)
+    print(f"• Worker ID:   `{test_id}`")
+    print(f"• Project Dir: `{project_dir}`")
+    print(f"• Harness:     `{harness}` (Model: `{model}`)")
+    print(f"• Target File: `{target_file.name}`")
+    print("-" * 60)
+
+    if target_file.is_file():
+        target_file.unlink()
+
+    provider = get_provider(cfg, dry_run=False)
+    pre = provider.preflight(str(project_dir))
+    if not pre.ok:
+        print(f"❌ Provider preflight failed: {pre.message}", file=sys.stderr)
+        return 1
+
+    print("🚀 Launching test worker via SCION Hub...")
+    cmd = [
+        binary,
+        "--project",
+        str(project_dir),
+        "start",
+        test_id,
+        prompt,
+        "-w",
+        str(project_dir),
+        "--enable-telemetry",
+        "--non-interactive",
+    ]
+    if (project_dir / ".scion" / "templates" / "taskforce-worker").is_dir():
+        cmd.extend(["-t", "taskforce-worker"])
+    if harness:
+        cmd.extend(["--harness-config", harness])
+    if model and model.lower() not in ("default", ""):
+        cmd.extend(["--model", model])
+    for extra in provider_cfg.get("extra_start_args", []):
+        cmd.append(str(extra))
+
+    env = os.environ.copy()
+    if "GOOGLE_CLOUD_REGION" not in env:
+        region = env.get("GOOGLE_CLOUD_LOCATION") or env.get("VERTEX_LOCATION") or ("us-east5" if harness == "claude" else "us-central1")
+        env["GOOGLE_CLOUD_REGION"] = region
+        env["GOOGLE_CLOUD_LOCATION"] = region
+
+    launch_res = subprocess.run(cmd, cwd=str(project_dir), env=env, capture_output=True, text=True)
+    if launch_res.returncode != 0:
+        print(f"❌ Failed to launch test worker:\n{launch_res.stderr or launch_res.stdout}", file=sys.stderr)
+        return 1
+
+    print(f"✅ Test worker '{test_id}' started on SCION Hub!")
+    provider.post_spawn(str(project_dir), test_id, timeout_seconds=15)
+    print("⏳ Waiting for worker to write poem.md (polling up to 90s)...")
+
+    start_t = time.time()
+    found = False
+    while time.time() - start_t < 90:
+        if target_file.is_file() and target_file.stat().st_size > 0:
+            found = True
+            break
+        candidate_paths = [
+            project_dir / ".scion" / "agents" / test_id / "workspace" / "poem.md",
+        ]
+        hub_configs = Path.home() / ".scion" / "project-configs"
+        if hub_configs.is_dir():
+            candidate_paths.extend(hub_configs.glob(f"*/.scion/agents/{test_id}/workspace/poem.md"))
+
+        for candidate in candidate_paths:
+            if candidate.is_file() and candidate.stat().st_size > 0:
+                import shutil
+                shutil.copy2(candidate, target_file)
+                found = True
+                break
+        if found:
+            break
+        print(".", end="", flush=True)
+        time.sleep(2.0)
+    print()
+
+    if not found:
+        print("⚠️ Test worker did not produce poem.md within 90s.")
+        print("   Capturing agent terminal output...")
+        look_proc = subprocess.run(
+            [binary, "--non-interactive", "--project", str(project_dir), "look", test_id],
+            capture_output=True,
+            text=True,
+        )
+        if look_proc.stdout:
+            print(look_proc.stdout[:800])
+        subprocess.run(
+            [binary, "--non-interactive", "--project", str(project_dir), "delete", test_id, "-y"],
+            capture_output=True,
+        )
+        return 1
+
+    content = target_file.read_text(encoding="utf-8").strip()
+    print("🎉 Test worker completed successfully!")
+    print("📄 Verified poem.md in local project workspace:")
+    print("-" * 60)
+    print(content)
+    print("-" * 60)
+
+    # Clean up test poem so project working directory remains clean
+    if target_file.is_file():
+        target_file.unlink()
+
+    print(f"🧹 Cleaning up test worker '{test_id}'...")
+    subprocess.run(
+        [binary, "--non-interactive", "--project", str(project_dir), "delete", test_id, "-y"],
+        capture_output=True,
+    )
+    print("✅ Test run verified! Your SCION Task Force is fully operational.")
+    return 0
+
+
 def cmd_init(args: list[str], project_dir: Path) -> int:
     global_scope = "--global" in args or "-g" in args
     force = "--force" in args or "-f" in args
+    is_interactive = (
+        sys.stdin.isatty()
+        and not global_scope
+        and "--defaults" not in args
+        and "--non-interactive" not in args
+        and "-y" not in args
+    )
+
+    harness = "claude"
+    model = ""
+    gcp_proj = _detect_default_gcp_project()
+    gcp_region = os.environ.get("GOOGLE_CLOUD_REGION") or "us-east5"
+    claim_tag = "taskforce"
+    review_tag = "waiting-for-review"
+    max_concurrent = 1
+
+    if is_interactive:
+        print("=" * 60)
+        print("🚀 SCION Task Force Setup Wizard")
+        print("=" * 60)
+        print("Configure your project-level worker template & orchestrator.")
+        print("Press [Enter] to accept the recommended default in brackets.\n")
+
+        harness = _prompt_user("1. SCION Harness Engine", "claude")
+        model = _prompt_user("2. Default Model (Model Garden / Vertex AI, blank for default)", "")
+        gcp_proj = _prompt_user("3. Google Cloud Project ID", gcp_proj)
+        gcp_region = _prompt_user("4. Google Cloud Region", gcp_region)
+        claim_tag = _prompt_user("5. Task Opt-in Tag", "taskforce")
+        max_str = _prompt_user("6. Max Concurrent Workers", "1")
+        try:
+            max_concurrent = int(max_str)
+        except ValueError:
+            max_concurrent = 1
+
+        os.environ["GOOGLE_CLOUD_PROJECT"] = gcp_proj
+        os.environ["GOOGLE_CLOUD_REGION"] = gcp_region
+
     scope_desc = "global scope" if global_scope else f"project scope at `{project_dir}`"
-    print(f"🚀 Initializing SCION Task Force ({scope_desc})...")
-    target, archived_count = init_config(project_dir=project_dir, global_scope=global_scope, force=force)
+    print(f"\n🚀 Initializing SCION Task Force ({scope_desc})...")
+    target, archived_count = init_config(
+        project_dir=project_dir,
+        global_scope=global_scope,
+        force=force,
+        harness=harness,
+        model=model,
+        claim_tag=claim_tag,
+        review_tag=review_tag,
+        max_concurrent=max_concurrent,
+    )
     if archived_count > 0:
         print(f"📦 Archived {archived_count} existing configuration/prompt file(s) with timestamped .old suffixes.")
-    print(f"📁 Created/Updated configuration directory & templates:")
-    print(f"   • Path: `{target.parent}`")
-    print(f"   • `scion-taskforce.yaml` — Task force orchestrator configuration (claim tags, concurrency limits, provider rules)")
-    print(f"   • `prompt.md`           — Default customizable autonomous worker brief template")
-    print(f"✅ Initialization successful! You can now run 'tk scion-taskforce start' to launch the task force.")
+    print("📁 Created/Updated configuration directory & templates:")
+    print(f"   • Config:   `{target}`")
+    print(f"   • Template: `{project_dir / '.scion' / 'templates' / 'taskforce-worker'}` (harness={harness}, model={model})")
+    print(f"   • Brief:    `{target.parent / 'prompt.md'}`")
+    if not global_scope:
+        binary = shutil.which("scion") or "scion"
+        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "link", "--yes"], capture_output=True)
+        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "enable"], capture_output=True)
+        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "env", "set", "--project", f"GOOGLE_CLOUD_PROJECT={gcp_proj}"], capture_output=True)
+        subprocess.run([binary, "--non-interactive", "--project", str(project_dir), "hub", "env", "set", "--project", f"GOOGLE_CLOUD_REGION={gcp_region}"], capture_output=True)
+
+    print("✅ Initialization successful! You can now run 'tk scion-taskforce start' to launch the task force.")
+
+    if is_interactive:
+        try:
+            ans = input("\n🧪 Run a quick test worker now? (create poem.md about Gemini) [Y/n]: ").strip().lower()
+            if ans in ("", "y", "yes"):
+                return cmd_test([], project_dir)
+        except (EOFError, KeyboardInterrupt):
+            print()
+
     return 0
+
 
 
 def cmd_uninit(args: list[str], project_dir: Path) -> int:
@@ -566,6 +800,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if subcmd == "init":
         return cmd_init(subargs, project_dir)
+
+    if subcmd == "test":
+        return cmd_test(subargs, project_dir)
 
     if subcmd == "uninit":
         return cmd_uninit(subargs, project_dir)

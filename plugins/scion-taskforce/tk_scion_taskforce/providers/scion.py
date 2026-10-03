@@ -50,7 +50,9 @@ class ScionProvider(WorkerProvider):
         prov_cfg = config.get("provider", {})
         self.binary_name = str(prov_cfg.get("binary", "scion") or "scion")
         self.profile = str(prov_cfg.get("profile", "") or "")
+        self.template = str(prov_cfg.get("template", "") or "")
         self.harness_config = str(prov_cfg.get("harness_config", "") or "")
+        self.model = str(prov_cfg.get("model", "") or "")
         self.branch_prefix = str(prov_cfg.get("branch_prefix", "") or "")
         self.extra_start_args = [str(x) for x in (prov_cfg.get("extra_start_args") or [])]
         self.extra_resume_args = [str(x) for x in (prov_cfg.get("extra_resume_args") or [])]
@@ -106,6 +108,10 @@ class ScionProvider(WorkerProvider):
         if extra_env:
             for k, v in extra_env.items():
                 env[str(k)] = str(v)
+        if "GOOGLE_CLOUD_REGION" not in env:
+            region = env.get("GOOGLE_CLOUD_LOCATION") or env.get("VERTEX_LOCATION") or ("us-east5" if self.harness_config == "claude" else "us-central1")
+            env["GOOGLE_CLOUD_REGION"] = region
+            env["GOOGLE_CLOUD_LOCATION"] = region
 
         try:
             res = subprocess.run(
@@ -148,9 +154,43 @@ class ScionProvider(WorkerProvider):
         if self.dry_run:
             return ProviderResult(ok=True, message="[dry-run] provider assumed healthy")
         binary = self._resolve_binary()
-        res = self._run([binary, "--project", proj, "list", "--format", "json"], cwd=proj, timeout=60)
+
+        res = self._run(
+            [binary, "--project", proj, "list", "--format", "json", "--non-interactive"],
+            cwd=proj,
+            timeout=60,
+        )
         if res.returncode != 0:
             return ProviderResult(ok=False, message=self.last_error)
+
+        # Seamless Hub Integration: auto-link and enable Hub for project if Hub is active
+        try:
+            hub_stat = self._run(
+                [binary, "--project", proj, "hub", "status", "--non-interactive"],
+                cwd=proj,
+                timeout=15,
+            )
+            if hub_stat.returncode == 0:
+                if "Linked: no" in hub_stat.stdout:
+                    self._run(
+                        [binary, "--project", proj, "hub", "link", "--yes", "--non-interactive"],
+                        cwd=proj,
+                        timeout=30,
+                    )
+                    self._run(
+                        [binary, "--project", proj, "hub", "enable", "--non-interactive"],
+                        cwd=proj,
+                        timeout=15,
+                    )
+                elif "Enabled: false" in hub_stat.stdout:
+                    self._run(
+                        [binary, "--project", proj, "hub", "enable", "--non-interactive"],
+                        cwd=proj,
+                        timeout=15,
+                    )
+        except Exception:
+            pass
+
         return ProviderResult(ok=True, message="ok")
 
     def health(self, project_dir: str, worker_id: str) -> WorkerStatus | None:
@@ -196,15 +236,22 @@ class ScionProvider(WorkerProvider):
             prompt,
             "--branch",
             target_branch,
+            "-w",
+            proj,
             "--enable-telemetry",
             "--non-interactive",
         ]
+        if self.template and (Path(proj) / ".scion" / "templates" / self.template).is_dir():
+            cmd.extend(["-t", self.template])
         if self.profile:
             cmd.extend(["--profile", self.profile])
         if self.harness_config:
             cmd.extend(["--harness-config", self.harness_config])
+        if self.model and self.model.lower() not in ("default", ""):
+            cmd.extend(["--model", self.model])
         if self.extra_start_args:
             cmd.extend(self.extra_start_args)
+
 
         res = self._run(cmd, cwd=proj, extra_env=env)
         if res.returncode == 0 and self.dry_run:
@@ -216,9 +263,9 @@ class ScionProvider(WorkerProvider):
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
 
-        res = self._run([binary, "--project", proj, "suspend", clean_id], cwd=proj)
+        res = self._run([binary, "--project", proj, "suspend", clean_id, "--non-interactive"], cwd=proj)
         if res.returncode != 0:
-            res = self._run([binary, "--project", proj, "stop", clean_id], cwd=proj)
+            res = self._run([binary, "--project", proj, "stop", clean_id, "--non-interactive"], cwd=proj)
         if res.returncode == 0 and self.dry_run:
             self._dry_run_pods[clean_id] = "paused"
         return res.returncode == 0
@@ -228,14 +275,28 @@ class ScionProvider(WorkerProvider):
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
 
-        res = self._run([binary, "--project", proj, "message", clean_id, message, "--wake"], cwd=proj)
+        res = self._run(
+            [binary, "--project", proj, "message", clean_id, message, "--wake", "--non-interactive"],
+            cwd=proj,
+        )
         if res.returncode != 0:
-            fallback = [binary, "--project", proj, "resume", clean_id, message, "--enable-telemetry"]
+            fallback = [
+                binary,
+                "--project",
+                proj,
+                "resume",
+                clean_id,
+                message,
+                "--enable-telemetry",
+                "--non-interactive",
+            ]
             fallback.extend(self.extra_resume_args)
             res = self._run(fallback, cwd=proj)
         if res.returncode == 0 and self.dry_run:
             self._dry_run_pods[clean_id] = "running"
         return res.returncode == 0
+
+
 
     def attach_command(self, project_dir: str, worker_id: str) -> list[str]:
         clean_id = validate_ticket_id(worker_id)
@@ -272,7 +333,11 @@ class ScionProvider(WorkerProvider):
                 for wid, st in self._dry_run_pods.items()
             }
         binary = self._resolve_binary()
-        res = self._run([binary, "--project", proj, "list", "--format", "json"], cwd=proj, timeout=60)
+        res = self._run(
+            [binary, "--non-interactive", "--project", proj, "list", "--format", "json"],
+            cwd=proj,
+            timeout=60,
+        )
         workers: dict[str, WorkerStatus] = {}
         if res.returncode != 0 or not res.stdout.strip():
             return workers
@@ -311,17 +376,35 @@ class ScionProvider(WorkerProvider):
         return None
 
     def _container_for(self, project_dir: str, worker_id: str) -> tuple[str, str] | None:
-        """Return (runtime, container_id) for a worker from ``scion list --format json``."""
+        """Return (runtime, container_id) for a worker."""
+        clean_id = validate_ticket_id(worker_id).lower()
+        # Direct lookup via podman container name filter (e.g. ticket--test-worker-2780)
+        try:
+            p_res = subprocess.run(
+                ["podman", "ps", "-q", "--filter", f"name=--{clean_id}$"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if p_res.returncode == 0 and p_res.stdout.strip():
+                return "podman", p_res.stdout.strip().splitlines()[0]
+        except Exception:
+            pass
+
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
-        res = self._run([binary, "--project", proj, "list", "--format", "json"], cwd=proj, timeout=60)
+        res = self._run(
+            [binary, "--non-interactive", "--project", proj, "list", "--format", "json"],
+            cwd=proj,
+            timeout=60,
+        )
         if res.returncode != 0 or not res.stdout.strip():
             return None
         try:
             items = json.loads(res.stdout)
         except json.JSONDecodeError:
             return None
-        wanted = worker_id.lower()
+        wanted = clean_id
         for item in items if isinstance(items, list) else []:
             if not isinstance(item, dict) or str(item.get("name", "")).lower() != wanted:
                 continue

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+- SCION Task Force: Pluggable Dual-Mode SCION Hub integration (`--project <dir>` with Hub routing, fallback to `--no-hub` offline mode).
+- SCION Task Force: Interactive setup wizard (`tk scion-taskforce init` and `tk scion-taskforce init --defaults`) with automatic project template seeding (`.scion/templates/taskforce-worker/`).
+- SCION Task Force: Verification test runner (`tk scion-taskforce test`) validating provider runtime, GCP ADC, Vertex AI Model Garden, and agent container execution.
+- SCION Task Force: Automated Google Cloud Vertex AI region injection (`GOOGLE_CLOUD_REGION=us-east5`) for Anthropic Claude models on Model Garden.
+- Agent Skill: Comprehensive developer and AI agent operational guide with full CLI reference, 5-step loop, and GitHub repository / documentation links.
+
+### Fixed
+- SCION Task Force: Cleaned up deprecated `harness` and `harness_config` schema fields in generated agent templates.
+- SCION Task Force: Enhanced Podman container discovery via suffix matching (`podman ps -q --filter name=--<id>$`).
+- SCION Task Force: Automatically strip `waiting-for-review` from both main ticket and worker workspace ticket upon wake.
+- Web UI: Increased border contrast depth in light theme (`border-slate-300`).
+
 ## [0.4.0] - 2026-10-03
 
 ### Added

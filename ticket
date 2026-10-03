@@ -1216,8 +1216,8 @@ cmd_link() {
     done
 
     # Use awk to update all files in one pass per file
-    local id_list
-    id_list=$(printf '%s\n' "${ids[@]}")
+    # Deprecated: id_list was unused (SC2034)
+    # local id_list=$(printf '%s\n' "${ids[@]}")
 
     local count=0
     for ((i=0; i<${#ids[@]}; i++)); do
@@ -1764,7 +1764,8 @@ _list_plugins() {
         done < <(compgen -c "${prefix}-" 2>/dev/null | sort -u)
 
         if [[ -d "$repo_dir/plugins" ]]; then
-            for f in "$repo_dir"/plugins/*/"${prefix}-"* "$repo_dir"/plugins/"${prefix}-"*; do
+            # Cleanly quote plugin paths to prevent SC2140
+            for f in "$repo_dir/plugins"/*/"${prefix}-"* "$repo_dir/plugins/${prefix}-"*; do
                 if [[ -x "$f" && -f "$f" ]]; then
                     candidates+=("$(basename "$f")")
                 fi
@@ -2117,7 +2118,8 @@ if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--he
                 fi
                 export TICKETS_DIR
             fi
-            export TK_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+            TK_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+            export TK_SCRIPT
             shift
             exec "$_plugin_exec" "$@"
         fi

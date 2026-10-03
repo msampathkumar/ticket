@@ -1,11 +1,11 @@
+import json
 import os
+import signal
+import subprocess
 import sys
 import time
-import signal
-import json
-import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 STATE_DIR = Path.home() / ".local" / "state" / "tk"
 PID_FILE = STATE_DIR / "webui.json"

@@ -1,151 +1,194 @@
 ---
 name: tk
-description: Manage local tickets, tasks, bugs, dependencies, and project planning using the tk minimal, offline task tracker with dependency intelligence and tk-webui.
+description: Minimal, dependency-aware task tracker. Built to scale agentic workflows. Manage tickets, DAG dependencies, Kanban Web UI, GitHub sync, and autonomous SCION task forces.
 ---
 
-# tk - Agent Skill Guide
+# tk - Developer & Agent Operational Guide
 
-This skill equips agents to interact with **`tk`**, a **minimal, offline task tracker with dependency intelligence** designed for AI agents and human developers.
+`tk` (`ticket`) is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
 
-## Overview
+- **Repository**: [https://github.com/msampathkumar/ticket](https://github.com/msampathkumar/ticket)
+- **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)
+- **LLM Context Endpoints**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)
 
-Tickets are stored as Markdown files with YAML frontmatter in a `.tickets/` directory at the project root. All operations are local, plain-text, and trackable with git.
+---
 
-## Core Commands Reference
+## 1. Installation & Setup
 
-### 1. Ticket Lifecycle
-- **Initialize Repository**:
-  ```bash
-  tk init [directory]   # Initialize .tickets tracking repository
-  ```
+Any coding agent or developer can install `tk` directly:
 
-- **Create**:
-  ```bash
-  tk create "Feature title" -t feature -p 2 -d "Detailed description" --tags "ui,backend"
-  ```
-  Options:
-  - `-t, --type`: `bug` | `feature` | `task` | `epic` | `chore` (default: `task`)
-  - `-p, --priority`: `0` (critical) to `4` (trivial) (default: `2`)
-  - `-a, --assignee`: Assignee name / username
-  - `-d, --description`: Description text
-  - `--design`: Architecture / design notes
-  - `--acceptance`: Acceptance criteria checklist
-  - `--parent`: Parent ticket ID for subtasks (or `--parent none` to unlink)
-  - `--external-ref`: GitHub issue / PR / JIRA reference (e.g. `gh-42`)
-  - `--tags`: Comma-separated tags
-
-- **Inspect**:
-  ```bash
-  tk show <ticket-id>
-  ```
-
-- **Update**:
-  ```bash
-  tk update <ticket-id> -p 1 -a "Developer" -d "New details" --tags "urgent"
-  ```
-
-- **Status transitions**:
-  ```bash
-  tk start <ticket-id>     # In progress
-  tk close <ticket-id>     # Closed
-  tk reopen <ticket-id>    # Back to open
-  tk status <ticket-id> <open|in_progress|closed>
-  ```
-
-- **Add Review / Progress Note**:
-  ```bash
-  tk add-note <ticket-id> "Review feedback or progress update"
-  ```
-
-- **List & Filter Tickets**:
-  ```bash
-  tk ls                          # List tickets (hides closed, limit 10 by default)
-  tk ls --full                   # List all open tickets without limit
-  tk ls --status=closed          # List closed tickets
-  tk ls -a "Developer" --type bug # Filter by assignee and type
-  ```
-
-- **Search & Query**:
-  ```bash
-  tk find "search query"         # Search text across title, desc, notes
-  tk query                       # Stream tickets as JSON lines
-  tk query '.priority == "0"'    # Query with jq filter
-  tk edit <ticket-id>            # Open in $EDITOR
-  ```
-
-### 2. Dependency Management & Symmetrical Links
-- **Add dependency**:
-  ```bash
-  tk dep <ticket-id> <blocker-id>   # <ticket-id> now depends on <blocker-id>
-  ```
-- **Remove dependency**:
-  ```bash
-  tk undep <ticket-id> <blocker-id>
-  ```
-- **Link related tickets (symmetric)**:
-  ```bash
-  tk link <ticket-a> <ticket-b>     # Relates tickets without blocking semantics
-  ```
-- **Unlink related tickets**:
-  ```bash
-  tk unlink <ticket-a> <ticket-b>
-  ```
-- **Show dependency tree**:
-  ```bash
-  tk dep tree <ticket-id>
-  ```
-- **Detect dependency cycles**:
-  ```bash
-  tk dep cycle
-  ```
-- **Query Ready / Unblocked tasks**:
-  ```bash
-  tk ready       # Lists tickets whose dependencies are all closed
-  ```
-- **Query Blocked tasks**:
-  ```bash
-  tk blocked     # Lists tickets waiting on unresolved dependencies
-  ```
-- **Recently closed tasks**:
-  ```bash
-  tk closed      # Lists recently closed tickets
-  ```
-
-### 3. Interactive Web UI & Background Server
+### Option A: Install from GitHub (Zero Clone via NPX or Curl)
 ```bash
-# Foreground server on port 8475 (ASCII: T=84, K=75)
-tk webui [optional-dir]
-
-# Background daemon server management
-tk webui server start [dir]    # Start daemon in background
-tk webui server status         # Check status, URL, and PID
-tk webui server stop           # Stop background daemon
-tk webui server restart [dir]  # Restart background daemon
+# Direct agent skill installation
+npx github:msampathkumar/ticket agent-skill --install
 ```
 
-### 4. GitHub Synchronization Plugin
+### Option B: Clone & Install Full Suite
 ```bash
-tk github sync                 # Sync open GitHub issues & PRs to .tickets/
-tk github sync --issues        # Sync only issues
-tk github sync --prs           # Sync only PRs
-tk github list                 # List synced GitHub tickets
-tk github unsync -y            # Remove synced tickets
+git clone https://github.com/msampathkumar/ticket.git
+cd ticket
+
+# Full Suite: Core CLI + Web UI + Agent Skill (Default)
+./install.sh --full
+
+# Or install everything including optional plugins (GitHub & SCION Task Force):
+./install.sh --all
+
+# Or core POSIX Bash CLI only (pure Bash, zero Python/Node runtime required):
+./install.sh --core
+```
+Binaries are placed in `~/.local/bin/` (`tk`, `tk-webui`, `tk-github`, `tk-scion-taskforce`). Ensure `~/.local/bin` is in `$PATH`.
+
+---
+
+## 2. Core Concepts & Storage
+
+- **Pure Plain Text & Git-Backed**: State is stored in `.tickets/*.md` files with YAML frontmatter. Zero external databases.
+- **DAG Dependency Graph**: Native support for parent-child hierarchies (`--parent`), blocking dependencies (`tk dep`), cycle detection (`tk dep cycle`), and automated downstream unblocking upon ticket completion.
+- **Discovered Discovery**: Running `tk help` automatically lists all built-in commands and dynamically discovers installed plugins (`tk-<cmd>` or `ticket-<cmd>`).
+
+---
+
+## 3. The 5-Step Autonomous Agent Workflow Loop
+
+When operating in repositories tracked by `tk`, autonomous coding agents follow this deterministic operational loop:
+
+```mermaid
+flowchart LR
+    A["1. Query Actionable Work<br/>`tk ready`"] --> B["2. Claim Ticket<br/>`tk start <id>`"]
+    B --> C["3. Inspect & Decompose<br/>`tk show <id>`"]
+    C --> D["4. Execute & Audit<br/>`tk add-note <id> '...'`"]
+    D --> E["5. Close & Unblock<br/>`tk close <id>`"]
 ```
 
-### 5. Other Optional Plugins
-Plugins are discovered automatically: `tk help` lists every installed `tk-<name>` with a one-line description, so check it before assuming a command exists.
+1. **Discover Actionable Tasks**:
+   Run `tk ready` to list unblocked tickets whose dependencies have all been satisfied. Never pick blocked tasks out of order.
+2. **Claim the Task**:
+   Run `tk start <id>` to transition status to `in_progress`, signaling to humans and other agents that the ticket is claimed.
+3. **Inspect Requirements & Subtasks**:
+   Run `tk show <id>` to inspect design notes, acceptance criteria checklists, and parent/child hierarchies.
+   Decompose complex tasks into subtasks:
+   ```bash
+   tk create "Implement backend endpoint" --parent <epic-id> -t task
+   tk create "Build frontend UI modal" --parent <epic-id> -t task
+   tk dep <frontend-id> <backend-id>
+   ```
+4. **Implement, Verify & Record Notes**:
+   Execute the code changes, run automated tests, and append timestamped review audit notes:
+   ```bash
+   tk add-note <id> "Implemented changes and passed test suite."
+   ```
+5. **Close the Ticket**:
+   Run `tk close <id>`. This resolves the ticket and automatically unblocks all downstream dependent tickets.
 
-- **`tk scion-taskforce`** (optional): a daemon that launches an autonomous SCION coding worker for each ticket a *human* has tagged `taskforce`. **Agents must not add the `taskforce` tag themselves.** If you are the worker, finish by `tk add-note <id> "..."` and tag the ticket `waiting-for-review`; use `tk scion-taskforce status` to inspect the pool.
+---
 
-## Agent Best Practices
+## 4. Complete CLI Reference
 
-1. **Check `tk ready` before picking up work**:
-   Always run `tk ready` to find actionable, unblocked tickets rather than picking blocked ones.
-2. **Start the ticket**:
-   Run `tk start <id>` when beginning work so other team members and agents know it's in progress.
-3. **Decompose complex features**:
-   Create subtasks with `tk create "<title>" --parent <epic-id>` and wire `tk dep <child> <blocker>`.
-4. **Document review notes**:
-   Use `tk add-note <id> "..."` when submitting code for review or recording architectural findings.
-5. **Close upon completion**:
-   Run `tk close <id>` when verification and tests pass.
+### Repository & Ticket Management
+```bash
+# Initialize tracking in current repository
+tk init [directory]
+
+# Create a ticket
+tk create "Title" -t feature -p 1 -d "Description" --tags "backend,auth"
+# Options:
+#   -t, --type: bug | feature | task | epic | chore (default: task)
+#   -p, --priority: 0 (critical) to 4 (trivial) (default: 2)
+#   -a, --assignee: Name or username
+#   -d, --description: Description text
+#   --design: Architecture / design notes
+#   --acceptance: Acceptance criteria checklist
+#   --parent: Parent ticket ID (or 'none' to unlink)
+#   --external-ref: External reference (e.g. gh-42, JIRA-101)
+#   --tags: Comma-separated tags
+
+# Inspect ticket
+tk show <ticket-id>
+
+# Update ticket fields
+tk update <ticket-id> -p 1 -a "Developer" --tags "urgent"
+
+# Status changes
+tk start <ticket-id>                       # Mark in_progress
+tk close <ticket-id>                       # Mark closed
+tk reopen <ticket-id>                      # Reopen ticket
+tk status <ticket-id> <open|in_progress|closed>
+
+# Append audit notes
+tk add-note <ticket-id> "Progress update or review feedback"
+
+# Listings & Search
+tk ls                                      # List tickets (hides closed, limit 10)
+tk ls --full                               # List all open tickets without limit
+tk ls --status=closed                      # List closed tickets
+tk ls -a "Developer" --type bug            # Filter by assignee and type
+tk find "search query"                     # Search across titles, body, and notes
+tk query                                   # Stream tickets as JSON lines
+tk query '.priority == "0"'                # Query via jq filter
+tk edit <ticket-id>                        # Open ticket in $EDITOR
+```
+
+### Dependency Management & DAG Queries
+```bash
+tk dep <child-id> <blocker-id>             # <child-id> now depends on <blocker-id>
+tk undep <child-id> <blocker-id>           # Remove dependency
+tk link <ticket-a> <ticket-b>              # Symmetrical link without blocking semantics
+tk unlink <ticket-a> <ticket-b>            # Remove symmetrical link
+tk dep tree <ticket-id>                    # Show dependency tree
+tk dep cycle                               # Detect dependency cycles in open tickets
+tk ready                                   # Query actionable tickets (all deps closed)
+tk blocked                                 # Query blocked tickets (waiting on deps)
+tk closed                                  # List recently closed tickets
+```
+
+---
+
+## 5. Official Plugins Reference
+
+Plugins are discovered automatically from `$PATH` matching `tk-<name>` or `ticket-<name>`. Use `tk super <command>` to bypass plugins and run built-in commands directly.
+
+### 5.1 Interactive Web UI (`tk webui`)
+Interactive 4-lane drag-and-drop Kanban board, live DAG Mind Map graph, table view, and project switcher on default **port `8475`** (ASCII `T=84`, `K=75`):
+```bash
+# Foreground launch
+tk webui [dir]
+
+# Background singleton daemon management
+tk webui server start [dir]                # Start daemon in background
+tk webui server status                     # Check URL, PID, and active project
+tk webui server stop                       # Stop background daemon
+tk webui server restart [dir]              # Restart background daemon
+```
+
+### 5.2 GitHub Issue & PR Sync (`tk github`)
+Bi-directional sync between local `.tickets/` markdown files and GitHub issues/pull requests:
+```bash
+tk github sync                             # Sync issues and PRs
+tk github sync --issues                    # Sync only issues
+tk github sync --prs                       # Sync only pull requests
+tk github list                             # List synced GitHub tickets
+tk github unsync -y                        # Remove synced tickets
+```
+
+### 5.3 SCION Task Force (`tk scion-taskforce`)
+Autonomous multi-agent worker orchestration daemon wrapping the SCION agent runtime with human review checkpoints:
+```bash
+# Interactive project setup wizard & template seeder
+tk scion-taskforce init                    # Interactive setup (wizard)
+tk scion-taskforce init --defaults         # Non-interactive with sensible defaults
+
+# Verification test run
+tk scion-taskforce test                    # Verifies provider, model garden, and agent container
+
+# Global daemon management
+tk scion-taskforce server start [dir]      # Start daemon for project
+tk scion-taskforce status                  # Inspect worker pool and project status
+tk scion-taskforce server stop             # Stop taskforce daemon
+tk scion-taskforce attach <id>             # Attach to an active worker session
+```
+
+> **Rules for Task Force**:
+> - Only tickets tagged `taskforce` by human operators are claimed by autonomous workers.
+> - Workers keep the ticket `in_progress` with the label `waiting-for-review`, record progress via `tk add-note`, and pause.
+> - When feedback is added via `tk add-note`, the daemon wakes the worker to iterate.

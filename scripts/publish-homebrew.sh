@@ -45,7 +45,8 @@ generate_plugin_formula() {
     pkgdesc="${metadata#*|}"
 
     # Convert plugin name to Ruby class name (ticket-query -> TicketQuery)
-    local class_name="Ticket$(echo "$plugin_name" | sed -r 's/(^|-)(\w)/\U\2/g')"
+    local class_name
+    class_name="Ticket$(echo "$plugin_name" | sed -r 's/(^|-)(\w)/\U\2/g')"
 
     cat > "$formula_dir/ticket-$plugin_name.rb" << EOF
 class $class_name < Formula

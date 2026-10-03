@@ -116,9 +116,11 @@ provider:
   driver: scion                   # Orchestrator backend ('scion' today; extensible)
   binary: scion                   # Path or command name for the provider CLI
   profile: ""                     # Optional SCION runtime profile (--profile)
-  harness_config: ""              # Optional SCION harness config (--harness-config)
+  template: "taskforce-worker"    # Project-level SCION template (.scion/templates/taskforce-worker)
+  harness_config: "claude"        # Claude Code harness with Google Cloud Vertex AI & ADC
+  model: ""                       # Default model via Vertex AI Model Garden
   branch_prefix: ""               # Optional git branch prefix (default: <ticket-id>)
-  extra_start_args: []            # Additional flags passed to 'scion start'
+  extra_start_args: ["--harness-auth", "vertex-ai"] # Additional flags passed to 'scion start'
   extra_resume_args: []           # Additional flags passed to 'scion resume'
   auto_accept_prompts: true       # Press Enter on known harness start-up prompts inside the pod
   auto_accept_prompt_patterns: ["Yes, I trust this folder"]
@@ -311,10 +313,51 @@ def load_config(
     return cfg
 
 
+def seed_project_scion_template(
+    project_dir: Path,
+    harness: str = "claude",
+    model: str = "",
+) -> Path:
+    """Seed project-scoped SCION template at <project>/.scion/templates/taskforce-worker/."""
+    tmpl_dir = project_dir / ".scion" / "templates" / "taskforce-worker"
+    tmpl_dir.mkdir(parents=True, exist_ok=True)
+
+    agent_yaml = tmpl_dir / "scion-agent.yaml"
+    agent_yaml_content = """# SCION Task Force worker agent template
+schema_version: "1"
+description: "SCION Task Force autonomous worker template"
+agent_instructions: "agents.md"
+system_prompt: "system-prompt.md"
+"""
+    agent_yaml.write_text(agent_yaml_content, encoding="utf-8")
+
+    agents_md = tmpl_dir / "agents.md"
+    agents_md_content = """# SCION Task Force Worker Instructions
+
+You are an autonomous engineering agent working inside a project repository tracked by `tk`.
+Follow these guidelines to fulfill your task:
+1. Carefully review your assigned task instructions and ticket context.
+2. Implement necessary code or documentation edits cleanly and focused on the requirements.
+3. Validate your changes (run test suites, verify file outputs).
+4. Commit your work to git when complete and record notes in the ticket.
+"""
+    agents_md.write_text(agents_md_content, encoding="utf-8")
+
+    sys_prompt = tmpl_dir / "system-prompt.md"
+    sys_prompt.write_text("You are an autonomous SCION taskforce engineering worker.\n", encoding="utf-8")
+
+    return tmpl_dir
+
+
 def init_config(
     project_dir: Path | None = None,
     global_scope: bool = False,
     force: bool = False,
+    harness: str = "claude",
+    model: str = "",
+    claim_tag: str = "taskforce",
+    review_tag: str = "waiting-for-review",
+    max_concurrent: int = 1,
 ) -> tuple[Path, int]:
     """Initialize .scion-taskforce/ directory in project or global config."""
     archived_count = 0
@@ -345,7 +388,24 @@ def init_config(
                 existing_file.rename(old_backup)
                 archived_count += 1
 
-    yaml_target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
+    yaml_content = STARTER_YAML_TEMPLATE
+    if (
+        harness != "claude"
+        or model != ""
+        or claim_tag != "taskforce"
+        or review_tag != "waiting-for-review"
+        or max_concurrent != 1
+    ):
+        yaml_content = (
+            yaml_content
+            .replace('harness_config: "claude"', f'harness_config: "{harness}"')
+            .replace('model: ""', f'model: "{model}"')
+            .replace("claim: taskforce", f"claim: {claim_tag}")
+            .replace("review: waiting-for-review", f"review: {review_tag}")
+            .replace("max_concurrent_per_project: 1", f"max_concurrent_per_project: {max_concurrent}")
+        )
+
+    yaml_target.write_text(yaml_content, encoding="utf-8")
 
     default_prompt_content = (
         "# Default Scion Task Force Prompt Template\n"
@@ -355,6 +415,9 @@ def init_config(
         "### Ticket Details\n{ticket_details}\n"
     )
     prompt_target.write_text(default_prompt_content, encoding="utf-8")
+
+    # Seed the project-scoped SCION template
+    seed_project_scion_template(base_dir, harness=harness, model=model)
 
     return yaml_target, archived_count
 
@@ -373,8 +436,15 @@ def uninit_config(
 
     base_dir = Path(project_dir or Path.cwd()).expanduser().resolve()
     scion_dir = base_dir / ".scion-taskforce"
+    removed_any = False
     if scion_dir.is_dir():
         import shutil
         shutil.rmtree(scion_dir)
-        return True, str(scion_dir)
-    return False, str(scion_dir)
+        removed_any = True
+    tmpl_dir = base_dir / ".scion" / "templates" / "taskforce-worker"
+    if tmpl_dir.is_dir():
+        import shutil
+        shutil.rmtree(tmpl_dir)
+        removed_any = True
+    return removed_any, str(scion_dir)
+

@@ -20,3 +20,7 @@ site/
 
 # Task Force local log symlink
 .tickets/.scion-taskforce-logs
+.scion/agents/
+.scion/project-id
+.scion/state.yaml
+.scion-taskforce/

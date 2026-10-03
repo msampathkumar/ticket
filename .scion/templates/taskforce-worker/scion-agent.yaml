@@ -1,0 +1,5 @@
+# SCION Task Force worker agent template
+schema_version: "1"
+description: "SCION Task Force autonomous worker template"
+agent_instructions: "agents.md"
+system_prompt: "system-prompt.md"

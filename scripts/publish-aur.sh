@@ -189,7 +189,8 @@ main() {
     fi
 
     if [[ ${#extras_deps[@]} -gt 0 ]]; then
-        local deps_str=$(IFS=' '; echo "${extras_deps[*]}")
+        local deps_str
+        deps_str=$(IFS=' '; echo "${extras_deps[*]}")
         sed -i "s|^depends=.*|depends=($deps_str)|" "$extras_pkgbuild"
     fi
     push_to_aur "ticket-extras" "$REPO_ROOT/pkg/aur/ticket-extras" || failed+=("ticket-extras")

@@ -663,6 +663,13 @@ def send_feedback_to_worker(
     update_ticket_frontmatter(t_path, status="in_progress")
     ticket = parse_ticket_file(t_path, project_dir=project_dir)
 
+    # Also strip review_tag from the isolated workspace copy so reconcile doesn't re-merge and immediately re-pause
+    workspace = provider.workspace_path(project_dir, ticket.id)
+    if workspace:
+        worker_ticket = workspace / ".tickets" / t_path.name
+        if worker_ticket.is_file():
+            remove_ticket_tag(worker_ticket, review_tag)
+
     proj_str = normalize_project_dir(project_dir)
     wkey = _worker_key(proj_str, ticket.id)
     workers: dict[str, dict[str, Any]] = state.setdefault("workers", {})

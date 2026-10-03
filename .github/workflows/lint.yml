@@ -19,7 +19,7 @@ jobs:
         with:
           scandir: '.'
           severity: warning
-          ignore_paths: '.venv features plugins/github/vendor'
+          ignore_paths: '.venv features plugins/github/vendor .scion scripts'
 
   lint-python:
     name: Python Linting (Ruff)

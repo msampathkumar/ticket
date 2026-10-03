@@ -26,3 +26,12 @@ include = ["tk_webui*"]
 
 [tool.setuptools.package-data]
 tk_webui = ["static/*", "static/**/*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+

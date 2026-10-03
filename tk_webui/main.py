@@ -1,39 +1,40 @@
-import os
 import argparse
+import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List
+
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Body
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from .models import (
+    DirectoryBrowseItem,
     DirectoryCheckResponse,
     Ticket,
-    TicketCreateRequest,
-    TicketUpdateRequest,
-    TicketStatusUpdateRequest,
     TicketAddNoteRequest,
+    TicketCreateRequest,
     TicketDependencyRequest,
     TicketLinkRequest,
-    DirectoryBrowseItem,
+    TicketStatusUpdateRequest,
+    TicketUpdateRequest,
 )
 from .tk_cli import (
+    add_dep_cli,
+    add_global_project,
+    add_link_cli,
+    add_note_cli,
+    browse_path,
+    create_ticket_cli,
     find_tickets_dir,
     get_all_tickets,
-    create_ticket_cli,
+    get_global_projects,
+    init_tickets_dir,
+    remove_dep_cli,
+    remove_link_cli,
     update_ticket_content_cli,
     update_ticket_status_cli,
-    add_note_cli,
-    add_dep_cli,
-    remove_dep_cli,
-    add_link_cli,
-    remove_link_cli,
-    init_tickets_dir,
-    browse_path,
-    get_global_projects,
-    add_global_project,
 )
 
 app = FastAPI(title="tk Web UI", version="0.1.0")
@@ -266,7 +267,14 @@ Thank you for using tk! If you find it helpful, please star the repo or contribu
 
 def main():
     import sys
-    from .server import DEFAULT_PORT, start_server, stop_server, status_server, restart_server
+
+    from .server import (
+        DEFAULT_PORT,
+        restart_server,
+        start_server,
+        status_server,
+        stop_server,
+    )
 
     if "--tk-describe" in sys.argv:
         print("tk-plugin: Interactive Kanban Web UI & PR review dashboard")
@@ -302,7 +310,7 @@ def main():
         server_parser = argparse.ArgumentParser(prog=f"{prog_name} server", add_help=False)
         server_parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Target repository directory")
         server_parser.add_argument("--host", default="127.0.0.1", help="Host address")
-        server_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Port number")
+        server_parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port number")
 
         if action in ("--help", "-h", "help"):
             print_help(prog_name)
@@ -328,7 +336,7 @@ def main():
         parser = argparse.ArgumentParser(prog=prog_name, add_help=False)
         parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Initial directory to open")
         parser.add_argument("--host", default="127.0.0.1", help="Host address")
-        parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Port number")
+        parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port number")
         parser.add_argument("--reload", action="store_true", help="Auto-reload on code change")
         parser.add_argument("--help", "-h", action="store_true", help="Help")
         parser.add_argument("--version", "-v", action="store_true", help="Version")

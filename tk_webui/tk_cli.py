@@ -1,13 +1,14 @@
-import os
 import json
+import os
 import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
+
 import yaml
 
-from .models import Ticket, NoteItem, DirectoryBrowseItem
+from .models import DirectoryBrowseItem, NoteItem, Ticket
 
 
 def find_tk_binary() -> str:
@@ -165,7 +166,7 @@ def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
         tags=tags,
         created=created,
         deps=[str(d) for d in deps],
-        links=[str(l) for l in links],
+        links=[str(lnk) for lnk in links],
         parent=parent,
         external_ref=external_ref,
         description=description,
