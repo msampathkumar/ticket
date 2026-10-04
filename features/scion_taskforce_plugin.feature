@@ -53,7 +53,7 @@ Feature: SCION Task Force Plugin
   Scenario: Init wizard offers menus, validates input and saves Vertex AI project and region
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
-    When I run "printf '3\nclaude\nopencode\n\n2\nBad_Proj\nmy-proj-123\neu-central1\n4\n\n9\n1\ny\nn\n' | GOOGLE_CLOUD_PROJECT=tk-detected-proj ticket scion-taskforce init --interactive"
+    When I run "printf '3\nclaude\nopencode\n\n2\nBad_Proj\nmy-proj-123\neu-central1\n4\n\n9\n1\n\n2\ny\nn\n' | GOOGLE_CLOUD_PROJECT=tk-detected-proj ticket scion-taskforce init --interactive"
     Then the command should succeed
     And the output should contain "Other (type a value)"
     And the output should contain "'claude' is not installed"
@@ -69,14 +69,16 @@ Feature: SCION Task Force Plugin
   Scenario: Init wizard defaults to gemini-cli with API-key auth and the standard worker template
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
-    When I run "printf '\n\n\n\ny\nn\n' | ticket scion-taskforce init --interactive"
+    When I run "printf '\n\n\n\n\n2\ny\nn\n' | ticket scion-taskforce init --interactive"
     Then the command should succeed
+    And the output should contain "7. Privacy"
+    And the output should contain "8. agent-team role templates"
     And the output should contain "recommended: API-key auth"
     And the output should contain "skipped; gemini-cli authenticates with the GEMINI_API_KEY Scion secret"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "api-key"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "tk-worker-gemini-cli-with-api-key-auth"
     And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/scion-agent.yaml" should contain "agent_instructions: agents.md"
-    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "Commit on your ticket branch only"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "Git is optional: never run `git init`"
 
   Scenario: test verifies the task force through a real ticket and closes it
     Given a clean tickets directory
@@ -120,6 +122,84 @@ Feature: SCION Task Force Plugin
     And the output should contain "tk init: Initialized ticket repository"
     And the output should contain "Initialization successful"
 
+  Scenario: In a git repo, .scion/agents/ goes to .git/info/exclude, never to .gitignore
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the project is a git repository
+    And a file ".scion/settings.yaml" with content "schema_version: '1'"
+    When I run "ticket scion-taskforce init"
+    Then the command should succeed
+    And the output should contain "auto-fix: added `/.scion/agents/`"
+    And the file ".git/info/exclude" should contain "/.scion/agents/"
+    And the file ".gitignore" should not exist
+    When I run "ticket scion-taskforce init"
+    Then the output should not contain "auto-fix"
+
+  Scenario: A folder that becomes a git repo after init still dispatches, and status shows the auto-fix
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0005" and title "Git arrives later"
+    And ticket "tf-0005" has tags "taskforce"
+    When I run "ticket scion-taskforce init"
+    Then the output should not contain "auto-fix"
+    Given the project is a git repository
+    When I run "ticket scion-taskforce dispatch tf-0005"
+    Then the command should succeed
+    And the file ".git/info/exclude" should contain "/.scion/agents/"
+    When I run "ticket scion-taskforce status"
+    Then the output should contain "Settings:  worker.git=off, worker.privacy=confidential, roles: none"
+    And the output should contain "Needs you: nothing"
+    And the output should contain "Automatic actions (latest 5):"
+    And the output should contain "auto-fix: added `/.scion/agents/`"
+
+  Scenario: templates install vendors agent-team roles with the tk contract
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a local agent-team mirror at "mirror"
+    When I run "ticket scion-taskforce init"
+    And I run "ticket scion-taskforce templates install developer --from mirror"
+    Then the command should succeed
+    And the output should contain "tk-developer: installed, 2 skill(s) vendored; dropped: gcs-artifact-publishing"
+    And the file ".scion/templates/tk-developer/agents.md" should contain "tk contract (wins over the role guidance below)"
+    And the file ".scion/templates/tk-developer/agents.md" should contain "Commit and push per logical phase"
+    And the file ".scion/templates/tk-developer/skills/code-review/SKILL.md" should contain "name: code-review"
+    And the file ".scion/templates/tk-developer/skills/code-simplification/LICENSE" should contain "MIT License"
+    And the file ".scion/templates/tk-developer/skills/gcs-artifact-publishing/SKILL.md" should not exist
+    And the file ".scion/templates/tk-developer/scion-agent.yaml" should not contain "uri:"
+    And the file ".scion/templates/tk-developer/UPSTREAM.md" should contain "dropped: publishes public links"
+    And the file ".scion/templates/tk-developer/LICENSE" should contain "Apache License"
+    When I run "ticket scion-taskforce templates install developer --from mirror"
+    Then the output should contain "tk-developer: kept"
+    When I run "ticket scion-taskforce templates install ghost --from mirror"
+    Then the command should fail
+    And the output should contain "unknown role(s): ghost. Available: developer"
+    When I run "ticket scion-taskforce templates list"
+    Then the output should contain "developer"
+    When I run "ticket scion-taskforce uninit --yes"
+    Then the file ".scion/templates/tk-developer/agents.md" should not exist
+
+  Scenario: A role tag runs the worker on its role template
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a local agent-team mirror at "mirror"
+    And a ticket exists with ID "tf-0007" and title "Developer role"
+    And ticket "tf-0007" has tags "taskforce, role:developer"
+    When I run "ticket scion-taskforce init"
+    And I run "ticket scion-taskforce templates install developer --from mirror"
+    And I run "ticket scion-taskforce dispatch tf-0007"
+    Then the command should succeed
+    And the fake scion start for "tf-0007" should include "-t tk-developer"
+
+  Scenario: A role tag without an installed template falls back to the default worker with a note
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0006" and title "Ghost role"
+    And ticket "tf-0006" has tags "taskforce, role:ghost"
+    When I run "ticket scion-taskforce dispatch tf-0006"
+    Then the command should succeed
+    And ticket "tf-0006" should contain "role `ghost` has no template in this project; using the default worker"
+    And the fake scion start for "tf-0006" should not include "tk-ghost"
+
   Scenario: Task force is opt-in - only tickets the user tagged taskforce are dispatched
     Given a clean tickets directory
     And a ticket exists with ID "tf-0001" and title "Opted-in task"
@@ -158,7 +238,9 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0011" should have field "status" with value "open"
     And ticket "tf-0012" should have field "status" with value "open"
     When I run "ticket scion-taskforce status"
-    Then the output should contain "provider unavailable: scion list exited 125: Error: podman ps failed"
+    Then the output should contain "Provider:  unavailable"
+    And the output should contain "Needs you:"
+    And the output should contain "- scion list exited 125: Error: podman ps failed"
     When I run "ticket scion-taskforce logs"
     Then the output should contain "Provider runtime UNAVAILABLE"
 
@@ -289,24 +371,47 @@ Feature: SCION Task Force Plugin
     Then the command should succeed
     And the output should contain "started=2"
     And the fake scion prompt for "tf-0071" should contain "Your Job: Pull-Request Review"
-    And the fake scion prompt for "tf-0071" should contain "gh pr checkout 2246"
-    And the fake scion prompt for "tf-0071" should contain "never approve/merge"
+    And the fake scion prompt for "tf-0071" should contain "gh pr diff 2246"
+    And the fake scion prompt for "tf-0071" should contain "Do not check out the PR branch"
+    And the fake scion prompt for "tf-0071" should not contain "gh pr comment"
     And the fake scion prompt for "tf-0071" should not contain "Your Job: Implementation"
     And the fake scion prompt for "tf-0072" should contain "Your Job: Implementation"
     And the fake scion prompt for "tf-0072" should contain "tk` may NOT be installed in this pod"
     And the fake scion prompt for "tf-0072" should contain "tags: [taskforce, waiting-for-review]"
-    And the fake scion prompt for "tf-0072" should contain "do NOT push, merge, rebase onto other branches, or `git stash`"
+    And the fake scion prompt for "tf-0072" should contain "Git is optional here. Do not change git state"
+    And the fake scion prompt for "tf-0072" should contain "Do not commit; list the files you changed"
+    And the fake scion prompt for "tf-0072" should contain "Confidentiality (this project is confidential)"
+    And the fake scion start for "tf-0072" should not include "--branch"
+
+  Scenario: worker.git branch and worker.privacy standard restore branch commits and PR comments
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the scion-taskforce setting "watcher.max_concurrent_per_project" is "2"
+    And the scion-taskforce setting "worker.git" is "branch"
+    And the scion-taskforce setting "worker.privacy" is "standard"
+    And a ticket exists with ID "tf-0073" and title "Review: add retry to client"
+    And ticket "tf-0073" has tags "pr, taskforce"
+    And ticket "tf-0073" has external ref "gh-pr-2246"
+    And a ticket exists with ID "tf-0074" and title "Implement retry in client"
+    And ticket "tf-0074" has tags "taskforce"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "started=2"
+    And the fake scion prompt for "tf-0073" should contain "gh pr checkout 2246"
+    And the fake scion prompt for "tf-0073" should contain "never approve/merge"
+    And the fake scion prompt for "tf-0074" should contain "do NOT push, merge, rebase onto other branches, or"
+    And the fake scion prompt for "tf-0074" should not contain "Confidentiality"
+    And the fake scion start for "tf-0074" should include "--branch tf-0074"
 
   Scenario: A custom worker.prompt_file template overrides the built-in brief
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
     And the scion-taskforce setting "worker.prompt_file" is ".tickets/worker-prompt.md"
-    And a file ".tickets/worker-prompt.md" with content "CUSTOM BRIEF for {ticket_id} ({work_type}) on {branch}: {ticket_title}"
+    And a file ".tickets/worker-prompt.md" with content "CUSTOM BRIEF for {ticket_id} ({work_type}): {ticket_title}"
     And a ticket exists with ID "tf-0075" and title "Custom prompt ticket"
     And ticket "tf-0075" has tags "taskforce"
     When I run "ticket scion-taskforce dispatch tf-0075"
     Then the command should succeed
-    And the fake scion prompt for "tf-0075" should contain "CUSTOM BRIEF for tf-0075 (implement) on tf-0075: Custom prompt ticket"
+    And the fake scion prompt for "tf-0075" should contain "CUSTOM BRIEF for tf-0075 (implement): Custom prompt ticket"
     And the fake scion prompt for "tf-0075" should not contain "Your Job"
 
   Scenario: A Scion model alias is resolved before start so resumed workers keep a valid model
@@ -504,7 +609,8 @@ Feature: SCION Task Force Plugin
     And I run "ticket update tf-0201 --tags taskforce"
     Then the command should succeed
     And ticket "tf-0201" should contain "Task Force:** request noted; no existing worker found"
-    And ticket "tf-0201" should contain "started Scion worker `tf-0201` on branch `tf-0201`"
+    And ticket "tf-0201" should contain "started Scion worker `tf-0201`."
+    And the fake scion start for "tf-0201" should not include "--branch"
     And ticket "tf-0201" should have field "status" with value "in_progress"
     And the fake scion runtime should have 1 pod(s)
 
@@ -567,7 +673,7 @@ Feature: SCION Task Force Plugin
     And I run "ticket update tf-0232 --tags taskforce"
     Then the fake scion runtime should have 1 pod(s)
     When I run "ticket update tf-0232 --tags docs"
-    Then ticket "tf-0232" should contain "`taskforce` tag removed; stopped and removed worker `tf-0232` (branch `tf-0232` kept)"
+    Then ticket "tf-0232" should contain "`taskforce` tag removed; stopped and removed worker `tf-0232`."
     And the fake scion runtime should have 0 pod(s)
 
   Scenario: Adding the no-taskforce tag stops and removes the worker

@@ -40,6 +40,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "gc_retention_days": 5,
     },
     "worker": {
+        "git": "off",
+        "privacy": "confidential",
         "prompt_file": "",
         "review_tags": ["pr", "review"],
         "review_ref_prefixes": ["gh-pr-"],
@@ -101,6 +103,12 @@ watcher:
 #    pull-request tickets (e.g. synced by `tk github sync --prs`). Both explain how to
 #    report back even when `tk` is not installed inside the pod.
 worker:
+  git: "off"                      # off: workers never change git state (no init/commit/checkout/push); they
+                                  #   leave changes in the working tree and list them. Works in plain folders.
+                                  # branch: workers commit on the ticket branch (never push). Git repos only.
+  privacy: "confidential"         # confidential: the brief forbids uploads, public links, pushes and PR
+                                  #   comments; `templates install` drops publishing skills.
+                                  # standard: no extra restrictions.
   prompt_file: ""                 # Optional path to a custom prompt template. Placeholders:
                                   # {ticket_id} {project_dir} {branch} {ticket_details} {work_type}
                                   # {claim_tag} {review_tag} {external_ref} {ticket_title}
@@ -117,7 +125,7 @@ provider:
                                   # model ID at start so resumed workers keep a valid model; blank = harness default
   gcp_project: ""                 # Vertex AI project (GOOGLE_CLOUD_PROJECT); blank = inherit from env
   gcp_region: ""                  # Vertex AI location, e.g. europe-west3 or global; blank = env or fallback
-  branch_prefix: ""               # Optional git branch prefix (default: <ticket-id>)
+  branch_prefix: ""               # Branch prefix for worker.git: branch (default branch: <ticket-id>)
   extra_start_args: ["--harness-auth", "api-key"] # gemini-cli: GEMINI_API_KEY (Scion secret); other harnesses: vertex-ai
   extra_resume_args: []           # Additional flags passed to 'scion resume'
 
@@ -317,13 +325,13 @@ WORKER_TEMPLATE_FILES = {
 # Pairs with harness `gemini-cli` + `--harness-auth api-key` (set in scion-taskforce.yaml), the setup
 # proven by a hand-made Scion agent. Per Scion's template rules, harness/harness_config are NOT set here.
 schema_version: "1"
-description: "tk task force worker: implements one tk ticket on its own branch, then reports back for review"
+description: "tk task force worker: works on one tk ticket, then reports back in the ticket for review"
 agent_instructions: agents.md
 system_prompt: system-prompt.md
 """,
     "agents.md": """# tk Task Force Worker
 
-You own exactly one `tk` ticket. Its ID, branch and full details are in your task prompt.
+You own exactly one `tk` ticket. Its ID and full details are in your task prompt.
 
 ## Work
 1. Read the ticket and its acceptance criteria before changing anything.
@@ -335,9 +343,9 @@ You own exactly one `tk` ticket. Its ID, branch and full details are in your tas
   `.tickets/<id>.md` (use `tk add-note <id> "..."` when `tk` is installed).
 - Add the review tag named in your task prompt (default `waiting-for-review`), then stop. Review feedback arrives as a new note.
 
-## Git
-- Commit on your ticket branch only. Do not push, merge, rebase onto other branches or `git stash`;
-  the checkout may be shared with a human.
+## Git and confidentiality
+- Follow the git and confidentiality rules in your task prompt. Git is optional: never run `git init`.
+- Never push. The checkout may be shared with a human.
 """,
     "system-prompt.md": """# Software Engineer (tk Task Force)
 
@@ -348,14 +356,29 @@ changes over broad rewrites, state assumptions explicitly, and report honestly w
 
 
 def seed_project_scion_template(project_dir: Path, force: bool = False) -> Path:
-    """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/. Existing files are kept unless ``force``."""
+    """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/. Existing files are kept unless ``force``,
+    except that the pre-2026-10 git section of agents.md is replaced in place (other edits are kept)."""
     tmpl_dir = project_dir / ".scion" / "templates" / WORKER_TEMPLATE
     tmpl_dir.mkdir(parents=True, exist_ok=True)
     for name, content in WORKER_TEMPLATE_FILES.items():
         target = tmpl_dir / name
         if force or not target.exists():
             target.write_text(content, encoding="utf-8")
+    agents = tmpl_dir / "agents.md"
+    text = agents.read_text(encoding="utf-8")
+    if _OLD_GIT_SECTION in text:
+        text = text.replace(_OLD_GIT_SECTION + _OLD_GIT_EXTRA, _OLD_GIT_SECTION).replace(_OLD_GIT_SECTION, _NEW_GIT_SECTION)
+        agents.write_text(text, encoding="utf-8")
     return tmpl_dir
+
+
+# deprecated: git section seeded before worker.git existed (it told workers to commit); remove after 2027-01-01
+_OLD_GIT_SECTION = """## Git
+- Commit on your ticket branch only. Do not push, merge, rebase onto other branches or `git stash`;
+  the checkout may be shared with a human.
+"""
+_OLD_GIT_EXTRA = "- If the workspace is not a git repository, never run `git init`: skip committing and say so in your report.\n"
+_NEW_GIT_SECTION = "## Git and confidentiality" + WORKER_TEMPLATE_FILES["agents.md"].split("## Git and confidentiality", 1)[1]
 
 
 def set_yaml_value(text: str, section: str, key: str, value: str) -> str:
@@ -386,6 +409,7 @@ def _answer_values(answers: dict[str, Any]) -> dict[tuple[str, str], str]:
     auth = "api-key" if answers["harness"] == "gemini-cli" else "vertex-ai"
     return {
         ("tags", "claim"): str(answers["claim_tag"]),
+        ("worker", "privacy"): f'"{answers.get("privacy", "confidential")}"',
         ("watcher", "max_concurrent_per_project"): str(answers["max_concurrent"]),
         ("provider", "harness_config"): f'"{answers["harness"]}"',
         ("provider", "model"): f'"{answers["model"]}"',
@@ -440,8 +464,10 @@ def uninit_config(
     if scion_dir.is_dir():
         shutil.rmtree(scion_dir)
         removed_any = True
-    for name in (WORKER_TEMPLATE, *LEGACY_TEMPLATES):
-        tmpl_dir = base_dir / ".scion" / "templates" / name
+    tmpl_root = base_dir / ".scion" / "templates"
+    # Generated role templates carry an UPSTREAM.md marker; hand-made templates are left alone.
+    role_dirs = [m.parent for m in tmpl_root.glob("tk-*/UPSTREAM.md")]
+    for tmpl_dir in [tmpl_root / n for n in (WORKER_TEMPLATE, *LEGACY_TEMPLATES)] + role_dirs:
         if tmpl_dir.is_dir():
             shutil.rmtree(tmpl_dir)
             removed_any = True

@@ -1121,6 +1121,12 @@ def step_file_with_content(context, rel_path, content):
     path.write_text(content + "\n")
 
 
+@given(r'the project is a git repository')
+def step_project_is_git_repo(context):
+    """`git init` the scenario sandbox."""
+    subprocess.run(['git', 'init', '-q', context.test_dir], check=True)
+
+
 @given(r'the file "(?P<rel_path>[^"]+)" is deleted')
 def step_file_deleted(context, rel_path):
     """Remove a file inside the scenario sandbox (simulates `rm`, which fires no tk hook)."""
@@ -1153,3 +1159,44 @@ def step_help_commands_in_doc(context, rel_path):
     prefix = context.stdout.split(" - ", 1)[0].removeprefix("tk-") + " "
     missing = [s for s in syntax if (s if s.startswith("tk ") else prefix + s) not in doc]
     assert not missing, f"{rel_path} is missing these help lines: {missing}"
+
+
+@then(r'the fake scion start for "(?P<name>[^"]+)" should not include "(?P<text>[^"]+)"')
+def step_fake_scion_start_args_not(context, name, text):
+    """Assert the argv of the last `start <name>` does not contain ``text``."""
+    log = Path(os.environ['FAKE_SCION_STATE'] + '.start_args')
+    calls = [json.loads(ln) for ln in (log.read_text().splitlines() if log.exists() else []) if ln.strip()]
+    argv = [" ".join(c["args"]) for c in calls if c["name"] == name]
+    assert argv and text not in argv[-1], f"Did not expect {text!r} in start args for {name}, got: {argv}"
+
+
+@given(r'a local agent-team mirror at "(?P<rel_path>[^"]+)"')
+def step_agent_team_mirror(context, rel_path):
+    """A minimal <owner>/<repo>/ mirror for `templates install --from`: one `developer` role that
+    references an agent-team skill, a publishing skill and a third-party skill."""
+    root = Path(context.test_dir) / rel_path
+    team = root / 'scion-frontiers' / 'agent-team'
+    files = {
+        team / 'LICENSE': 'Apache License 2.0\n',
+        team / 'templates' / 'developer' / 'scion-agent.yaml': (
+            'schema_version: "1"\n'
+            'description: "Developer — implements features"\n'
+            'agent_instructions: agents.md\n'
+            'system_prompt: system-prompt.md\n'
+            'skills:\n'
+            '  - uri: "gh://scion-frontiers/agent-team/code-review"\n'
+            '  - uri: "gh://scion-frontiers/agent-team/gcs-artifact-publishing"\n'
+            '  - uri: "gh://addyosmani/agent-skills/code-simplification"\n'
+        ),
+        team / 'templates' / 'developer' / 'agents.md': '## Role: Developer\n\nCommit and push per logical phase.\n',
+        team / 'templates' / 'developer' / 'system-prompt.md': '# Developer\n',
+        team / 'skills' / 'code-review' / 'SKILL.md': '---\nname: code-review\ndescription: review\n---\n',
+        team / 'skills' / 'gcs-artifact-publishing' / 'SKILL.md': '---\nname: gcs-artifact-publishing\ndescription: x\n---\n',
+        root / 'addyosmani' / 'agent-skills' / 'LICENSE': 'MIT License\n',
+        root / 'addyosmani' / 'agent-skills' / 'skills' / 'code-simplification' / 'SKILL.md': (
+            '---\nname: code-simplification\ndescription: simplify\n---\n'
+        ),
+    }
+    for path, text in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)

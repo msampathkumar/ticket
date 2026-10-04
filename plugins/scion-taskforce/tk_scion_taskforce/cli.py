@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -31,6 +33,13 @@ from tk_scion_taskforce.events import (
     uninstall_hook,
 )
 from tk_scion_taskforce.providers.scion import ScionProvider
+from tk_scion_taskforce.roles import (
+    DEFAULT_ROLES,
+    UPSTREAM_REF,
+    RoleInstallError,
+    install_roles,
+    installed_roles,
+)
 from tk_scion_taskforce.state import StateError, known_projects, load_state, normalize_project_dir, state_lock
 from tk_scion_taskforce.telemetry import TelemetryManager, new_trace_id, project_slug
 from tk_scion_taskforce.tickets import find_tk_binary, parse_ticket_file, resolve_ticket_path
@@ -43,7 +52,9 @@ from tk_scion_taskforce.wizard import (
 )
 from tk_scion_taskforce.workers import (
     _worker_key,
+    git_mode,
     pause_worker_for_ticket,
+    privacy_level,
     project_lock,
     run_gc,
     send_feedback_to_worker,
@@ -62,7 +73,8 @@ in the background. For a ticket YOU tagged `taskforce`:
 - worker reports back (`waiting-for-review`): worker paused, next queued ticket starts
 - ticket closed: worker stopped, next queued ticket starts
 - tag removed, `no-taskforce` added or ticket file deleted: worker stopped and deleted (branch kept)
-`gc` deletes the workers of tickets closed more than 5 days ago.
+`gc` deletes the workers of tickets closed more than 5 days ago. A `role:<name>` tag runs the
+worker on the role template `tk-<name>` (see `templates`).
 
 Setup:
   init [--global] [--force] [--defaults|--interactive]
@@ -71,6 +83,10 @@ Setup:
                                    .scion-taskforce/, the worker template and the save hook; asks first unless --yes
   hook install|uninstall|status    Manage the tk post-write hook for this project
   test [--timeout <s>] [--keep]    Create a ticket tagged init+taskforce, wait for its worker to report back
+  templates install [<role>...] [--force] [--from <dir>] [--ref <sha>]
+                                   Install agent-team role templates (default set) into .scion/templates/,
+                                   skills vendored, pinned to a commit; --from uses a local <owner>/<repo>/ mirror
+  templates list                   Installed role templates and their sources
 
 Dispatch:
   on-save <id> [--event <e>]       Handle one ticket save (called by the hook)
@@ -79,7 +95,8 @@ Dispatch:
   dispatch <id>                    Start a worker for one ready, opted-in ticket now (ignores the worker limit)
 
 Workers:
-  status                           Save hook, provider health and workers for this project
+  status                           Settings, save hook, provider health, workers, what needs you and
+                                   the automatic actions taken for this project
   list | ps                        List all tracked workers across projects
   feedback <id> "<msg>"            Wake the ticket's active worker with a review note, remove waiting-for-review
   attach <id>                      Attach interactively to worker <id>
@@ -190,7 +207,7 @@ def _ensure_runtime_project(project_dir: Path, explicit_config: str | None = Non
 SMOKE_TITLE = "Task force check: report your setup"
 SMOKE_BODY = """Created by `tk scion-taskforce test` to verify the task force end to end. Do not change any file except this ticket.
 
-1. Add a note to this ticket with: the harness and model you run on, the output of `git branch --show-current`, and the output of `ls | head -10`.
+1. Add a note to this ticket with: the harness and model you run on, whether the workspace is a git repository, and the output of `ls | head -10`. Do not change git state.
 2. Add the `{review_tag}` tag to this ticket, then stop.
 """
 
@@ -293,6 +310,8 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
         "gcp_region": "",  # non-interactive: keep the shell's region (or the harness fallback)
         "claim_tag": "taskforce",
         "max_concurrent": 1,
+        "privacy": "confidential",
+        "roles": "none",  # non-interactive: no download; `templates install` adds roles later
     }
     if is_interactive:
         answers["gcp_project"] = _detect_default_gcp_project()
@@ -329,6 +348,9 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
         _ensure_runtime_project(project_dir)
         hook = install_hook(project_dir)
         print(f"🪝 Save hook:  `{hook}` (ticket saves now trigger the task force)")
+        if is_interactive and answers.get("roles", "none") != "none":
+            chosen = None if answers["roles"] == "recommended" else [r.strip() for r in answers["roles"].split(",")]
+            _install_roles_report(project_dir, chosen, str(answers.get("privacy", "confidential")))
     print(f"✅ Initialization successful! Tag a ready ticket `{answers['claim_tag']}` to hand it to the task force.")
 
     if is_interactive:
@@ -344,6 +366,53 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
 
     return 0
 
+
+
+def _install_roles_report(
+    project_dir: Path, roles: list[str] | None, privacy: str, mirror: Path | None = None,
+    ref: str = UPSTREAM_REF, force: bool = False,
+) -> int:
+    print(f"🧩 Role templates: fetching {', '.join(roles or DEFAULT_ROLES)} ({'local mirror' if mirror else 'GitHub'})...")
+    try:
+        results = install_roles(project_dir, roles, privacy=privacy, mirror=mirror, ref=ref, force=force)
+    except RoleInstallError as exc:
+        print(f"⚠️  Role templates not installed: {exc}\n   Retry with `tk scion-taskforce templates install`.")
+        return 1
+    for r in results:
+        if r.action == "kept":
+            print(f"   = {r.template_dir.name}: kept (use --force to regenerate)")
+            continue
+        dropped = f"; dropped: {', '.join(r.dropped)}" if r.dropped else ""
+        print(f"   ✓ {r.template_dir.name}: {r.action}, {len(r.skills)} skill(s) vendored{dropped}")
+    print("   Sources and licences: UPSTREAM.md in each folder. Tag a ticket `role:<name>` to use one.")
+    return 0
+
+
+def cmd_templates(args: list[str], project_dir: Path, explicit_config: str | None) -> int:
+    action = args[0] if args else "list"
+    if action == "list":
+        found = installed_roles(project_dir)
+        if not found:
+            print("No role templates installed. Run `tk scion-taskforce templates install`.")
+        for role, source in found:
+            print(f"  {role:<18} tk-{role:<20} {source}")
+        print(f"Default set: {', '.join(DEFAULT_ROLES)}")
+        return 0
+    if action != "install":
+        print("Usage: tk scion-taskforce templates install [<role>...] [--force] [--from <dir>] [--ref <sha>] | list",
+              file=sys.stderr)
+        return 1
+    rest = args[1:]
+    value_flags = ("--from", "--ref")
+    roles = [a for i, a in enumerate(rest) if not a.startswith("-") and (i == 0 or rest[i - 1] not in value_flags)]
+    mirror = _flag_value(rest, ("--from",), "")
+    cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
+    return _install_roles_report(
+        project_dir, roles or None, privacy_level(cfg),
+        mirror=Path(mirror).expanduser().resolve() if mirror else None,
+        ref=_flag_value(rest, ("--ref",), UPSTREAM_REF),
+        force="--force" in rest or "-f" in rest,
+    )
 
 
 def cmd_uninit(args: list[str], project_dir: Path, explicit_config: str | None, dry_run: bool) -> int:
@@ -459,19 +528,52 @@ def cmd_list(project_dir: Path, explicit_config: str | None) -> int:
 
 def cmd_status(project_dir: Path, explicit_config: str | None) -> int:
     proj = normalize_project_dir(project_dir)
+    cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
     hook = hook_path(project_dir)
+    roles = ", ".join(r for r, _ in installed_roles(project_dir)) or "none"
     print(f"Project:   {proj}")
+    print(f"Settings:  worker.git={git_mode(cfg)}, worker.privacy={privacy_level(cfg)}, roles: {roles}")
     print(f"Save hook: {'✅ installed' if hook.exists() else '❌ not installed (run `tk scion-taskforce hook install`)'}")
     state = load_state()
+    needs: list[str] = []
     health = state.get("project_health", {}).get(proj)
     if health:
-        label = "ok" if health.get("ok") else f"provider unavailable: {health.get('message', '')}"
+        label = "ok" if health.get("ok") else "unavailable"
         print(f"Provider:  {label} (checked {health.get('checked_at', '?')})")
+        if not health.get("ok"):
+            needs.append(str(health.get("message", "")).splitlines()[0][:200])
+    if privacy_level(cfg) == "confidential":
+        endpoint = ScionProvider(cfg).hub_endpoint(proj)
+        if endpoint and not re.match(r"^https?://(127\.0\.0\.1|localhost|\[::1\])(:|/|$)", endpoint):
+            needs.append(f"Hub endpoint {endpoint} is not local; this confidential project's prompts go there")
     mine = [w for w in state.get("workers", {}).values() if w.get("project_dir") == proj]
     print(f"Workers:   {len(mine)}")
     for w in sorted(mine, key=lambda x: str(x.get("ticket_id", ""))):
         print(f"  {str(w.get('ticket_id', '')):<14} {str(w.get('state', 'unknown')):<10}")
+        if w.get("state") == "error" and w.get("error"):
+            needs.append(f"{w.get('ticket_id')}: {str(w['error']).splitlines()[0][:160]}")
+    print("Needs you:" + ("" if needs else " nothing"))
+    for item in needs:
+        print(f"  - {item}")
+    actions = _automatic_actions(cfg, proj)
+    print("Automatic actions (latest 5):" + ("" if actions else " none"))
+    for line in actions[-5:]:
+        print(f"  {line}")
     return 0
+
+
+def _automatic_actions(cfg: dict[str, Any], proj: str) -> list[str]:
+    """Log records flagged ``autofix`` for this project, as ``<timestamp> <message>``."""
+    out = []
+    for raw in TelemetryManager(cfg).read_logs(limit=5000):
+        try:
+            rec = json.loads(raw)
+        except ValueError:
+            continue
+        attrs = rec.get("attributes") or {}
+        if attrs.get("autofix") and attrs.get("project") == proj:
+            out.append(f"{rec.get('timestamp', '?')} {rec.get('message', '')}")
+    return out
 
 
 def cmd_feedback(
@@ -759,6 +861,9 @@ def _main(argv: list[str] | None = None) -> int:
 
     if subcmd == "uninit":
         return cmd_uninit(subargs, project_dir, explicit_config, dry_run)
+
+    if subcmd == "templates":
+        return cmd_templates(subargs, project_dir, explicit_config)
 
     if subcmd == "hook":
         return cmd_hook(subargs, project_dir)

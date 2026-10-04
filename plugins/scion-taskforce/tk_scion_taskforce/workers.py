@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from tk_scion_taskforce.providers.scion import ScionProvider
+from tk_scion_taskforce.roles import role_template_for
 from tk_scion_taskforce.state import get_state_dir, normalize_project_dir, save_state
 from tk_scion_taskforce.telemetry import (
     TelemetryManager,
@@ -30,6 +31,7 @@ from tk_scion_taskforce.tickets import (
     run_tk_show,
     update_ticket_frontmatter,
 )
+from tk_scion_taskforce.wizard import ensure_scion_agents_ignored
 
 NOTE_PREFIX = "**Task Force:**"
 FEEDBACK_PREFIX = "**Review Feedback:**"
@@ -104,7 +106,46 @@ def _pr_number_from_ref(external_ref: str) -> str:
     return tail if tail.isdigit() else ""
 
 
-def _reporting_protocol(ticket: TicketInfo, claim_tag: str, review_tag: str) -> str:
+def git_mode(config: dict[str, Any]) -> str:
+    """``worker.git``: ``off`` (default; no commits, git optional) or ``branch`` (commit on the ticket branch)."""
+    mode = str((config.get("worker") or {}).get("git", "off")).strip().lower()
+    return mode if mode in ("off", "branch") else "off"
+
+
+def privacy_level(config: dict[str, Any]) -> str:
+    """``worker.privacy``: ``confidential`` (default) or ``standard``."""
+    level = str((config.get("worker") or {}).get("privacy", "confidential")).strip().lower()
+    return level if level in ("standard", "confidential") else "confidential"
+
+
+def _git_rules(mode: str, branch: str) -> str:
+    if mode == "branch":
+        return (
+            f"- Commit your work on branch `{branch}`; do NOT push, merge, rebase onto other branches, or\n"
+            "  `git stash`: this checkout is shared with the human operator.\n"
+            "- If the workspace is not a git repository, never run `git init`; skip committing and say so.\n"
+        )
+    return (
+        "- Git is optional here. Do not change git state: no `git init`, `commit`, `checkout`, `switch`,\n"
+        "  `branch`, `stash`, `reset` or `push`. Read-only commands (`status`, `diff`, `log`) are fine.\n"
+        "- Leave your changes in the working tree and list every changed file in your report; the human\n"
+        "  reviews and commits them.\n"
+    )
+
+
+def _privacy_rules(level: str) -> str:
+    if level != "confidential":
+        return ""
+    return (
+        "\n### Confidentiality (this project is confidential)\n"
+        "- Do not upload, publish or share project content: no public links, gists, pastebins, artifact\n"
+        "  buckets or external services other than the model API you run on.\n"
+        "- Do not push to any remote and do not post comments on external systems.\n"
+        "- Keep secrets, credentials and customer data out of ticket notes and reports.\n"
+    )
+
+
+def _reporting_protocol(ticket: TicketInfo, claim_tag: str, review_tag: str, git_rules: str) -> str:
     rel_path = f".tickets/{ticket.path.name}"
     return (
         "### Reporting Back (mandatory — the orchestrator watches the ticket file)\n"
@@ -115,50 +156,75 @@ def _reporting_protocol(ticket: TicketInfo, claim_tag: str, review_tag: str) -> 
         "  `**<UTC timestamp YYYY-MM-DDTHH:MM:SSZ>**` followed by a blank line and your report, and set the\n"
         f"  frontmatter to `tags: [{claim_tag}, {review_tag}]` while keeping `status: in_progress`.\n"
         "- Never set `status: closed` yourself; a human closes the ticket after review.\n"
-        "- Commit your work on the branch; do NOT push, merge, rebase onto other branches, or `git stash`:\n"
-        "  this checkout is shared with the human operator.\n"
+        f"{git_rules}"
         "- Then stop. The orchestrator pauses your pod and wakes you with any review feedback as a new note.\n"
     )
 
 
-def _default_prompt(ticket: TicketInfo, branch: str, work_type: str, claim_tag: str, review_tag: str) -> str:
+def _default_prompt(
+    ticket: TicketInfo, branch: str, work_type: str, claim_tag: str, review_tag: str, config: dict[str, Any]
+) -> str:
+    mode = git_mode(config)
     ticket_details = run_tk_show(ticket.project_dir, ticket.id)
     header = (
         f"You are an autonomous SCION task force worker assigned to ticket `{ticket.id}` "
-        f"in project `{ticket.project_dir}` (mounted here as your workspace).\n\n"
+        f"in project `{ticket.project_dir}` (mounted here as your workspace). You work alone: "
+        "the ticket is your only channel to the human.\n\n"
         f"### Ticket Details (`tk show {ticket.id}`)\n{ticket_details.strip()}\n\n"
     )
     if work_type == "review":
         pr_num = _pr_number_from_ref(ticket.external_ref)
-        pr_hint = (
-            f"`gh pr checkout {pr_num}` (or `git fetch origin pull/{pr_num}/head:{branch} && git checkout {branch}`)"
-            if pr_num
-            else "the branch referenced by the ticket"
+        if mode == "branch":
+            fetch = (
+                f"Fetch the PR under review with `gh pr checkout {pr_num}` (or `git fetch origin "
+                f"pull/{pr_num}/head:{branch} && git checkout {branch}`)" if pr_num
+                else "Fetch the branch referenced by the ticket"
+            ) + ". Do not modify the PR's commits."
+            run_tests = "3. Run the project's test/lint suite on the PR head if it exists (e.g. `make test`).\n"
+        else:
+            fetch = (
+                f"Read the PR without changing the checkout: `gh pr view {pr_num}` and `gh pr diff {pr_num}`"
+                if pr_num else "Read the change referenced by the ticket without changing the checkout"
+            ) + ". Do not check out the PR branch."
+            run_tests = "3. If tests must run on the PR head, say so in the report instead of checking it out.\n"
+        may_comment = (
+            f"5. If `gh` is authenticated in this pod you MAY additionally post the same report as a PR comment "
+            f"(`gh pr comment {pr_num or '<n>'} --body-file <report>`); never approve/merge via `gh`.\n\n"
+            if privacy_level(config) != "confidential" else "\n"
         )
         task = (
             "### Your Job: Pull-Request Review\n"
-            f"1. Fetch the PR under review with {pr_hint}. Do not modify the PR's commits.\n"
+            f"1. {fetch}\n"
             "2. Review the full diff against the base branch: correctness, tests, security, API/spec "
             "compatibility, docs, and style consistent with this repository.\n"
-            "3. Run the project's test/lint suite on the PR head if it exists (e.g. `make test`).\n"
+            f"{run_tests}"
             "4. Write a structured review report into the ticket (see Reporting Back): "
             "**Summary**, **Blocking issues**, **Suggestions**, **Verdict** (approve / request changes), "
             "each finding with `path:line`.\n"
-            f"5. If `gh` is authenticated in this pod you MAY additionally post the same report as a PR comment "
-            f"(`gh pr comment {pr_num or '<n>'} --body-file <report>`); never approve/merge via `gh`.\n\n"
+            f"{may_comment}"
         )
     else:
+        where = (
+            f"on branch `{branch}` (create it from the current HEAD if it does not exist)"
+            if mode == "branch" else "in the working tree"
+        )
+        finish = (
+            "4. Commit on the branch with a clear message referencing the ticket id.\n"
+            if mode == "branch" else "4. Do not commit; list the files you changed in your report.\n"
+        )
         task = (
             "### Your Job: Implementation\n"
-            f"1. Implement the task described in ticket `{ticket.id}` on branch `{branch}` "
-            "(create it from the current HEAD if it does not exist).\n"
+            f"1. Implement the task described in ticket `{ticket.id}` {where}.\n"
             "2. Keep changes minimal and focused on the ticket; follow the repo's conventions and AGENTS/CLAUDE guides.\n"
             "3. Run the project test suite (e.g. `make test`) and lints; fix what you break.\n"
-            "4. Commit on the branch with a clear message referencing the ticket id.\n"
+            f"{finish}"
             "5. Write a completion report into the ticket (see Reporting Back): "
             "**Summary of changes**, **Files touched**, **Verification results**, **Open questions**.\n\n"
         )
-    return header + task + _reporting_protocol(ticket, claim_tag, review_tag)
+    return (
+        header + task + _reporting_protocol(ticket, claim_tag, review_tag, _git_rules(mode, branch))
+        + _privacy_rules(privacy_level(config))
+    )
 
 
 def build_worker_prompt(
@@ -193,7 +259,7 @@ def build_worker_prompt(
                 template = template.replace("{" + key + "}", str(value))
             return template
 
-    return _default_prompt(ticket, branch, work_type, claim_tag, review_tag)
+    return _default_prompt(ticket, branch, work_type, claim_tag, review_tag, config)
 
 
 def _parse_iso_ts(ts_str: str | None) -> float | None:
@@ -318,7 +384,7 @@ def dispatch_ticket(
 
     trace_id = new_trace_id()
     lifecycle_span_id = new_span_id()
-    branch = provider.format_branch(ticket.id)
+    branch = provider.format_branch(ticket.id) if git_mode(config) == "branch" else ""
     slug = project_slug(project_dir)
 
     # 0. Pre-flight: is the provider runtime (podman/docker/k8s) reachable at all?
@@ -361,6 +427,18 @@ def dispatch_ticket(
             return False
 
     telemetry.ensure_project_symlink(project_dir)
+    # Auto-fix (logged; listed by `status`): Scion refuses to start in a git repo that does not ignore
+    # .scion/agents/. A plain folder needs nothing.
+    fixed = ensure_scion_agents_ignored(Path(proj_str))
+    if fixed:
+        telemetry.log_event("INFO", fixed, trace_id=trace_id, ticket_id=ticket.id, project=proj_str, autofix=True)
+    role, template = role_template_for(Path(proj_str), ticket.tags)
+    if role and not template:
+        status_note(
+            ticket.path,
+            f"role `{role}` has no template in this project; using the default worker. "
+            f"Install it with `tk scion-taskforce templates install {role}`.",
+        )
     prompt = build_worker_prompt(ticket, config, branch=branch)
     telemetry.save_worker_brief(project_dir, ticket.id, prompt)
     worker_env = {
@@ -377,12 +455,13 @@ def dispatch_ticket(
         _record(
             telemetry, project_dir, ticket.id, "taskforce.worker.spawn", ok, message,
             trace_id=trace_id, parent_span_id=lifecycle_span_id,
-            attrs={"worker.branch": branch, **attrs}, worker_line=worker_line, metric=metric,
+            attrs={"worker.branch": branch, "worker.template": template or provider.template, **attrs},
+            worker_line=worker_line, metric=metric,
         )
 
     # 2. Spawn (request accepted by provider?)
     if existing is None and not provider.spawn(
-        project_dir=proj_str, worker_id=ticket.id, prompt=prompt, branch=branch, env=worker_env
+        project_dir=proj_str, worker_id=ticket.id, prompt=prompt, branch=branch, env=worker_env, template=template
     ):
         err = provider.last_error or "provider.spawn returned False"
         record_spawn(
@@ -464,8 +543,9 @@ def dispatch_ticket(
         ],
     )
     record_spawn(
-        True, f"Spawned & verified worker {ticket.id} in {proj_str} (branch={branch})",
-        f"Worker {ticket.id} spawned on branch '{branch}' and verified running", "taskforce.workers.spawned",
+        True, f"Spawned & verified worker {ticket.id} in {proj_str}" + (f" (branch={branch})" if branch else ""),
+        f"Worker {ticket.id} spawned" + (f" on branch '{branch}'" if branch else "") + " and verified running",
+        "taskforce.workers.spawned",
         {"worker.state": "running", "worker.verified": True},
     )
     workers[wkey] = {**entry, "state": "running", "feedback_cycles": 0}

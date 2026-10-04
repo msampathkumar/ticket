@@ -128,10 +128,11 @@ def _remove_worker(ctx: _Ctx, tid: str, entry: dict[str, Any], reason: str, tick
     ok = ctx.provider.delete(ctx.proj_str, tid, preserve_branch=True)
     # Marked deleted even on failure so a missing agent is not retried (and re-noted) on every save.
     entry.update({"state": "deleted", "agent": False})
-    branch = entry.get("branch") or tid
+    branch = entry.get("branch")
     if ticket is not None:
         if ok:
-            _note(ticket.path, f"{reason}; stopped and removed worker `{tid}` (branch `{branch}` kept).")
+            kept = f" (branch `{branch}` kept)" if branch else ""
+            _note(ticket.path, f"{reason}; stopped and removed worker `{tid}`{kept}.")
         else:
             _note(ticket.path, f"{reason}; could not remove worker `{tid}`: {failure_hint(ctx.provider.last_error, tid)}")
     if ok:
@@ -206,8 +207,8 @@ def _start(ctx: _Ctx, ticket: TicketInfo, ack: str) -> bool:
         )
         return False
     if ok:
-        branch = ctx.workers.get(_worker_key(ctx.proj_str, ticket.id), {}).get("branch", ticket.id)
-        _note(ticket.path, f"started Scion worker `{ticket.id}` on branch `{branch}`.")
+        branch = ctx.workers.get(_worker_key(ctx.proj_str, ticket.id), {}).get("branch")
+        _note(ticket.path, f"started Scion worker `{ticket.id}`" + (f" on branch `{branch}`." if branch else "."))
     else:
         ctx.error = f"a worker named `{ticket.id}` already exists in Scion; not starting another"
         _note(ticket.path, f"{ctx.error}.")

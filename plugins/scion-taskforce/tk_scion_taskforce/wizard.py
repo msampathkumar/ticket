@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from tk_scion_taskforce.config import load_yaml_file
+from tk_scion_taskforce.roles import DEFAULT_ROLES
 from tk_scion_taskforce.tickets import find_tk_binary
 
 QUIT_WORDS = ("q", "quit", "exit")
@@ -144,6 +145,13 @@ def validate_workers(value: str) -> str | None:
     return None if value.isdigit() and 1 <= int(value) <= 10 else "Enter a whole number from 1 to 10."
 
 
+def validate_roles(value: str) -> str | None:
+    names = [n.strip() for n in value.split(",")]
+    if all(_TAG_RE.match(n) for n in names):
+        return None
+    return "List role names separated by commas, e.g. developer,code-reviewer."
+
+
 def harness_validator(installed: list[str]) -> Validator:
     def _check(value: str) -> str | None:
         if not _TAG_RE.match(value):
@@ -159,7 +167,7 @@ def harness_validator(installed: list[str]) -> Validator:
 
 
 def run_wizard(defaults: dict, installed: list[str]) -> dict:
-    """Ask the six setup questions as validated menus. Raises WizardAbort when the user quits."""
+    """Ask the setup questions as validated menus. Raises WizardAbort when the user quits."""
     print("=" * 60)
     print("🚀 SCION Task Force Setup Wizard")
     print("=" * 60)
@@ -200,6 +208,20 @@ def run_wizard(defaults: dict, installed: list[str]) -> dict:
         )
     )
 
+    privacy = choose(
+        "7. Privacy (what workers may share outside this machine)",
+        [
+            ("confidential", "recommended: no uploads, public links, pushes or PR comments"),
+            ("standard", "no extra restrictions"),
+        ],
+        other=False,
+    )
+    roles = choose(
+        "8. agent-team role templates (github.com/scion-frontiers/agent-team; tag a ticket role:<name>)",
+        [("recommended", ", ".join(DEFAULT_ROLES)), ("none", "only the default worker")],
+        validate=validate_roles,
+    )
+
     answers = {
         "harness": harness,
         "model": model,
@@ -207,6 +229,8 @@ def run_wizard(defaults: dict, installed: list[str]) -> dict:
         "gcp_region": gcp_region,
         "claim_tag": claim_tag,
         "max_concurrent": max_concurrent,
+        "privacy": privacy,
+        "roles": roles,
     }
     print("\nSummary:")
     for key, val in answers.items():
@@ -319,24 +343,59 @@ def ensure_project_initialized(project_dir: Path, scion_binary: str = "scion") -
 
     if (project_dir / ".scion").is_dir():
         print("✓ scion: .scion/ already initialized")
-        return
-    if not shutil.which(scion_binary):
+    elif not shutil.which(scion_binary):
         print(f"⚠️  scion: `{scion_binary}` not found on PATH; install Scion, then run `scion init`.")
         return
-    try:
-        res = subprocess.run(
-            [scion_binary, "--non-interactive", "init"],
-            cwd=str(project_dir),
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        print(f"⚠️  scion init failed: {exc}")
-        return
-    if res.returncode != 0:
-        print(f"⚠️  scion init failed: {(res.stderr or res.stdout).strip()[:300]}")
-    elif (project_dir / ".scion").is_dir():
-        print("✓ scion init: created .scion/")
     else:
-        print(f"⚠️  scion init ran, but {project_dir}/.scion/ is missing (Scion initializes the git root).")
+        try:
+            res = subprocess.run(
+                [scion_binary, "--non-interactive", "init"],
+                cwd=str(project_dir),
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"⚠️  scion init failed: {exc}")
+            return
+        if res.returncode != 0:
+            print(f"⚠️  scion init failed: {(res.stderr or res.stdout).strip()[:300]}")
+        elif (project_dir / ".scion").is_dir():
+            print("✓ scion init: created .scion/")
+        else:
+            print(f"⚠️  scion init ran, but {project_dir}/.scion/ is missing (Scion initializes the git root).")
+    fixed = ensure_scion_agents_ignored(project_dir)
+    if fixed:
+        print(f"✓ {fixed}")
+
+
+def ensure_scion_agents_ignored(project_dir: Path) -> str:
+    """Make git ignore `.scion/agents/` (agent homes, staged secrets) when ``project_dir`` is in a git repo.
+
+    Scion refuses to start workers in a git repo unless that path is ignored (`CheckAgentsGitignore`,
+    which uses `git check-ignore`). The entry goes to the repo's local `.git/info/exclude`: untracked,
+    never pushed, and the user's `.gitignore` stays untouched. Plain folders need nothing.
+    Returns a one-line description of the change, or ``""`` when nothing was needed.
+    """
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["git", "-C", str(project_dir), *args], capture_output=True, text=True)
+
+    if not shutil.which("git"):
+        return ""
+    top = git("rev-parse", "--show-toplevel")
+    if top.returncode != 0:
+        return ""  # not a git repo: Scion does not check
+    if git("check-ignore", "-q", ".scion/agents/").returncode == 0:
+        return ""
+    try:
+        rel = (project_dir.resolve() / ".scion" / "agents").relative_to(Path(top.stdout.strip()).resolve())
+    except ValueError:
+        return ""
+    exclude = Path(git("rev-parse", "--git-path", "info/exclude").stdout.strip())
+    if not exclude.is_absolute():
+        exclude = project_dir / exclude
+    entry = f"/{rel.as_posix()}/"
+    text = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text(text + ("" if not text or text.endswith("\n") else "\n") + entry + "\n", encoding="utf-8")
+    return f"auto-fix: added `{entry}` to {exclude} (Scion requires it in git repos; local file, never committed)"

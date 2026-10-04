@@ -39,7 +39,7 @@ def _hint_for(detail: str, project_dir: str) -> str:
     """Turn well-known scion failures into one actionable sentence for `status`/logs."""
     low = detail.lower()
     if "must be in .gitignore" in low or "run 'scion init'" in low:
-        return f" → HINT: run `scion init` once inside {project_dir} (it adds agents/ to .gitignore), then retry."
+        return f" → HINT: add `/.scion/agents/` to .git/info/exclude in {project_dir}'s repo, then retry."
     if "podman" in low and ("failed" in low or "cannot connect" in low or "exit status 125" in low):
         return " → HINT: the container runtime is down; start it (`podman machine start`) and retry."
     if "no such file" in low and "scion" in low or "not found" in low and "binary" in low:
@@ -215,6 +215,15 @@ class ScionProvider:
         """True only when the Hub is reachable and this folder is not linked to it."""
         return bool(status) and "Connection: ok" in status and "Linked: no" in status
 
+    def hub_endpoint(self, project_dir: str) -> str:
+        """The Hub URL from `scion hub status`, or ``""`` (dry run, Hub disabled or unreadable)."""
+        if self.dry_run:
+            return ""
+        proj = self._validate_project_dir(project_dir)
+        status = self._hub_status(self._resolve_binary(), proj) or ""
+        match = re.search(r"^Endpoint:\s*(\S+)", status, re.MULTILINE)
+        return match.group(1) if match else ""
+
     def ensure_project_registered(self, project_dir: str) -> ProviderResult:
         """Link ``project_dir`` to the Scion Hub once: one Hub project per project folder.
 
@@ -267,27 +276,21 @@ class ScionProvider:
         prompt: str,
         branch: str,
         env: dict[str, str],
+        template: str = "",
     ) -> bool:
+        """Start a worker. ``branch`` is passed only when set (``worker.git: branch``); ``template``
+        overrides ``provider.template`` (role templates) and is used only if it exists in the project."""
         clean_id = validate_ticket_id(worker_id)
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
 
-        cmd: list[str] = [
-            binary,
-            "--project",
-            proj,
-            "start",
-            clean_id,
-            prompt,
-            "--branch",
-            branch,
-            "-w",
-            proj,
-            "--enable-telemetry",
-            "--non-interactive",
-        ]
-        if self.template and (Path(proj) / ".scion" / "templates" / self.template).is_dir():
-            cmd.extend(["-t", self.template])
+        cmd: list[str] = [binary, "--project", proj, "start", clean_id, prompt]
+        if branch:
+            cmd.extend(["--branch", branch])
+        cmd.extend(["-w", proj, "--enable-telemetry", "--non-interactive"])
+        tmpl = template or self.template
+        if tmpl and (Path(proj) / ".scion" / "templates" / tmpl).is_dir():
+            cmd.extend(["-t", tmpl])
         if self.profile:
             cmd.extend(["--profile", self.profile])
         if self.harness_config:

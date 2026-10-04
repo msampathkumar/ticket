@@ -84,7 +84,8 @@ plugins/scion-taskforce/
     ├── workers.py               # verified launch, pause, feedback, liveness, gc, project lock
     ├── state.py                 # state file and state lock
     ├── tickets.py               # ticket parsing, note and tag writes, workspace merge
-    ├── wizard.py                # init menus, tk/scion pre-flight, model alias resolution
+    ├── roles.py                 # agent-team role templates: fetch, vendor skills, tk contract
+    ├── wizard.py                # init menus, tk/scion pre-flight, git exclude fix, model alias resolution
     ├── telemetry.py             # JSONL spans, metrics, logs, rotation
     └── providers/scion.py       # ScionProvider adapter
 ```
@@ -115,7 +116,7 @@ The project lock stops two quick saves from starting two workers. The state lock
 | :--- | :--- |
 | `preflight` | `list --format json`, then `hub status`; fails when the Hub is reachable and reports `Linked: no` |
 | `ensure_project_registered` | `hub status`, then `hub link --yes` and `hub enable`. `init` only |
-| `spawn` | `start <id> <brief> --branch <b> -w <dir> --enable-telemetry [-t <template>] [--profile <p>] [--harness-config <h>] [--model <resolved>] [extra_start_args]` |
+| `spawn` | `start <id> <brief> [--branch <b>] -w <dir> --enable-telemetry [-t <template>] [--profile <p>] [--harness-config <h>] [--model <resolved>] [extra_start_args]` |
 | `health`, `wait_until_running` | `list --format json`, matched case-insensitively; polled until `running` or `error` |
 | `pause` | `suspend <id>`, falling back to `stop <id>` |
 | `stop` | `stop <id>` |
@@ -124,7 +125,7 @@ The project lock stops two quick saves from starting two workers. The state lock
 | `delete` | `delete <id> --preserve-branch` |
 | `workspace_path` | No call. Returns `<project>/.scion/agents/<id>/workspace` if it exists, else `None` |
 
-`-t <template>` is passed only when `.scion/templates/<template>/` exists. Scion state names map to `running` (running, thinking, idle, waiting_for_input), `paused` (suspended, paused, stopped) or `error`.
+`--branch` is passed only with `worker.git: branch`. `-t <template>` is the ticket's role template (`role:<name>` -> `tk-<name>`) or `provider.template`, passed only when `.scion/templates/<template>/` exists. Before `start`, dispatch adds `/.scion/agents/` to `.git/info/exclude` when the project is in a git repo that does not ignore it (Scion's `CheckAgentsGitignore`); the change is logged with `autofix: true` and listed by `status`. Scion state names map to `running` (running, thinking, idle, waiting_for_input), `paused` (suspended, paused, stopped) or `error`.
 
 ## 6. State machine
 
@@ -198,12 +199,14 @@ Spawns pass `-w <project>`, so workers in one project share the checkout. The co
 
 | Type | Trigger | Job |
 | :--- | :--- | :--- |
-| `review` | A tag in `worker.review_tags` (`pr`, `review`) or an `external-ref` starting with a `worker.review_ref_prefixes` entry (`gh-pr-`), as created by `tk github sync --prs` | Fetch the PR, review the diff, run the suite, report Summary, Blocking issues, Suggestions and Verdict with `path:line` findings. May post a PR comment; never approves or merges |
-| `implement` | Everything else | Implement on the ticket branch, run tests and lints, commit, report Summary, Files touched, Verification and Open questions |
+| `review` | A tag in `worker.review_tags` (`pr`, `review`) or an `external-ref` starting with a `worker.review_ref_prefixes` entry (`gh-pr-`), as created by `tk github sync --prs` | `off`: read `gh pr view`/`gh pr diff` without checkout. `branch`: check out the PR and run the suite. Report Summary, Blocking issues, Suggestions and Verdict with `path:line` findings. `standard` privacy may post a PR comment; never approves or merges |
+| `implement` | Everything else | Implement, run tests and lints, report Summary, Files touched, Verification and Open questions. `worker.git: off`: no commits, list changed files. `branch`: commit on the ticket branch |
 
-Both end with a reporting protocol written for a pod without `tk`: append a timestamped note under `## Notes`, set `tags: [<claim>, <review>]`, keep `status: in_progress`, never close the ticket, and never push, merge, rebase or stash. `worker.prompt_file` replaces the brief; it accepts `{ticket_id} {ticket_title} {project_dir} {branch} {work_type} {claim_tag} {review_tag} {external_ref} {ticket_details}`.
+Both end with a reporting protocol written for a pod without `tk`: append a timestamped note under `## Notes`, set `tags: [<claim>, <review>]`, keep `status: in_progress`, never close the ticket, and follow the `worker.git` rule (never push). `worker.privacy: confidential` (default) appends a confidentiality section: no uploads, public links, pushes or external comments. `worker.prompt_file` replaces the brief; it accepts `{ticket_id} {ticket_title} {project_dir} {branch} {work_type} {claim_tag} {review_tag} {external_ref} {ticket_details}`.
 
 The seeded template `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/` adds `agents.md` and `system-prompt.md`. Its `scion-agent.yaml` sets no harness, because Scion's template rules reserve that for the launch config.
+
+**Role templates** (`roles.py`). `templates install` fetches `scion-frontiers/agent-team` at a pinned commit (GitHub tarball, or `--from <dir>` holding `<owner>/<repo>/`). For each role it writes `.scion/templates/tk-<role>/`: upstream `system-prompt.md`; `agents.md` = tk contract + upstream guidance; `scion-agent.yaml` without `skills:`; every `gh://` skill copied into `skills/` with its repo's LICENSE; `UPSTREAM.md` with sources, licences and dropped skills. Template-mounted skills need no Hub or network at start. With `confidential` privacy, publishing skills (`gcs-artifact-publishing`) are dropped. `UPSTREAM.md` marks generated folders: only those are regenerated (`--force`) or removed (`uninit`).
 
 ## 11. Telemetry
 

@@ -27,7 +27,7 @@ sequenceDiagram
 
 ## 1. Tag the ticket
 
-Write clear acceptance criteria, then add the opt-in tag. The save starts a worker on a branch named after the ticket ID.
+Write clear acceptance criteria, then add the opt-in tag. The save starts a worker in the project folder. Add `role:<name>` (for example `role:code-reviewer`) to run it on an installed [role template](../plugins/scion-taskforce.md#role-templates).
 
 ```bash
 tk create "Add input sanitization to auth endpoints" -p 1 \
@@ -39,12 +39,13 @@ If the ticket has open dependencies, it waits for them. If all worker slots are 
 
 ## 2. Review the report
 
-The worker commits on its branch, adds a report note and tags the ticket `waiting-for-review`. The next save in the project, or `tk scion-taskforce sync`, merges the report and pauses the worker.
+The worker leaves its changes in the working tree, adds a report note listing the changed files and tags the ticket `waiting-for-review`. With `worker.git: branch` it commits on a branch named after the ticket instead. The next save in the project, or `tk scion-taskforce sync`, merges the report and pauses the worker.
 
 ```bash
 tk scion-taskforce sync
 tk show <id>
-git diff main...<id>
+git diff            # worker.git: off (in a git repo)
+git diff main...<id> # worker.git: branch
 ```
 
 ## 3. Send feedback
@@ -59,10 +60,10 @@ tk add-note <id> "Also reject empty usernames"
 
 ## 4. Close the ticket
 
-Merge the branch the usual way, then close the ticket. Closing stops the worker, unblocks dependent tickets and starts the next queued one.
+Commit or merge the changes the usual way, then close the ticket. Closing stops the worker, unblocks dependent tickets and starts the next queued one.
 
 ```bash
 tk close <id>
 ```
 
-`tk scion-taskforce gc` deletes the stopped worker 5 days later. The branch is kept.
+`tk scion-taskforce gc` deletes the stopped worker 5 days later. A worker branch, if any, is kept.
