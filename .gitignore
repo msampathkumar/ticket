@@ -20,6 +20,8 @@ site/
 
 # Task Force local log symlink
 .tickets/.scion-taskforce-logs
+# Task Force save hook: per-machine opt-in installed by `tk scion-taskforce init`
+.tickets/.hooks/post-write.d/scion-taskforce
 .scion/agents/
 .scion/project-id
 .scion/state.yaml

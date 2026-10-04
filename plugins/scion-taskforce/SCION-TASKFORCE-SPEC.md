@@ -29,7 +29,9 @@ Each `on-save` run takes the per-project lock (`flock` under `~/.local/state/tk/
 | No free slot | Queue | "request noted; queued (N of M workers busy)…" |
 | Worker active and event is `add-note` from a human | `scion message <id>` (wakes a paused worker) | "worker `<id>` is already in progress; forwarded the latest update." |
 | Worker reported back (`waiting-for-review`) | Pause worker, free its slot, start next queued ticket | None |
-| Ticket `closed` with a tracked worker | Stop worker, start next queued ticket | "ticket closed; stopped worker `<id>`." |
+| Ticket `closed` with a tracked worker | `scion stop <id>`, start next queued ticket | "ticket closed; stopped worker `<id>`." |
+| `taskforce` removed or `no-taskforce` added, worker tracked | `scion stop` + `scion delete --preserve-branch` | "`taskforce` tag removed; stopped and removed worker `<id>` (branch `<id>` kept)." |
+| Ticket file deleted, worker tracked (seen on the next save or `sync`) | `scion stop` + `scion delete --preserve-branch`, free its slot | None (no ticket to note) |
 
 - Status notes are written directly to the ticket file, so they never re-trigger the hook. `TK_HOOK_DEPTH` also blocks recursion.
 - Identical consecutive Task Force notes are deduplicated.
@@ -42,7 +44,7 @@ Each `on-save` run takes the per-project lock (`flock` under `~/.local/state/tk/
 1. **Opt-in**: only tickets the *user* tagged `taskforce` (`tags.claim`) are picked up; `no-taskforce` (`tags.ignore`) is a hard override. The task force never adds the opt-in tag itself.
 2. **One worker per ticket, in the ticket's own project**: the worker ID and branch match the ticket ID (e.g. `tic-822k`). Any number of projects can use the task force at once; each has its own hook and Hub project.
 3. **Review checkpoint**: workers report via notes and the `waiting-for-review` tag, then get paused. A human note wakes the worker (`scion message <id> --wake`); `tk scion-taskforce attach <id>` opens an interactive session.
-4. **Cleanup**: `tk close` stops the worker; `tk scion-taskforce gc` deletes workers of tickets closed more than 5 days ago.
+4. **Lifecycle in step with the ticket**: `tk close` stops the worker (`scion stop`; reopening starts a fresh one). Removing `taskforce`, adding `no-taskforce`, or deleting the ticket file stops and deletes the worker, keeping its branch. `tk scion-taskforce gc` deletes stopped workers of tickets closed more than 5 days ago.
 5. **Observability**: the lifecycle is traced with OpenTelemetry (traces, metrics, structured logs) to local files under `~/.local/state/tk/scion-taskforce/logs/`.
 
 ### 1.3 Key Decisions
@@ -256,7 +258,7 @@ stateDiagram-v2
    > | Mode | How you get it | What each pod sees | Safe `max_concurrent_per_project` |
    > | :--- | :--- | :--- | :--- |
    > | **Hub / external** | repo has no `.scion/` directory | the *live* checkout mounted at `/workspace` — every worker shares one working tree and will switch branches, stash and rebase under each other (observed in the field: 10 concurrent workers left a repo on a worker branch with 5 stray stashes and swallowed the untracked `.tickets/` directory) | **1** |
-   > | **Project-local** | you ran `scion init` once in the repo (creates `.scion/` and ignores `.scion/agents/`) | its own git worktree at `<repo>/.scion/agents/<id>/workspace` on branch `<id>`; the task force mirrors the ticket file in and merges notes/review tag back (§4.3) | can be raised (e.g. 3–5); left at 1 it becomes 5 |
+   > | **Project-local** | you ran `scion init` once in the repo (creates `.scion/` and ignores `.scion/agents/`) | its own git worktree at `<repo>/.scion/agents/<id>/workspace` on branch `<id>`; the task force mirrors the ticket file in and merges notes/review tag back (§4.3) | can be raised explicitly (e.g. 3–5); the default stays 1 because spawns pass `-w <project>`, which mounts the shared checkout |
    >
    > Different projects are always independent and run in parallel up to `max_concurrent`. **Recommended:** run `scion init` in every repo you hand to the task force (see §10).
 6. **Liveness (`sync`)**: for each tracked `running` worker, `provider.health()` is consulted. If the pod is gone, stopped or crashed (e.g. container exit 137/255), the worker is marked `error`, a `worker.lost` span + `ERROR` log is emitted, and a triage note is appended to the ticket (which stays `in_progress`). The slot is freed. `tk reopen <id>` (keeping the `taskforce` tag) fires the hook, which deletes the dead pod (`--preserve-branch`) and relaunches.
@@ -328,8 +330,8 @@ While a ticket is in `status: in_progress` with tag `waiting-for-review`:
    - **Via `tk` CLI or Web UI**: The user appends a new note (`tk add-note <id> "Please also handle edge case X"`) or edits the ticket in `tk-webui`.
    - **Via Explicit Plugin Command**: The user runs `tk scion-taskforce feedback <id> "Please also handle edge case X"`.
 2. **How the Hook Routes Feedback**:
-   - `tk add-note` fires the hook with `TK_EVENT=add-note`. If the ticket has an active (`running` or `paused`) worker and the latest note is not a `**Task Force:**` status note, the note is forwarded. Hand edits are not forwarded; use `feedback` or `tk add-note`.
-   - Forwarding (and `tk scion-taskforce feedback`) emits a `taskforce.worker.feedback_wake` span linked to the ticket's `trace_id`, removes `waiting-for-review` (keeping `status: in_progress` and `taskforce`), and calls `provider.wake_with_message(project_dir, id, message)`:
+   - `tk add-note` fires the hook with `TK_EVENT=add-note`. If the ticket has an active (`running` or `paused`) worker and the latest note is not plugin-authored (`**Task Force:**`, `**Review Feedback:**` or `## Task Force:`), the note is forwarded. Hand edits are not forwarded; use `feedback` or `tk add-note`.
+   - Forwarding (and `tk scion-taskforce feedback`) emits a `taskforce.worker.feedback_wake` span linked to the ticket's `trace_id` and first calls `provider.wake_with_message(project_dir, id, message)`. Only when the wake succeeds does it remove `waiting-for-review` (keeping `taskforce`; status becomes `in_progress`). `feedback` refuses closed tickets and tickets without an active worker:
      ```bash
      scion --project "<project_dir>" message "<id>" \
        "New review feedback received on ticket <id>: ... re-add the 'waiting-for-review' tag when ready for review." \
@@ -398,16 +400,16 @@ worker:
 
 provider:
   driver: scion                                 # Active worker backend (default: scion; swappable in future)
-  scion:
-    harness: ""                                 # Optional harness override (e.g., claude, gemini, codex)
-    template: default                           # SCION agent template (-t)
-    model: ""                                   # Optional model alias or ID (e.g., large)
-    preserve_branch_on_gc: true                 # Pass --preserve-branch on scion delete
-    auto_accept_prompts: true                   # Press Enter on known harness start-up prompts inside the pod
-    auto_accept_prompt_patterns: ["Yes, I trust this folder"]
-    harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
-    container_user: scion                       # User owning the tmux session inside the pod
-    tmux_session: scion                         # tmux session name used by the scion image
+  harness_config: ""                            # Scion harness-config (`scion harness-config list`)
+  template: tk-worker-gemini-cli-with-api-key-auth                    # SCION agent template (-t)
+  model: ""                                     # Model ID or Scion alias (small|medium|large); blank = harness default
+  gcp_project: ""                               # Vertex AI project -> GOOGLE_CLOUD_PROJECT (overrides the shell)
+  gcp_region: ""                                # Vertex AI location -> GOOGLE_CLOUD_REGION/LOCATION (overrides the shell)
+  auto_accept_prompts: true                     # Press Enter on known harness start-up prompts inside the pod
+  auto_accept_prompt_patterns: ["Yes, I trust this folder"]
+  harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
+  container_user: scion                         # User owning the tmux session inside the pod
+  tmux_session: scion                           # tmux session name used by the scion image
 
 telemetry:
   enabled: true                                 # Enable OpenTelemetry tracing, metrics & structured logs
@@ -574,10 +576,11 @@ tk scion-taskforce [--config <path>] [--dry-run] <command> [args]
 
 | Command | Description |
 | :--- | :--- |
-| `init [--global] [--force] [--defaults]` | Create `scion-taskforce.yaml` and the worker template; for project scope, link the folder to the Hub once and install the save hook. |
+| `init [--global] [--force] [--defaults\|--interactive]` | Run `tk init`/`scion init` if missing; menu wizard with validation (harness, model, GCP project, location, tag, workers); create `scion-taskforce.yaml` and the worker template; for project scope, link the folder to the Hub once and install the save hook. |
 | `uninit [--global]` | Remove `.scion-taskforce/` and the save hook. |
 | `hook install\|uninstall\|status` | Manage `.tickets/.hooks/post-write.d/scion-taskforce`. |
-| `test [--prompt "<text>"]` | Launch a throwaway worker to verify the Hub, runtime and model credentials. |
+| `test [--timeout <s>] [--keep]` | End-to-end check: create a ticket tagged `init,<claim tag>`, wait (default 600 s) for its worker to report back with the review tag, then close it unless `--keep`. Requires the save hook. Init offers to run it. |
+| `test --raw [--prompt "<text>"]` | Launch a throwaway worker directly (no ticket, no hook) to verify the Hub, runtime and model credentials. |
 
 ### Dispatch
 
@@ -593,8 +596,8 @@ tk scion-taskforce [--config <path>] [--dry-run] <command> [args]
 | :--- | :--- |
 | `status` | Save hook, provider health and workers for the current project. |
 | `list` \| `ps` | All tracked workers across projects. |
-| `feedback <id> "<message>"` | Append a review note, clear `waiting-for-review`, and wake the worker. |
-| `attach <id>` | Resume (if paused) and attach interactively to the worker's session. |
+| `feedback <id> "<message>"` | Wake the ticket's active worker with a review note, then clear `waiting-for-review`. |
+| `attach <id>` | Attach to a running worker, or resume a suspended/stopped one and attach. |
 | `pause <id>` | Pause a running worker. |
 | `logs [<id>]` | Show `taskforce.log` or `workers/<project>/<id>.log` (including rotated `.gz`). |
 | `brief <id>` | Show the persisted worker brief. |

@@ -22,6 +22,76 @@ Feature: SCION Task Force Plugin
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "retention_days: 30"
     And the file ".scion-taskforce/prompt.md" should contain "Default Scion Task Force Prompt Template"
 
+  Scenario: Init wizard offers menus, validates input and saves Vertex AI project and region
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "printf '3\nclaude\nopencode\n\n2\nBad_Proj\nmy-proj-123\neu-central1\n4\n\n9\n1\ny\nn\n' | GOOGLE_CLOUD_PROJECT=tk-detected-proj ticket scion-taskforce init --interactive"
+    Then the command should succeed
+    And the output should contain "Other (type a value)"
+    And the output should contain "'claude' is not installed"
+    And the output should contain "Project IDs are 6-30 chars"
+    And the output should contain "looks like an AWS region"
+    And the output should contain "choose 4 to type your own value"
+    And the output should contain "scion init: created .scion/"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "opencode"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "vertex-ai"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "my-proj-123"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "europe-west4"
+
+  Scenario: Init wizard defaults to gemini-cli with API-key auth and the standard worker template
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "printf '\n\n\n\ny\nn\n' | ticket scion-taskforce init --interactive"
+    Then the command should succeed
+    And the output should contain "recommended: API-key auth"
+    And the output should contain "skipped; gemini-cli authenticates with the GEMINI_API_KEY Scion secret"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "api-key"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "tk-worker-gemini-cli-with-api-key-auth"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/scion-agent.yaml" should contain "agent_instructions: agents.md"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "Commit on your ticket branch only"
+
+  Scenario: test verifies the task force through a real ticket and closes it
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    And I run "FAKE_SCION_WORKER_REPORT=1 TK_HOOKS_SYNC=1 ticket scion-taskforce test --timeout 20"
+    Then the command should succeed
+    And the output should contain "(tags: init, taskforce)"
+    And the output should contain "started Scion worker"
+    And the output should contain "fake worker report"
+    And the output should contain "the task force works end to end"
+    And the output should contain "its worker is stopped"
+
+  Scenario: test times out and leaves the ticket open when no worker reports back
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    And I run "TK_HOOKS_SYNC=1 ticket scion-taskforce test --timeout 2"
+    Then the command should fail
+    And the output should contain "started Scion worker"
+    And the output should contain "Timed out"
+
+  Scenario: test requires the save hook
+    Given a clean tickets directory
+    When I run "ticket scion-taskforce test"
+    Then the command should fail
+    And the output should contain "Save hook not installed"
+
+  Scenario: Quitting the init wizard changes nothing
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "printf 'q\n' | ticket scion-taskforce init --interactive"
+    Then the command should fail
+    And the output should contain "Setup cancelled; nothing was changed."
+    And the file ".scion-taskforce/scion-taskforce.yaml" should not exist
+
+  Scenario: Init runs tk init when the folder has no .tickets yet
+    Given a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    Then the command should succeed
+    And the output should contain "tk init: Initialized ticket repository"
+    And the output should contain "Initialization successful"
+
   Scenario: Task force is opt-in - only tickets the user tagged taskforce are dispatched
     Given a clean tickets directory
     And a ticket exists with ID "tf-0001" and title "Opted-in task"
@@ -190,6 +260,18 @@ Feature: SCION Task Force Plugin
     And the fake scion prompt for "tf-0075" should contain "CUSTOM BRIEF for tf-0075 (implement) on tf-0075: Custom prompt ticket"
     And the fake scion prompt for "tf-0075" should not contain "Your Job"
 
+  Scenario: A Scion model alias is resolved before start so resumed workers keep a valid model
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the scion-taskforce setting "provider.harness_config" is "gemini-cli"
+    And the scion-taskforce setting "provider.model" is "medium"
+    And a file ".scion-home/harness-configs/gemini-cli/config.yaml" with content "{model_aliases: {medium: gemini-3.5-flash}}"
+    And a ticket exists with ID "tf-0076" and title "Alias ticket"
+    And ticket "tf-0076" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0076"
+    Then the command should succeed
+    And the fake scion start for "tf-0076" should include "--model gemini-3.5-flash"
+
   Scenario: A worker whose pod dies without reporting back is flagged, noted on the ticket, and frees its slot
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
@@ -269,7 +351,7 @@ Feature: SCION Task Force Plugin
     And the output should contain "You are an autonomous SCION task force worker assigned to ticket `tf-0100`"
     And the output should contain "Brief test task"
 
-  Scenario: Project-local worktree mode (.scion/) allows higher concurrent worker execution per project
+  Scenario: The per-project worker limit is honored even when .scion/ exists
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
     And a file ".scion/config" with content "simulated worktree project"
@@ -281,8 +363,8 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0103" has tags "taskforce"
     When I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "started=3"
-    And the fake scion runtime should have 3 pod(s)
+    And the output should contain "started=1"
+    And the fake scion runtime should have 1 pod(s)
 
   Scenario: Dispatch never links an unlinked project folder to the Scion Hub
     Given a clean tickets directory
@@ -316,6 +398,8 @@ Feature: SCION Task Force Plugin
     When I run "ticket scion-taskforce init"
     Then the command should succeed
     And the file ".tickets/.hooks/post-write.d/scion-taskforce" should contain "scion-taskforce on-save"
+    And the file ".tickets/.hooks/.gitignore" should contain "post-write.d/scion-taskforce"
+    And the file ".tickets/.gitignore" should contain ".scion-taskforce-logs"
     When I run "ticket scion-taskforce hook status"
     Then the output should contain "installed"
     When I run "ticket scion-taskforce uninit"
@@ -406,6 +490,46 @@ Feature: SCION Task Force Plugin
     Then ticket "tf-0231" should contain "ticket closed; stopped worker `tf-0231`"
     And the fake scion pod "tf-0231" should be in state "stopped"
 
+  Scenario: Removing the taskforce tag stops and removes the worker and notes it
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0232" and title "Changed my mind"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0232 --tags taskforce"
+    Then the fake scion runtime should have 1 pod(s)
+    When I run "ticket update tf-0232 --tags docs"
+    Then ticket "tf-0232" should contain "`taskforce` tag removed; stopped and removed worker `tf-0232` (branch `tf-0232` kept)"
+    And the fake scion runtime should have 0 pod(s)
+
+  Scenario: Adding the no-taskforce tag stops and removes the worker
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0233" and title "Hands off"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0233 --tags taskforce"
+    And I run "ticket update tf-0233 --tags taskforce,no-taskforce"
+    Then ticket "tf-0233" should contain "`no-taskforce` tag added; stopped and removed worker"
+    And the fake scion runtime should have 0 pod(s)
+
+  Scenario: Deleting a ticket file removes its worker and frees the slot
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0234" and title "Deleted soon"
+    And a ticket exists with ID "tf-0235" and title "Queued behind it"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0234 --tags taskforce"
+    And I run "ticket update tf-0235 --tags taskforce"
+    Then ticket "tf-0235" should contain "queued (1 of 1 workers busy)"
+    Given the file ".tickets/tf-0234.md" is deleted
+    When I run "ticket scion-taskforce sync"
+    Then the command should succeed
+    And the output should contain "started=1"
+    And the fake scion pod "tf-0235" should be in state "running"
+    And the fake scion runtime should have 1 pod(s)
+
   Scenario: A tagged ticket waiting on dependencies starts when the blocker closes
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
@@ -436,3 +560,99 @@ Feature: SCION Task Force Plugin
     And the output should contain "started=1"
     And ticket "tf-0242" should have field "status" with value "in_progress"
 
+  Scenario: A failed start is retried on its own save, not on saves of other tickets
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "fail"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0261" and title "Fails to start"
+    And a ticket exists with ID "tf-0262" and title "Unrelated"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0261 --tags taskforce"
+    Then ticket "tf-0261" should contain "could not start a Scion worker" 1 time(s)
+    And ticket "tf-0261" should contain "(see `tk scion-taskforce logs tf-0261`)"
+    When I run "ticket update tf-0262 --priority 1"
+    And I run "ticket add-note tf-0262 'unrelated change'"
+    Then ticket "tf-0261" should contain "could not start a Scion worker" 1 time(s)
+    And ticket "tf-0261" should contain "request noted" 1 time(s)
+    When I run "ticket update tf-0261 --priority 1"
+    Then ticket "tf-0261" should contain "could not start a Scion worker" 2 time(s)
+
+  Scenario: A failed stop keeps the worker's slot and notes only a short reason
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0271" and title "Stop fails"
+    And a ticket exists with ID "tf-0272" and title "Queued behind it"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0271 --tags taskforce"
+    And I run "ticket update tf-0272 --tags taskforce"
+    Given the environment variable "FAKE_SCION_FAIL_CMDS" is "stop,suspend"
+    When I run "ticket close tf-0271"
+    Then ticket "tf-0271" should contain "could not stop worker `tf-0271`: scion stop exited 1: Error: stop failed: simulated failure"
+    And ticket "tf-0271" should not contain "second line with detail"
+    And ticket "tf-0272" should have field "status" with value "open"
+    And the fake scion pod "tf-0271" should be in state "running"
+    When I run "ticket scion-taskforce logs tf-0271"
+    Then the output should contain "second line with detail"
+
+  Scenario: A failed suspend keeps the worker running and its slot taken
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0281" and title "Suspend fails"
+    And a ticket exists with ID "tf-0282" and title "Queued behind it"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0281 --tags taskforce"
+    And I run "ticket update tf-0282 --tags taskforce"
+    Given the environment variable "FAKE_SCION_FAIL_CMDS" is "stop,suspend"
+    When I run "ticket update tf-0281 --tags taskforce,waiting-for-review"
+    Then ticket "tf-0281" should contain "could not pause worker `tf-0281`"
+    And ticket "tf-0282" should have field "status" with value "open"
+    And the fake scion runtime should have 1 pod(s)
+
+  Scenario: feedback needs an active worker, changes the ticket only after a successful wake, and never re-adds the opt-in tag
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0291" and title "No worker yet"
+    When I run "ticket scion-taskforce feedback tf-0291 \"Please fix\""
+    Then the command should fail
+    And the output should contain "has no active worker"
+    And ticket "tf-0291" should not contain "Review Feedback"
+    Given a ticket exists with ID "tf-0292" and title "Worker reported back"
+    And ticket "tf-0292" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0292"
+    Then the command should succeed
+    Given ticket "tf-0292" has tags "waiting-for-review"
+    And the environment variable "FAKE_SCION_FAIL_CMDS" is "message,resume"
+    When I run "ticket scion-taskforce feedback tf-0292 \"Please add tests\""
+    Then the command should fail
+    And the output should contain "the ticket was not changed"
+    And ticket "tf-0292" should contain "waiting-for-review"
+    And ticket "tf-0292" should not contain "Review Feedback"
+    Given the environment variable "FAKE_SCION_FAIL_CMDS" is ""
+    When I run "ticket scion-taskforce feedback tf-0292 \"Please add tests\""
+    Then the command should succeed
+    And ticket "tf-0292" should contain "**Review Feedback:** Please add tests"
+    And ticket "tf-0292" should not contain "waiting-for-review"
+    And ticket "tf-0292" should not contain "taskforce"
+    Given ticket "tf-0292" has status "closed"
+    When I run "ticket scion-taskforce feedback tf-0292 \"More\""
+    Then the command should fail
+    And the output should contain "is closed"
+
+  Scenario: on-save matches the saved ticket ID exactly
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0301" and title "Similar ID"
+    And ticket "tf-0301" has tags "taskforce"
+    When I run "ticket scion-taskforce on-save tf-030 --event delete"
+    Then the command should succeed
+    And the output should contain "tf-030: not found"
+    And the fake scion runtime should have 0 pod(s)
+
+  Scenario: A corrupt worker state file is backed up and reported, not silently reset
+    Given a clean tickets directory
+    And a file ".state/scion-taskforce.json" with content "{not json"
+    When I run "ticket scion-taskforce sync"
+    Then the command should fail
+    And the output should contain "is not valid JSON; a copy is at"

@@ -13,6 +13,7 @@ from typing import Any
 
 from tk_scion_taskforce.providers import ProviderResult, WorkerProvider, WorkerStatus
 from tk_scion_taskforce.tickets import validate_ticket_id
+from tk_scion_taskforce.wizard import resolve_model_alias
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -38,6 +39,28 @@ def _normalize_state(raw: str) -> str:
     if any(k in raw for k in ("suspend", "pause", "stop")):
         return "paused"
     return raw
+
+
+def apply_vertex_env(prov_cfg: dict[str, Any], env: dict[str, str]) -> dict[str, str]:
+    """Set Vertex AI project/location in ``env`` for `scion start`.
+
+    `provider.gcp_project` / `provider.gcp_region` (written by `init`) win over the shell;
+    without them, keep the shell's values or fall back to a region the harness supports.
+    """
+    project = str(prov_cfg.get("gcp_project", "") or "").strip()
+    if project:
+        env["GOOGLE_CLOUD_PROJECT"] = project
+    region = str(prov_cfg.get("gcp_region", "") or "").strip()
+    if not region and "GOOGLE_CLOUD_REGION" in env:
+        return env
+    if not region:
+        harness = str(prov_cfg.get("harness_config", "") or "")
+        region = env.get("GOOGLE_CLOUD_LOCATION") or env.get("VERTEX_LOCATION") or (
+            "us-east5" if harness == "claude" else "us-central1"
+        )
+    env["GOOGLE_CLOUD_REGION"] = region
+    env["GOOGLE_CLOUD_LOCATION"] = region
+    return env
 
 
 class ScionProvider(WorkerProvider):
@@ -101,6 +124,7 @@ class ScionProvider(WorkerProvider):
         timeout: int = 120,
     ) -> subprocess.CompletedProcess[str]:
         self.last_commands.append(args)
+        self.last_error = ""
         if self.dry_run:
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="[dry-run] ok\n", stderr="")
 
@@ -108,10 +132,7 @@ class ScionProvider(WorkerProvider):
         if extra_env:
             for k, v in extra_env.items():
                 env[str(k)] = str(v)
-        if "GOOGLE_CLOUD_REGION" not in env:
-            region = env.get("GOOGLE_CLOUD_LOCATION") or env.get("VERTEX_LOCATION") or ("us-east5" if self.harness_config == "claude" else "us-central1")
-            env["GOOGLE_CLOUD_REGION"] = region
-            env["GOOGLE_CLOUD_LOCATION"] = region
+        apply_vertex_env(self.config.get("provider", {}), env)
 
         try:
             res = subprocess.run(
@@ -304,7 +325,7 @@ class ScionProvider(WorkerProvider):
         if self.harness_config:
             cmd.extend(["--harness-config", self.harness_config])
         if self.model and self.model.lower() not in ("default", ""):
-            cmd.extend(["--model", self.model])
+            cmd.extend(["--model", resolve_model_alias(self.harness_config, self.model)])
         if self.extra_start_args:
             cmd.extend(self.extra_start_args)
 
@@ -324,6 +345,14 @@ class ScionProvider(WorkerProvider):
             res = self._run([binary, "--project", proj, "stop", clean_id, "--non-interactive"], cwd=proj)
         if res.returncode == 0 and self.dry_run:
             self._dry_run_pods[clean_id] = "paused"
+        return res.returncode == 0
+
+    def stop(self, project_dir: str, worker_id: str) -> bool:
+        clean_id = validate_ticket_id(worker_id)
+        proj = self._validate_project_dir(project_dir)
+        res = self._run([self._resolve_binary(), "--project", proj, "stop", clean_id, "--non-interactive"], cwd=proj)
+        if res.returncode == 0 and self.dry_run:
+            self._dry_run_pods[clean_id] = "stopped"
         return res.returncode == 0
 
     def wake_with_message(self, project_dir: str, worker_id: str, message: str) -> bool:
@@ -359,6 +388,9 @@ class ScionProvider(WorkerProvider):
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
 
+        live = self.health(proj, clean_id)
+        if live is not None and live.is_running:
+            return [binary, "--project", proj, "attach", clean_id]
         cmd = [binary, "--project", proj, "resume", clean_id, "--enable-telemetry", "--attach"]
         cmd.extend(self.extra_resume_args)
         return cmd

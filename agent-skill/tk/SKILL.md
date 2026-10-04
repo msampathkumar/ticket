@@ -179,7 +179,7 @@ tk scion-taskforce init                    # Interactive setup (wizard)
 tk scion-taskforce init --defaults         # Non-interactive with sensible defaults
 
 # Verification test run
-tk scion-taskforce test                    # Verifies provider, model garden, and agent container
+tk scion-taskforce test                    # Creates an init+taskforce ticket, waits for its worker to report back
 
 # Workers
 tk scion-taskforce status                  # Save hook, provider health, workers for this project

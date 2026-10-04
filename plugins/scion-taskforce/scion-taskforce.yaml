@@ -44,6 +44,9 @@ provider:
   binary: scion                   # Path or command name for the provider CLI
   profile: ""                     # Optional SCION runtime profile (--profile)
   harness_config: ""              # Optional SCION harness config (--harness-config)
+  model: ""                       # Model ID or Scion alias (small|medium|large); blank = harness default
+  gcp_project: ""                 # Vertex AI project (GOOGLE_CLOUD_PROJECT); blank = inherit from env
+  gcp_region: ""                  # Vertex AI location, e.g. europe-west3 or global; blank = env or fallback
   branch_prefix: ""               # Optional git branch prefix (default: <ticket-id>)
   extra_start_args: []            # Additional flags passed to 'scion start'
   extra_resume_args: []           # Additional flags passed to 'scion resume'

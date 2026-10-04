@@ -55,22 +55,21 @@ tk scion-taskforce init --defaults
 
 This creates:
 - `.scion-taskforce/scion-taskforce.yaml`: Project orchestrator configuration.
-- `.scion/templates/taskforce-worker/`: Worker template with custom instructions.
+- `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/`: Worker template with custom instructions.
 - `.tickets/.hooks/post-write.d/scion-taskforce`: Hook that dispatches on each ticket save.
 - A one-time Scion Hub link for the project folder.
 
-### 2. Verify Hub & Model Credentials
+### 2. Verify the Pipeline End to End
 
-Run the end-to-end verification test before delegating real tasks:
+`init` offers this check at the end. Run it any time with:
 
 ```bash
-tk scion-taskforce test
+tk scion-taskforce test            # --timeout 600, --keep to leave the ticket open
 ```
 
-This verifies that:
-- Your local container runtime and SCION Hub (`http://127.0.0.1:8080`) are active.
-- Google Cloud Application Default Credentials (ADC) or API keys are valid.
-- The worker can read/write files in the mounted repository workspace.
+It creates a ticket tagged `init,taskforce` and waits for the real path to complete: save hook, `on-save`, worker start, worker note plus `waiting-for-review` merged back. The ticket is closed on success. A failure usually means the Hub or runtime is down, or the worker lacks credentials (`GEMINI_API_KEY` as a Hub secret for gemini-cli; ADC for Vertex AI).
+
+If another worker holds the only slot, the check queues until it frees. Use `tk scion-taskforce test --raw` to launch a worker directly without a ticket.
 
 ### 3. Tag Actionable Work for Autonomous Execution
 

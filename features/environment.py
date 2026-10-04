@@ -40,6 +40,8 @@ def before_scenario(context, scenario):
     os.environ['TK_SCION_TASKFORCE_LOG_DIR'] = str(Path(context.test_dir) / '.state' / 'logs')
     # Isolate from the developer's real ~/.config/tk/scion-taskforce.yaml
     os.environ['XDG_CONFIG_HOME'] = str(Path(context.test_dir) / '.config')
+    # ...and from the developer's real ~/.scion (default harness, harness model aliases)
+    os.environ['TK_SCION_TASKFORCE_SCION_HOME'] = str(Path(context.test_dir) / '.scion-home')
 
     # Initialize tracking
     context.tickets = {}
@@ -55,8 +57,8 @@ def after_scenario(context, scenario):
         shutil.rmtree(context.test_dir)
     if hasattr(context, 'plugin_dir') and os.path.exists(context.plugin_dir):
         shutil.rmtree(context.plugin_dir)
-    for var in ('FAKE_SCION_STATE', 'FAKE_SCION_MODE', 'FAKE_SCION_HUB', 'XDG_CONFIG_HOME',
-                'TK_HOOKS_SYNC', 'TK_HOOK_DEPTH', 'TK_NO_HOOKS'):
+    for var in ('FAKE_SCION_STATE', 'FAKE_SCION_MODE', 'FAKE_SCION_HUB', 'FAKE_SCION_WORKER_REPORT', 'FAKE_SCION_FAIL_CMDS',
+                'XDG_CONFIG_HOME', 'TK_SCION_TASKFORCE_SCION_HOME', 'TK_HOOKS_SYNC', 'TK_HOOK_DEPTH', 'TK_NO_HOOKS'):
         os.environ.pop(var, None)
 
 

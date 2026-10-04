@@ -585,6 +585,13 @@ def step_file_contains(context, rel_path, text):
     assert text in content, f"File {rel_path} does not contain '{text}'\nContent: {content}"
 
 
+@then(r'the file "(?P<rel_path>[^"]+)" should not exist')
+def step_file_not_exists(context, rel_path):
+    """Assert a file relative to test_dir does not exist."""
+    fpath = Path(context.test_dir) / rel_path
+    assert not fpath.exists(), f"File {fpath} should not exist"
+
+
 @then(r'ticket "(?P<ticket_id>[^"]+)" should contain a timestamp in notes')
 def step_ticket_has_timestamp_in_notes(context, ticket_id):
     """Assert ticket has a timestamp in notes section."""
@@ -831,6 +838,10 @@ def save(d):
 if mode == "fail":
     print("Error: podman ps failed: exit status 125", file=sys.stderr)
     sys.exit(125)
+# FAKE_SCION_FAIL_CMDS=stop,suspend makes just those subcommands fail.
+if cmd in [c for c in os.environ.get("FAKE_SCION_FAIL_CMDS", "").split(",") if c]:
+    print(f"Error: {cmd} failed: simulated failure\\nsecond line with detail", file=sys.stderr)
+    sys.exit(1)
 d = load()
 if cmd == "start":
     if mode != "silent":
@@ -840,10 +851,26 @@ if cmd == "start":
     prompts = json.load(open(prompts_file)) if os.path.exists(prompts_file) else {}
     prompts[name] = pos[2] if len(pos) > 2 else ""
     json.dump(prompts, open(prompts_file, "w"))
+    open(state_file + ".start_args", "a").write(json.dumps({"name": name, "args": args}) + "\\n")
+    if os.environ.get("FAKE_SCION_WORKER_REPORT"):
+        # Simulate a worker in an isolated workspace that adds a note and the review tag.
+        import re
+        src = os.path.join(os.getcwd(), ".tickets", name + ".md")
+        if os.path.exists(src):
+            text = re.sub(r"^tags: \\[(.*)\\]$", lambda m: "tags: [" + m.group(1) + ", waiting-for-review]",
+                          open(src).read(), count=1, flags=re.M)
+            if "## Notes" not in text:
+                text += "\\n## Notes\\n"
+            text += "\\n**2026-01-01T00:00:00Z**\\n\\nfake worker report: harness gemini-cli\\n"
+            dst = os.path.join(os.getcwd(), ".scion", "agents", name, "workspace", ".tickets")
+            os.makedirs(dst, exist_ok=True)
+            open(os.path.join(dst, name + ".md"), "w").write(text)
     print(f"started {name}"); sys.exit(0)
 if cmd in ("list", "ls"):
     print(json.dumps([{"name": k, "phase": v} for k, v in d.items()])); sys.exit(0)
-if cmd in ("suspend", "stop"):
+if cmd == "suspend":
+    d[name] = "suspended"; save(d); sys.exit(0)
+if cmd == "stop":
     d[name] = "stopped"; save(d); sys.exit(0)
 if cmd in ("message", "resume"):
     d[name] = "running"; save(d); sys.exit(0)
@@ -863,6 +890,13 @@ if cmd == "hub":
     if name == "status" and os.environ.get("FAKE_SCION_HUB"):
         print("Connection: ok")
         print("Linked: " + ("yes" if hub["linked"] else "no"))
+    sys.exit(0)
+if cmd == "init":
+    os.makedirs(".scion", exist_ok=True); sys.exit(0)
+if cmd == "harness-config" and name == "list":
+    print("NAME        HARNESS     IMAGE")
+    print("gemini-cli  gemini-cli  scion-gemini-cli:latest")
+    print("opencode    opencode    scion-opencode:latest")
     sys.exit(0)
 sys.exit(0)
 '''
@@ -1073,3 +1107,18 @@ def step_file_with_content(context, rel_path, content):
     path = Path(context.test_dir) / rel_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content + "\n")
+
+
+@given(r'the file "(?P<rel_path>[^"]+)" is deleted')
+def step_file_deleted(context, rel_path):
+    """Remove a file inside the scenario sandbox (simulates `rm`, which fires no tk hook)."""
+    (Path(context.test_dir) / rel_path).unlink()
+
+
+@then(r'the fake scion start for "(?P<name>[^"]+)" should include "(?P<text>[^"]+)"')
+def step_fake_scion_start_args(context, name, text):
+    """Assert the argv the fake scion received for `start <name>` contains ``text``."""
+    log = Path(os.environ['FAKE_SCION_STATE'] + '.start_args')
+    calls = [json.loads(ln) for ln in (log.read_text().splitlines() if log.exists() else []) if ln.strip()]
+    argv = [" ".join(c["args"]) for c in calls if c["name"] == name]
+    assert argv and text in argv[-1], f"Expected {text!r} in start args for {name}, got: {argv}"

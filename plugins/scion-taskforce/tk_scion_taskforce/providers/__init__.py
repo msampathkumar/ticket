@@ -64,6 +64,10 @@ class WorkerProvider(ABC):
     def pause(self, project_dir: str, worker_id: str) -> bool:
         """Suspend/pause the worker while preserving its workspace state."""
 
+    def stop(self, project_dir: str, worker_id: str) -> bool:
+        """Stop the worker (ticket closed). Providers without a distinct stop fall back to pause."""
+        return self.pause(project_dir, worker_id)
+
     @abstractmethod
     def wake_with_message(self, project_dir: str, worker_id: str, message: str) -> bool:
         """Wake a paused worker and deliver review feedback."""

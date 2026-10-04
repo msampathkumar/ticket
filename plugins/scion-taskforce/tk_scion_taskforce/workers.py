@@ -22,7 +22,6 @@ from tk_scion_taskforce.telemetry import (
 )
 from tk_scion_taskforce.tickets import (
     TicketInfo,
-    add_ticket_tag,
     append_ticket_note,
     load_all_tickets,
     parse_ticket_file,
@@ -31,6 +30,28 @@ from tk_scion_taskforce.tickets import (
     run_tk_show,
     update_ticket_frontmatter,
 )
+
+NOTE_PREFIX = "**Task Force:**"
+FEEDBACK_PREFIX = "**Review Feedback:**"
+# Notes the plugin writes itself; a ticket whose latest note starts with one is not forwarded to the worker.
+PLUGIN_NOTE_PREFIXES = (NOTE_PREFIX, FEEDBACK_PREFIX, "## Task Force:")
+
+
+def status_note(ticket_path: Path, text: str) -> None:
+    """Append a ``**Task Force:**`` status note unless it would repeat the ticket's latest note."""
+    body = f"{NOTE_PREFIX} {text}"
+    info = parse_ticket_file(ticket_path)
+    if info.notes and info.notes[-1][1] == body:
+        return
+    append_ticket_note(ticket_path, body)
+
+
+def failure_hint(detail: str, ticket_id: str) -> str:
+    """First line of ``detail``, cut to 120 chars, for a ticket note (ticket files are committed to git).
+    The full detail goes to the local logs only."""
+    first = next((line.strip() for line in str(detail or "").splitlines() if line.strip()), "unknown error")
+    short = first if len(first) <= 120 else first[:117] + "..."
+    return f"{short} (see `tk scion-taskforce logs {ticket_id}`)"
 
 
 class DispatchError(Exception):
@@ -276,6 +297,7 @@ def dispatch_ticket(
         pre = provider.preflight(proj_str)
         _record_project_health(state, telemetry, proj_str, pre.ok, pre.message)
         if not pre.ok:
+            telemetry.log_worker(project_dir, ticket.id, f"Provider preflight failed: {pre.message}", trace_id=trace_id)
             raise DispatchError(f"provider preflight failed: {pre.message}", abort_project=True)
 
     # 1. Idempotency: adopt an already-running pod with this ID instead of double-spawning.
@@ -531,9 +553,13 @@ def pause_worker_for_ticket(
     telemetry.log_worker(
         project_dir,
         ticket.id,
-        f"Worker {ticket.id} paused ({reason})",
+        f"Worker {ticket.id} paused ({reason})" if ok else f"Pausing worker {ticket.id} FAILED: {provider.last_error}",
         trace_id=trace_id,
     )
+    if not ok:
+        # The pod may still be running in the shared checkout: keep it `running` so its slot stays taken.
+        status_note(ticket.path, f"could not pause worker `{ticket.id}`: {failure_hint(provider.last_error, ticket.id)}")
+        return False
     telemetry.emit_metric(
         "taskforce.workers.paused_for_review",
         1,
@@ -553,7 +579,7 @@ def pause_worker_for_ticket(
     )
     workers[wkey] = w_entry
     save_state(state)
-    return ok
+    return True
 
 
 def mark_worker_lost(
@@ -645,29 +671,12 @@ def send_feedback_to_worker(
 
     ticket = parse_ticket_file(t_path, project_dir=project_dir)
     review_tag = str(config.get("tags", {}).get("review", "waiting-for-review"))
-    claim_tag = str(config.get("tags", {}).get("claim", "taskforce"))
 
     note_ts = utc_now_iso()
-    if append_note_to_ticket and feedback_message:
-        note_ts = append_ticket_note(t_path, f"**Review Feedback:** {feedback_message}")
-        ticket = parse_ticket_file(t_path, project_dir=project_dir)
-    elif ticket.notes:
+    if not (append_note_to_ticket and feedback_message) and ticket.notes:
         note_ts, last_note_body = ticket.notes[-1]
         if not feedback_message:
             feedback_message = last_note_body
-
-    # Remove waiting-for-review; keep the user's opt-in tag and status: in_progress
-    remove_ticket_tag(t_path, review_tag)
-    add_ticket_tag(t_path, claim_tag)
-    update_ticket_frontmatter(t_path, status="in_progress")
-    ticket = parse_ticket_file(t_path, project_dir=project_dir)
-
-    # Also strip review_tag from the isolated workspace copy so the next sync doesn't re-merge and immediately re-pause
-    workspace = provider.workspace_path(project_dir, ticket.id)
-    if workspace:
-        worker_ticket = workspace / ".tickets" / t_path.name
-        if worker_ticket.is_file():
-            remove_ticket_tag(worker_ticket, review_tag)
 
     proj_str = normalize_project_dir(project_dir)
     wkey = _worker_key(proj_str, ticket.id)
@@ -683,8 +692,23 @@ def send_feedback_to_worker(
         f"and re-add the `{review_tag}` tag when ready for review."
     )
 
+    # Wake first: the ticket changes only once the worker has actually received the feedback.
     ok = provider.wake_with_message(proj_str, ticket.id, prompt_msg)
-    cycles = int(w_entry.get("feedback_cycles", 0)) + 1
+    if ok:
+        if append_note_to_ticket and feedback_message:
+            note_ts = append_ticket_note(t_path, f"{FEEDBACK_PREFIX} {feedback_message}")
+        # Clear the review tag (the opt-in tag is user-owned and left alone) in the project ticket and
+        # in an isolated workspace copy, so the next merge does not re-add it and re-pause the worker.
+        remove_ticket_tag(t_path, review_tag)
+        if ticket.status != "closed":
+            update_ticket_frontmatter(t_path, status="in_progress")
+        workspace = provider.workspace_path(project_dir, ticket.id)
+        if workspace:
+            worker_ticket = workspace / ".tickets" / t_path.name
+            if worker_ticket.is_file():
+                remove_ticket_tag(worker_ticket, review_tag)
+        ticket = parse_ticket_file(t_path, project_dir=project_dir)
+    cycles = int(w_entry.get("feedback_cycles", 0)) + (1 if ok else 0)
 
     span_id = telemetry.emit_span(
         name="taskforce.worker.feedback_wake",
@@ -720,14 +744,17 @@ def send_feedback_to_worker(
     telemetry.log_worker(
         project_dir,
         ticket.id,
-        f"Worker {ticket.id} resumed with feedback (cycle #{cycles}): {feedback_message}",
+        f"Worker {ticket.id} resumed with feedback (cycle #{cycles}): {feedback_message}"
+        if ok
+        else f"Waking worker {ticket.id} with feedback FAILED: {provider.last_error}",
         trace_id=trace_id,
     )
-    telemetry.emit_metric(
-        "taskforce.workers.feedback_cycles",
-        1,
-        attributes={"project.name": project_slug(project_dir), "ticket.id": ticket.id},
-    )
+    if ok:
+        telemetry.emit_metric(
+            "taskforce.workers.feedback_cycles",
+            1,
+            attributes={"project.name": project_slug(project_dir), "ticket.id": ticket.id},
+        )
 
     w_entry.update(
         {
@@ -853,11 +880,9 @@ def _count_running(workers: dict[str, dict[str, Any]], proj_str: str | None = No
     )
 
 
-def max_workers_per_project(proj_cfg: dict[str, Any], proj_path: Path) -> int:
-    """Per-project worker limit (project-local `.scion/` worktrees allow 5 when left at the default 1)."""
-    configured = proj_cfg.get("watcher", {}).get("max_concurrent_per_project", 1)
-    has_worktree = (proj_path / ".scion").is_dir()
-    return 5 if (configured == 1 and has_worktree) else int(configured)
+def max_workers_per_project(proj_cfg: dict[str, Any]) -> int:
+    """Per-project worker limit. Workers mount the shared checkout, so the default is 1."""
+    return int(proj_cfg.get("watcher", {}).get("max_concurrent_per_project", 1))
 
 
 @contextmanager

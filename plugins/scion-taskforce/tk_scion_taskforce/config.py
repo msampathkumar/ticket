@@ -12,6 +12,10 @@ try:
 except ImportError:
     yaml = None
 
+# Seeded per project by `init`; modelled on a known-good Scion agent (gemini-cli + API-key auth).
+WORKER_TEMPLATE = "tk-worker-gemini-cli-with-api-key-auth"
+LEGACY_TEMPLATES = ("taskforce-worker",)  # removed by `uninit`; no longer seeded
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": 1,
     "tags": {
@@ -36,7 +40,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "driver": "scion",
         "binary": "scion",
         "profile": "",
+        "template": WORKER_TEMPLATE,
         "harness_config": "",
+        "model": "",
+        "gcp_project": "",
+        "gcp_region": "",
         "branch_prefix": "",
         "extra_start_args": [],
         "extra_resume_args": [],
@@ -110,11 +118,13 @@ provider:
   driver: scion                   # Orchestrator backend ('scion' today; extensible)
   binary: scion                   # Path or command name for the provider CLI
   profile: ""                     # Optional SCION runtime profile (--profile)
-  template: "taskforce-worker"    # Project-level SCION template (.scion/templates/taskforce-worker)
-  harness_config: "claude"        # Claude Code harness with Google Cloud Vertex AI & ADC
-  model: ""                       # Default model via Vertex AI Model Garden
+  template: "tk-worker-gemini-cli-with-api-key-auth"  # Project-level SCION template (.scion/templates/<name>)
+  harness_config: "gemini-cli"    # Scion harness-config (see `scion harness-config list`)
+  model: ""                       # Model ID or Scion alias (small|medium|large); blank = harness default
+  gcp_project: ""                 # Vertex AI project (GOOGLE_CLOUD_PROJECT); blank = inherit from env
+  gcp_region: ""                  # Vertex AI location, e.g. europe-west3 or global; blank = env or fallback
   branch_prefix: ""               # Optional git branch prefix (default: <ticket-id>)
-  extra_start_args: ["--harness-auth", "vertex-ai"] # Additional flags passed to 'scion start'
+  extra_start_args: ["--harness-auth", "api-key"] # gemini-cli: GEMINI_API_KEY (Scion secret); other harnesses: vertex-ai
   extra_resume_args: []           # Additional flags passed to 'scion resume'
   auto_accept_prompts: true       # Press Enter on known harness start-up prompts inside the pod
   auto_accept_prompt_patterns: ["Yes, I trust this folder"]
@@ -307,39 +317,47 @@ def load_config(
     return cfg
 
 
-def seed_project_scion_template(
-    project_dir: Path,
-    harness: str = "claude",
-    model: str = "",
-) -> Path:
-    """Seed project-scoped SCION template at <project>/.scion/templates/taskforce-worker/."""
-    tmpl_dir = project_dir / ".scion" / "templates" / "taskforce-worker"
-    tmpl_dir.mkdir(parents=True, exist_ok=True)
-
-    agent_yaml = tmpl_dir / "scion-agent.yaml"
-    agent_yaml_content = """# SCION Task Force worker agent template
+WORKER_TEMPLATE_FILES = {
+    "scion-agent.yaml": f"""# {WORKER_TEMPLATE}: standard tk task force worker.
+# Pairs with harness `gemini-cli` + `--harness-auth api-key` (set in scion-taskforce.yaml), the setup
+# proven by a hand-made Scion agent. Per Scion's template rules, harness/harness_config are NOT set here.
 schema_version: "1"
-description: "SCION Task Force autonomous worker template"
-agent_instructions: "agents.md"
-system_prompt: "system-prompt.md"
-"""
-    agent_yaml.write_text(agent_yaml_content, encoding="utf-8")
+description: "tk task force worker: implements one tk ticket on its own branch, then reports back for review"
+agent_instructions: agents.md
+system_prompt: system-prompt.md
+""",
+    "agents.md": """# tk Task Force Worker
 
-    agents_md = tmpl_dir / "agents.md"
-    agents_md_content = """# SCION Task Force Worker Instructions
+You own exactly one `tk` ticket. Its ID, branch and full details are in your task prompt.
 
-You are an autonomous engineering agent working inside a project repository tracked by `tk`.
-Follow these guidelines to fulfill your task:
-1. Carefully review your assigned task instructions and ticket context.
-2. Implement necessary code or documentation edits cleanly and focused on the requirements.
-3. Validate your changes (run test suites, verify file outputs).
-4. Commit your work to git when complete and record notes in the ticket.
-"""
-    agents_md.write_text(agents_md_content, encoding="utf-8")
+## Work
+1. Read the ticket and its acceptance criteria before changing anything.
+2. Make the smallest change that meets them. Follow the repository's AGENTS.md / CONTRIBUTING.md.
+3. Run the project's tests and linters; fix what you broke.
 
-    sys_prompt = tmpl_dir / "system-prompt.md"
-    sys_prompt.write_text("You are an autonomous SCION taskforce engineering worker.\n", encoding="utf-8")
+## Report back
+- Record what you changed, how you verified it and any open questions as a note in
+  `.tickets/<id>.md` (use `tk add-note <id> "..."` when `tk` is installed).
+- Add the review tag named in your task prompt (default `waiting-for-review`), then stop. Review feedback arrives as a new note.
 
+## Git
+- Commit on your ticket branch only. Do not push, merge, rebase onto other branches or `git stash`;
+  the checkout may be shared with a human.
+""",
+    "system-prompt.md": """# Software Engineer (tk Task Force)
+
+You are a careful senior engineer working autonomously on one ticket. You prefer small, verified
+changes over broad rewrites, state assumptions explicitly, and report honestly what you did not finish.
+""",
+}
+
+
+def seed_project_scion_template(project_dir: Path) -> Path:
+    """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/ (overwrites the three template files)."""
+    tmpl_dir = project_dir / ".scion" / "templates" / WORKER_TEMPLATE
+    tmpl_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in WORKER_TEMPLATE_FILES.items():
+        (tmpl_dir / name).write_text(content, encoding="utf-8")
     return tmpl_dir
 
 
@@ -347,8 +365,10 @@ def init_config(
     project_dir: Path | None = None,
     global_scope: bool = False,
     force: bool = False,
-    harness: str = "claude",
+    harness: str = "gemini-cli",
     model: str = "",
+    gcp_project: str = "",
+    gcp_region: str = "",
     claim_tag: str = "taskforce",
     review_tag: str = "waiting-for-review",
     max_concurrent: int = 1,
@@ -382,22 +402,18 @@ def init_config(
                 existing_file.rename(old_backup)
                 archived_count += 1
 
-    yaml_content = STARTER_YAML_TEMPLATE
-    if (
-        harness != "claude"
-        or model != ""
-        or claim_tag != "taskforce"
-        or review_tag != "waiting-for-review"
-        or max_concurrent != 1
-    ):
-        yaml_content = (
-            yaml_content
-            .replace('harness_config: "claude"', f'harness_config: "{harness}"')
-            .replace('model: ""', f'model: "{model}"')
-            .replace("claim: taskforce", f"claim: {claim_tag}")
-            .replace("review: waiting-for-review", f"review: {review_tag}")
-            .replace("max_concurrent_per_project: 1", f"max_concurrent_per_project: {max_concurrent}")
-        )
+    auth = "api-key" if harness == "gemini-cli" else "vertex-ai"
+    yaml_content = (
+        STARTER_YAML_TEMPLATE
+        .replace('harness_config: "gemini-cli"', f'harness_config: "{harness}"')
+        .replace('["--harness-auth", "api-key"]', f'["--harness-auth", "{auth}"]')
+        .replace('model: ""', f'model: "{model}"')
+        .replace('gcp_project: ""', f'gcp_project: "{gcp_project}"')
+        .replace('gcp_region: ""', f'gcp_region: "{gcp_region}"')
+        .replace("claim: taskforce", f"claim: {claim_tag}")
+        .replace("review: waiting-for-review", f"review: {review_tag}")
+        .replace("max_concurrent_per_project: 1", f"max_concurrent_per_project: {max_concurrent}")
+    )
 
     yaml_target.write_text(yaml_content, encoding="utf-8")
 
@@ -411,7 +427,7 @@ def init_config(
     prompt_target.write_text(default_prompt_content, encoding="utf-8")
 
     # Seed the project-scoped SCION template
-    seed_project_scion_template(base_dir, harness=harness, model=model)
+    seed_project_scion_template(base_dir)
 
     return yaml_target, archived_count
 
@@ -435,10 +451,11 @@ def uninit_config(
         import shutil
         shutil.rmtree(scion_dir)
         removed_any = True
-    tmpl_dir = base_dir / ".scion" / "templates" / "taskforce-worker"
-    if tmpl_dir.is_dir():
-        import shutil
-        shutil.rmtree(tmpl_dir)
-        removed_any = True
+    for name in (WORKER_TEMPLATE, *LEGACY_TEMPLATES):
+        tmpl_dir = base_dir / ".scion" / "templates" / name
+        if tmpl_dir.is_dir():
+            import shutil
+            shutil.rmtree(tmpl_dir)
+            removed_any = True
     return removed_any, str(scion_dir)
 

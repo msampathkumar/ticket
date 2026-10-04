@@ -9,6 +9,8 @@ catches up on worker reports, then decides what to do for the saved ticket:
 - worker reported back (``waiting-for-review``)       -> pause it, freeing its slot
 - no free slot                                        -> note "queued"
 - ticket closed                                       -> stop its worker, start the next queued
+- ``taskforce`` removed / ``no-taskforce`` added      -> stop and delete its worker (branch kept), note it
+- ticket file deleted                                 -> stop and delete its worker (branch kept)
 - otherwise                                           -> nothing
 
 Status notes are written straight to the ticket file (not via ``tk``), so they never re-trigger
@@ -24,32 +26,36 @@ from typing import Any
 
 from tk_scion_taskforce.config import load_config
 from tk_scion_taskforce.providers import WorkerProvider, get_provider
-from tk_scion_taskforce.state import load_state, normalize_project_dir, save_state
+from tk_scion_taskforce.state import load_state, normalize_project_dir, save_state, state_lock
 from tk_scion_taskforce.telemetry import TelemetryManager, utc_now_iso
 from tk_scion_taskforce.tickets import (
     TicketInfo,
-    append_ticket_note,
     get_ready_tickets,
+    get_tickets_dir,
     load_all_tickets,
     merge_worker_ticket_copy,
     parse_ticket_file,
-    resolve_ticket_path,
+    validate_ticket_id,
 )
 from tk_scion_taskforce.workers import (
+    PLUGIN_NOTE_PREFIXES,
     DispatchError,
     _count_running,
     _worker_key,
     dispatch_ticket,
+    failure_hint,
     is_eligible_for_dispatch,
     mark_worker_lost,
     max_workers_per_project,
     pause_worker_for_ticket,
     project_lock,
     send_feedback_to_worker,
+    status_note,
 )
 
-NOTE_PREFIX = "**Task Force:**"
 ACTIVE_STATES = ("running", "paused")
+# Every state in which Scion may still hold an agent for the ticket (everything but "deleted").
+LIVE_STATES = ("running", "paused", "stopped", "error")
 
 
 @dataclass
@@ -80,17 +86,18 @@ def _context(project_dir: str | Path, explicit_config: str | None, dry_run: bool
         cfg=cfg,
         telemetry=TelemetryManager(cfg),
         provider=get_provider(cfg, dry_run=dry_run),
-        state=load_state(),
+        state={},  # loaded by each caller under project_lock + state_lock
     )
 
 
 def _note(ticket_path: Path, text: str) -> None:
-    """Append a status note unless it would repeat the ticket's latest note."""
-    body = f"{NOTE_PREFIX} {text}"
-    info = parse_ticket_file(ticket_path)
-    if info.notes and info.notes[-1][1] == body:
-        return
-    append_ticket_note(ticket_path, body)
+    status_note(ticket_path, text)
+
+
+def _log_failure(ctx: _Ctx, tid: str, what: str, detail: str) -> None:
+    """Full failure detail goes to the local logs only; ticket notes get ``failure_hint``."""
+    ctx.telemetry.log_event("ERROR", f"{tid}: {what}: {detail}", ticket_id=tid)
+    ctx.telemetry.log_worker(ctx.project, tid, f"{what}: {detail}")
 
 
 def _project_workers(ctx: _Ctx, states: tuple[str, ...] = ACTIVE_STATES) -> list[dict[str, Any]]:
@@ -98,28 +105,54 @@ def _project_workers(ctx: _Ctx, states: tuple[str, ...] = ACTIVE_STATES) -> list
 
 
 def _stop_worker(ctx: _Ctx, ticket: TicketInfo, entry: dict[str, Any]) -> None:
-    ok = ctx.provider.pause(ctx.proj_str, ticket.id)
-    entry.update({"state": "stopped", "ended_at": utc_now_iso()})
-    if ok:
+    if ctx.provider.stop(ctx.proj_str, ticket.id):
+        entry.update({"state": "stopped", "ended_at": utc_now_iso()})
         _note(ticket.path, f"ticket closed; stopped worker `{ticket.id}`.")
+        ctx.telemetry.log_event("INFO", f"{ticket.id}: ticket closed, worker stopped", ticket_id=ticket.id)
+        return
+    # The pod may still run in the shared checkout: keep the entry active so its slot stays taken
+    # and the next save or `sync` retries the stop.
+    _log_failure(ctx, ticket.id, "ticket closed, stopping the worker failed", ctx.provider.last_error)
+    _note(ticket.path, f"ticket closed; could not stop worker `{ticket.id}`: {failure_hint(ctx.provider.last_error, ticket.id)}")
+
+
+def _remove_worker(ctx: _Ctx, tid: str, entry: dict[str, Any], reason: str, ticket: TicketInfo | None) -> None:
+    """Stop and delete the ticket's Scion agent, keeping its branch. Notes the ticket if it still exists."""
+    if entry.get("state") in ACTIVE_STATES:
+        ctx.provider.stop(ctx.proj_str, tid)  # best effort; delete removes a stopped agent either way
+    ok = ctx.provider.delete(ctx.proj_str, tid, preserve_branch=True)
+    # Marked deleted even on failure so a missing agent is not retried (and re-noted) on every save.
+    entry.update({"state": "deleted", "ended_at": utc_now_iso()})
+    branch = entry.get("branch") or tid
+    if ticket is not None:
+        if ok:
+            _note(ticket.path, f"{reason}; stopped and removed worker `{tid}` (branch `{branch}` kept).")
+        else:
+            _note(ticket.path, f"{reason}; could not remove worker `{tid}`: {failure_hint(ctx.provider.last_error, tid)}")
+    if ok:
+        ctx.telemetry.log_event("INFO", f"{tid}: {reason}, worker removed", ticket_id=tid)
     else:
-        _note(ticket.path, f"ticket closed; could not stop worker `{ticket.id}`: {ctx.provider.last_error}")
-    ctx.telemetry.log_event("INFO" if ok else "ERROR", f"{ticket.id}: ticket closed, worker stop ok={ok}", ticket_id=ticket.id)
+        _log_failure(ctx, tid, f"{reason}, removing the worker failed", ctx.provider.last_error)
 
 
 def _refresh(ctx: _Ctx) -> None:
-    """Catch up on worker reports: merge isolated-workspace notes, pause reviewed workers, stop closed tickets."""
+    """Keep each worker in step with its ticket: merge reports, pause reviewed workers, stop workers of
+    closed tickets, remove workers whose ticket opted out or was deleted."""
     # shortcut: worker reports are picked up on the next save or `sync`, not when written; subscribe to
     # Scion notifications (`scion notifications subscribe --triggers COMPLETED,WAITING_FOR_INPUT`) when
     # review latency matters.
     review_tag = ctx.tag("review", "waiting-for-review")
+    claim_tag = ctx.tag("claim", "taskforce")
+    ignore_tag = ctx.tag("ignore", "no-taskforce")
     tickets = load_all_tickets(ctx.project)
-    for entry in _project_workers(ctx):
+    for entry in _project_workers(ctx, LIVE_STATES):
         tid = str(entry.get("ticket_id", ""))
         ticket = tickets.get(tid)
         if ticket is None:
+            _remove_worker(ctx, tid, entry, "ticket file deleted", None)
             continue
-        workspace = ctx.provider.workspace_path(ctx.proj_str, tid)
+        active = entry.get("state") in ACTIVE_STATES
+        workspace = ctx.provider.workspace_path(ctx.proj_str, tid) if active else None
         if workspace is not None:
             merged = merge_worker_ticket_copy(ticket.path, workspace / ".tickets" / ticket.path.name, review_tag)
             if merged["notes"] or merged["review_tag"]:
@@ -131,16 +164,21 @@ def _refresh(ctx: _Ctx) -> None:
                     ticket_id=tid,
                 )
                 ticket = parse_ticket_file(ticket.path, project_dir=ctx.project)
-        if ticket.status == "closed":
+        if claim_tag not in ticket.tags or ignore_tag in ticket.tags:
+            reason = f"`{claim_tag}` tag removed" if claim_tag not in ticket.tags else f"`{ignore_tag}` tag added"
+            _remove_worker(ctx, tid, entry, reason, ticket)
+        elif not active:
+            continue
+        elif ticket.status == "closed":
             _stop_worker(ctx, ticket, entry)
         elif review_tag in ticket.tags and entry.get("state") == "running":
-            pause_worker_for_ticket(ctx.project, ticket, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state, reason=review_tag)
-            ctx.paused += 1
+            if pause_worker_for_ticket(ctx.project, ticket, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state, reason=review_tag):
+                ctx.paused += 1
     save_state(ctx.state)
 
 
 def _has_slot(ctx: _Ctx) -> tuple[bool, int, int]:
-    limit = max_workers_per_project(ctx.cfg, ctx.project)
+    limit = max_workers_per_project(ctx.cfg)
     busy = _count_running(ctx.workers, ctx.proj_str)
     global_limit = int(ctx.cfg.get("watcher", {}).get("max_concurrent", 10))
     return busy < limit and _count_running(ctx.workers) < global_limit, busy, limit
@@ -152,9 +190,23 @@ def _start(ctx: _Ctx, ticket: TicketInfo, ack: str) -> bool:
         ok = dispatch_ticket(ctx.project, ticket, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state)
     except DispatchError as exc:
         ctx.errors += 1
+        ctx.telemetry.log_event("ERROR", f"{ticket.id}: could not start a Scion worker: {exc}", ticket_id=ticket.id)
+        # Record the failure so the queue does not retry it on every save of another ticket;
+        # a save of this ticket or `sync` retries it.
+        entry = ctx.workers.setdefault(_worker_key(ctx.proj_str, ticket.id), {})
+        entry.update(
+            {
+                "ticket_id": ticket.id,
+                "project_dir": ctx.proj_str,
+                "provider": ctx.provider.provider_name,
+                "state": "error",
+                "error": str(exc),
+                "ended_at": utc_now_iso(),
+            }
+        )
         _note(
             ticket.path,
-            f"could not start a Scion worker: {str(exc)[:400]}\n"
+            f"could not start a Scion worker: {failure_hint(str(exc), ticket.id)}\n"
             "Retry by saving the ticket again or with `tk scion-taskforce sync`.",
         )
         return False
@@ -166,13 +218,18 @@ def _start(ctx: _Ctx, ticket: TicketInfo, ack: str) -> bool:
     return ok
 
 
-def _start_queued(ctx: _Ctx) -> int:
-    """Start opted-in ready tickets while slots are free. Stops at the first launch failure."""
+def _start_queued(ctx: _Ctx, retry_errors: bool = False) -> int:
+    """Start opted-in ready tickets while slots are free. Stops at the first launch failure.
+
+    Tickets whose last start failed (state ``error``) are skipped unless ``retry_errors`` (``sync``),
+    so a broken runtime does not retry and re-note them on every save of an unrelated ticket.
+    """
+    skip = ACTIVE_STATES if retry_errors else (*ACTIVE_STATES, "error")
     started = 0
     for ticket in get_ready_tickets(ctx.project):
         if not is_eligible_for_dispatch(ticket, ctx.cfg)[0]:
             continue
-        if ctx.workers.get(_worker_key(ctx.proj_str, ticket.id), {}).get("state") in ACTIVE_STATES:
+        if ctx.workers.get(_worker_key(ctx.proj_str, ticket.id), {}).get("state") in skip:
             continue
         if not _has_slot(ctx)[0]:
             break
@@ -180,6 +237,13 @@ def _start_queued(ctx: _Ctx) -> int:
             break
         started += 1
     return started
+
+
+def _saved_ticket_path(project: Path, ticket_id: str) -> Path | None:
+    """Exact ``.tickets/<id>.md`` only. The hook passes the file's basename as the ID, and a
+    substring match (as interactive commands allow) could resolve ``abc-1`` to ``abc-12``."""
+    path = get_tickets_dir(project) / f"{validate_ticket_id(ticket_id)}.md"
+    return path if path.is_file() else None
 
 
 def on_save(
@@ -191,10 +255,10 @@ def on_save(
 ) -> str:
     """Handle one ticket save. Returns a one-line summary (written to the hook log)."""
     ctx = _context(project_dir, explicit_config, dry_run)
-    with project_lock(ctx.project):
-        ctx.state = load_state()  # re-read under the lock
+    with project_lock(ctx.project), state_lock():
+        ctx.state = load_state()
         _refresh(ctx)
-        t_path = resolve_ticket_path(ctx.project, ticket_id)
+        t_path = _saved_ticket_path(ctx.project, ticket_id)
         if t_path is None:
             return f"{ticket_id}: not found"
         ticket = parse_ticket_file(t_path, project_dir=ctx.project)
@@ -216,7 +280,7 @@ def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
 
     if active:
         last = ticket.notes[-1][1] if ticket.notes else ""
-        if event == "add-note" and last and not last.startswith(NOTE_PREFIX):
+        if event == "add-note" and last and not last.startswith(PLUGIN_NOTE_PREFIXES):
             ok = send_feedback_to_worker(
                 ctx.project, ticket.id, None, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state,
                 append_note_to_ticket=False,
@@ -224,7 +288,8 @@ def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
             if ok:
                 _note(ticket.path, f"worker `{ticket.id}` is already in progress; forwarded the latest update.")
             else:
-                _note(ticket.path, f"could not forward the update to worker `{ticket.id}`: {ctx.provider.last_error}")
+                hint = failure_hint(ctx.provider.last_error, ticket.id)
+                _note(ticket.path, f"could not forward the update to worker `{ticket.id}`: {hint}")
             return f"{ticket.id}: forwarded note (ok={ok})"
         return f"{ticket.id}: worker already active"
 
@@ -244,6 +309,14 @@ def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
     return f"{ticket.id}: started={ok}"
 
 
+def collect_reports(project_dir: str | Path, explicit_config: str | None = None) -> None:
+    """Merge worker reports back into tickets (and pause reviewed workers) without starting anything."""
+    ctx = _context(project_dir, explicit_config, dry_run=False)
+    with project_lock(ctx.project), state_lock():
+        ctx.state = load_state()
+        _refresh(ctx)
+
+
 def sync_project(
     project_dir: str | Path,
     explicit_config: str | None = None,
@@ -253,7 +326,7 @@ def sync_project(
     """One-shot catch-up for saves the hook could not see."""
     ctx = _context(project_dir, explicit_config, dry_run)
     stats = {"started": 0, "paused": 0, "lost": 0, "errors": 0}
-    with project_lock(ctx.project):
+    with project_lock(ctx.project), state_lock():
         ctx.state = load_state()
         _refresh(ctx)
         # shortcut: dead pods are detected only by `sync`; run it from cron or a Scion notification when
@@ -270,7 +343,7 @@ def sync_project(
                         ctx.project, ticket, ctx.telemetry, ctx.provider, ctx.state, live.state if live else "missing"
                     )
                     stats["lost"] += 1
-        stats["started"] = _start_queued(ctx)
+        stats["started"] = _start_queued(ctx, retry_errors=True)
         stats["paused"], stats["errors"] = ctx.paused, ctx.errors + stats["lost"]
         save_state(ctx.state)
     return stats
@@ -290,14 +363,24 @@ def hook_path(project_dir: str | Path) -> Path:
     return Path(normalize_project_dir(project_dir)) / ".tickets" / ".hooks" / "post-write.d" / HOOK_NAME
 
 
+def _ensure_ignored(ignore_file: Path, lines: tuple[str, ...]) -> None:
+    """Append the missing ``lines`` to a ``.gitignore``, keeping whatever is already there."""
+    existing = ignore_file.read_text(encoding="utf-8") if ignore_file.exists() else ""
+    missing = [line for line in lines if line not in existing.splitlines()]
+    if missing:
+        prefix = "" if not existing or existing.endswith("\n") else "\n"
+        ignore_file.write_text(existing + prefix + "\n".join(missing) + "\n", encoding="utf-8")
+
+
 def install_hook(project_dir: str | Path) -> Path:
     target = hook_path(project_dir)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(HOOK_SCRIPT, encoding="utf-8")
     target.chmod(0o755)
-    ignore = target.parent.parent / ".gitignore"
-    if not ignore.exists():
-        ignore.write_text("hooks.log\n", encoding="utf-8")
+    hooks_dir = target.parent.parent
+    # Machine-local files: the hook log, this hook, and the telemetry log symlink (telemetry.py).
+    _ensure_ignored(hooks_dir / ".gitignore", ("hooks.log", f"post-write.d/{HOOK_NAME}"))
+    _ensure_ignored(hooks_dir.parent / ".gitignore", (".scion-taskforce-logs",))
     return target
 
 

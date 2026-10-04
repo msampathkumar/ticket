@@ -367,7 +367,7 @@ ticket/
 3. **GitHub Sync Plugin (`plugins/github`)**:
    - Syncs GitHub issues and pull requests into local `.tickets/` markdown files.
 4. **Scion Task Force Plugin (`plugins/scion-taskforce`, standalone optional plugin)**:
-   - Straightforward integration tool wrapping the native `scion` CLI. A per-project `tk` post-write hook (`.tickets/.hooks/post-write.d/scion-taskforce`) runs `tk scion-taskforce on-save <id>` on every save; tickets tagged `taskforce` get a status note and a 1:1 worker (or the update is forwarded to the existing worker). Uses project-level templates (`.scion/templates/taskforce-worker`), merges worker notes back on `waiting-for-review`, stops workers on `tk close`, supports Google Cloud Vertex AI ADC, and emits OpenTelemetry to local rotating logs (30-day retention). `tk scion-taskforce sync` catches up on hand edits. No daemon runs. Includes an interactive setup wizard (`tk scion-taskforce init`, which links the folder to the Hub once and installs the hook) and automated test runner (`tk scion-taskforce test`). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
+   - Straightforward integration tool wrapping the native `scion` CLI. A per-project `tk` post-write hook (`.tickets/.hooks/post-write.d/scion-taskforce`) runs `tk scion-taskforce on-save <id>` on every save; tickets tagged `taskforce` get a status note and a 1:1 worker (or the update is forwarded to the existing worker). Uses project-level templates (`.scion/templates/tk-worker-gemini-cli-with-api-key-auth`), merges worker notes back on `waiting-for-review`, stops workers on `tk close`, supports Google Cloud Vertex AI ADC, and emits OpenTelemetry to local rotating logs (30-day retention). `tk scion-taskforce sync` catches up on hand edits. No daemon runs. Includes an interactive setup wizard (`tk scion-taskforce init`, which links the folder to the Hub once and installs the hook) and automated test runner (`tk scion-taskforce test`). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
 
 ---
 
@@ -712,7 +712,7 @@ tk scion-taskforce init                    # Interactive setup (wizard)
 tk scion-taskforce init --defaults         # Non-interactive with sensible defaults
 
 # Verification test run
-tk scion-taskforce test                    # Verifies provider, model garden, and agent container
+tk scion-taskforce test                    # Creates an init+taskforce ticket, waits for its worker to report back
 
 # Workers
 tk scion-taskforce status                  # Save hook, provider health, workers for this project
@@ -912,7 +912,9 @@ Each `on-save` run takes the per-project lock (`flock` under `~/.local/state/tk/
 | No free slot | Queue | "request noted; queued (N of M workers busy)…" |
 | Worker active and event is `add-note` from a human | `scion message <id>` (wakes a paused worker) | "worker `<id>` is already in progress; forwarded the latest update." |
 | Worker reported back (`waiting-for-review`) | Pause worker, free its slot, start next queued ticket | None |
-| Ticket `closed` with a tracked worker | Stop worker, start next queued ticket | "ticket closed; stopped worker `<id>`." |
+| Ticket `closed` with a tracked worker | `scion stop <id>`, start next queued ticket | "ticket closed; stopped worker `<id>`." |
+| `taskforce` removed or `no-taskforce` added, worker tracked | `scion stop` + `scion delete --preserve-branch` | "`taskforce` tag removed; stopped and removed worker `<id>` (branch `<id>` kept)." |
+| Ticket file deleted, worker tracked (seen on the next save or `sync`) | `scion stop` + `scion delete --preserve-branch`, free its slot | None (no ticket to note) |
 
 - Status notes are written directly to the ticket file, so they never re-trigger the hook. `TK_HOOK_DEPTH` also blocks recursion.
 - Identical consecutive Task Force notes are deduplicated.
@@ -925,7 +927,7 @@ Each `on-save` run takes the per-project lock (`flock` under `~/.local/state/tk/
 1. **Opt-in**: only tickets the *user* tagged `taskforce` (`tags.claim`) are picked up; `no-taskforce` (`tags.ignore`) is a hard override. The task force never adds the opt-in tag itself.
 2. **One worker per ticket, in the ticket's own project**: the worker ID and branch match the ticket ID (e.g. `tic-822k`). Any number of projects can use the task force at once; each has its own hook and Hub project.
 3. **Review checkpoint**: workers report via notes and the `waiting-for-review` tag, then get paused. A human note wakes the worker (`scion message <id> --wake`); `tk scion-taskforce attach <id>` opens an interactive session.
-4. **Cleanup**: `tk close` stops the worker; `tk scion-taskforce gc` deletes workers of tickets closed more than 5 days ago.
+4. **Lifecycle in step with the ticket**: `tk close` stops the worker (`scion stop`; reopening starts a fresh one). Removing `taskforce`, adding `no-taskforce`, or deleting the ticket file stops and deletes the worker, keeping its branch. `tk scion-taskforce gc` deletes stopped workers of tickets closed more than 5 days ago.
 5. **Observability**: the lifecycle is traced with OpenTelemetry (traces, metrics, structured logs) to local files under `~/.local/state/tk/scion-taskforce/logs/`.
 
 ### 1.3 Key Decisions
@@ -1139,7 +1141,7 @@ stateDiagram-v2
    > | Mode | How you get it | What each pod sees | Safe `max_concurrent_per_project` |
    > | :--- | :--- | :--- | :--- |
    > | **Hub / external** | repo has no `.scion/` directory | the *live* checkout mounted at `/workspace` — every worker shares one working tree and will switch branches, stash and rebase under each other (observed in the field: 10 concurrent workers left a repo on a worker branch with 5 stray stashes and swallowed the untracked `.tickets/` directory) | **1** |
-   > | **Project-local** | you ran `scion init` once in the repo (creates `.scion/` and ignores `.scion/agents/`) | its own git worktree at `<repo>/.scion/agents/<id>/workspace` on branch `<id>`; the task force mirrors the ticket file in and merges notes/review tag back (§4.3) | can be raised (e.g. 3–5); left at 1 it becomes 5 |
+   > | **Project-local** | you ran `scion init` once in the repo (creates `.scion/` and ignores `.scion/agents/`) | its own git worktree at `<repo>/.scion/agents/<id>/workspace` on branch `<id>`; the task force mirrors the ticket file in and merges notes/review tag back (§4.3) | can be raised explicitly (e.g. 3–5); the default stays 1 because spawns pass `-w <project>`, which mounts the shared checkout |
    >
    > Different projects are always independent and run in parallel up to `max_concurrent`. **Recommended:** run `scion init` in every repo you hand to the task force (see §10).
 6. **Liveness (`sync`)**: for each tracked `running` worker, `provider.health()` is consulted. If the pod is gone, stopped or crashed (e.g. container exit 137/255), the worker is marked `error`, a `worker.lost` span + `ERROR` log is emitted, and a triage note is appended to the ticket (which stays `in_progress`). The slot is freed. `tk reopen <id>` (keeping the `taskforce` tag) fires the hook, which deletes the dead pod (`--preserve-branch`) and relaunches.
@@ -1211,8 +1213,8 @@ While a ticket is in `status: in_progress` with tag `waiting-for-review`:
    - **Via `tk` CLI or Web UI**: The user appends a new note (`tk add-note <id> "Please also handle edge case X"`) or edits the ticket in `tk-webui`.
    - **Via Explicit Plugin Command**: The user runs `tk scion-taskforce feedback <id> "Please also handle edge case X"`.
 2. **How the Hook Routes Feedback**:
-   - `tk add-note` fires the hook with `TK_EVENT=add-note`. If the ticket has an active (`running` or `paused`) worker and the latest note is not a `**Task Force:**` status note, the note is forwarded. Hand edits are not forwarded; use `feedback` or `tk add-note`.
-   - Forwarding (and `tk scion-taskforce feedback`) emits a `taskforce.worker.feedback_wake` span linked to the ticket's `trace_id`, removes `waiting-for-review` (keeping `status: in_progress` and `taskforce`), and calls `provider.wake_with_message(project_dir, id, message)`:
+   - `tk add-note` fires the hook with `TK_EVENT=add-note`. If the ticket has an active (`running` or `paused`) worker and the latest note is not plugin-authored (`**Task Force:**`, `**Review Feedback:**` or `## Task Force:`), the note is forwarded. Hand edits are not forwarded; use `feedback` or `tk add-note`.
+   - Forwarding (and `tk scion-taskforce feedback`) emits a `taskforce.worker.feedback_wake` span linked to the ticket's `trace_id` and first calls `provider.wake_with_message(project_dir, id, message)`. Only when the wake succeeds does it remove `waiting-for-review` (keeping `taskforce`; status becomes `in_progress`). `feedback` refuses closed tickets and tickets without an active worker:
      ```bash
      scion --project "<project_dir>" message "<id>" \
        "New review feedback received on ticket <id>: ... re-add the 'waiting-for-review' tag when ready for review." \
@@ -1281,16 +1283,16 @@ worker:
 
 provider:
   driver: scion                                 # Active worker backend (default: scion; swappable in future)
-  scion:
-    harness: ""                                 # Optional harness override (e.g., claude, gemini, codex)
-    template: default                           # SCION agent template (-t)
-    model: ""                                   # Optional model alias or ID (e.g., large)
-    preserve_branch_on_gc: true                 # Pass --preserve-branch on scion delete
-    auto_accept_prompts: true                   # Press Enter on known harness start-up prompts inside the pod
-    auto_accept_prompt_patterns: ["Yes, I trust this folder"]
-    harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
-    container_user: scion                       # User owning the tmux session inside the pod
-    tmux_session: scion                         # tmux session name used by the scion image
+  harness_config: ""                            # Scion harness-config (`scion harness-config list`)
+  template: tk-worker-gemini-cli-with-api-key-auth                    # SCION agent template (-t)
+  model: ""                                     # Model ID or Scion alias (small|medium|large); blank = harness default
+  gcp_project: ""                               # Vertex AI project -> GOOGLE_CLOUD_PROJECT (overrides the shell)
+  gcp_region: ""                                # Vertex AI location -> GOOGLE_CLOUD_REGION/LOCATION (overrides the shell)
+  auto_accept_prompts: true                     # Press Enter on known harness start-up prompts inside the pod
+  auto_accept_prompt_patterns: ["Yes, I trust this folder"]
+  harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
+  container_user: scion                         # User owning the tmux session inside the pod
+  tmux_session: scion                           # tmux session name used by the scion image
 
 telemetry:
   enabled: true                                 # Enable OpenTelemetry tracing, metrics & structured logs
@@ -1457,10 +1459,11 @@ tk scion-taskforce [--config <path>] [--dry-run] <command> [args]
 
 | Command | Description |
 | :--- | :--- |
-| `init [--global] [--force] [--defaults]` | Create `scion-taskforce.yaml` and the worker template; for project scope, link the folder to the Hub once and install the save hook. |
+| `init [--global] [--force] [--defaults\|--interactive]` | Run `tk init`/`scion init` if missing; menu wizard with validation (harness, model, GCP project, location, tag, workers); create `scion-taskforce.yaml` and the worker template; for project scope, link the folder to the Hub once and install the save hook. |
 | `uninit [--global]` | Remove `.scion-taskforce/` and the save hook. |
 | `hook install\|uninstall\|status` | Manage `.tickets/.hooks/post-write.d/scion-taskforce`. |
-| `test [--prompt "<text>"]` | Launch a throwaway worker to verify the Hub, runtime and model credentials. |
+| `test [--timeout <s>] [--keep]` | End-to-end check: create a ticket tagged `init,<claim tag>`, wait (default 600 s) for its worker to report back with the review tag, then close it unless `--keep`. Requires the save hook. Init offers to run it. |
+| `test --raw [--prompt "<text>"]` | Launch a throwaway worker directly (no ticket, no hook) to verify the Hub, runtime and model credentials. |
 
 ### Dispatch
 
@@ -1476,8 +1479,8 @@ tk scion-taskforce [--config <path>] [--dry-run] <command> [args]
 | :--- | :--- |
 | `status` | Save hook, provider health and workers for the current project. |
 | `list` \| `ps` | All tracked workers across projects. |
-| `feedback <id> "<message>"` | Append a review note, clear `waiting-for-review`, and wake the worker. |
-| `attach <id>` | Resume (if paused) and attach interactively to the worker's session. |
+| `feedback <id> "<message>"` | Wake the ticket's active worker with a review note, then clear `waiting-for-review`. |
+| `attach <id>` | Attach to a running worker, or resume a suspended/stopped one and attach. |
 | `pause <id>` | Pause a running worker. |
 | `logs [<id>]` | Show `taskforce.log` or `workers/<project>/<id>.log` (including rotated `.gz`). |
 | `brief <id>` | Show the persisted worker brief. |
@@ -2368,7 +2371,7 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 
 - **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
 - **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
-- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Autonomous worker orchestrator wrapping SCION Hub (`http://127.0.0.1:8080`). Features an interactive setup wizard (`tk scion-taskforce init`), automated test runner (`tk scion-taskforce test`), project worker templates (`.scion/templates/taskforce-worker`), Vertex AI Model Garden integration, and OpenTelemetry logging. *(optional; requires Python 3.9+ and the `scion` CLI)*
+- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Autonomous worker orchestrator wrapping SCION Hub (`http://127.0.0.1:8080`). Features an interactive setup wizard (`tk scion-taskforce init`), automated test runner (`tk scion-taskforce test`), project worker templates (`.scion/templates/tk-worker-gemini-cli-with-api-key-auth`), Vertex AI Model Garden integration, and OpenTelemetry logging. *(optional; requires Python 3.9+ and the `scion` CLI)*
 
 ---
 
@@ -2602,41 +2605,53 @@ This installs `tk-scion-taskforce` to `~/.local/bin/`. Ensure `~/.local/bin` is 
 Run the setup wizard in your repository to configure the project orchestrator and seed the worker template:
 
 ```bash
-# Interactive setup with guided prompts and defaults
-tk scion-taskforce init
-
-# Or non-interactive setup with production defaults
-tk scion-taskforce init --defaults
-
-# Force overwrite existing templates
-tk scion-taskforce init --force
+tk scion-taskforce init                 # wizard when run in a terminal
+tk scion-taskforce init --defaults      # no questions; detected harness, blank model, shell's GCP env
+tk scion-taskforce init --interactive   # force the wizard (e.g. piped input)
+tk scion-taskforce init --force         # overwrite instead of archiving old config as *.old
 ```
 
-The setup wizard configures:
-- **SCION Harness Engine**: Defaults to `claude` (Claude Code) or `opencode`.
-- **Model**: Default model ID or alias (blank for Model Garden Claude Sonnet via Vertex AI).
-- **Google Cloud Settings**: Automatically detects active `gcloud` project ID and sets default region (`us-east5` for Vertex AI Anthropic models).
-- **Project Template**: Seeds `.scion/templates/taskforce-worker/` with `scion-agent.yaml`, `agents.md`, and `system-prompt.md`.
-- **Project Configuration**: Generates `.scion-taskforce/scion-taskforce.yaml` and `.scion-taskforce/prompt.md`.
+**Pre-flight.** `init` runs `tk init` when `.tickets/` is missing and `scion init` when `.scion/` is missing, so one command sets up a fresh repository.
 
-### 2. End-to-End Test Worker (`tk scion-taskforce test`)
+**Wizard.** Each question is a numbered menu. Press Enter for the default (`*`), pick a number, or choose `Other` to type a value. Invalid input is re-asked; `q` quits without changing anything. A summary is confirmed before anything is written.
 
-Verify your SCION Hub connection, container permissions, and model authentication with a real test run:
+| # | Question | Options | Validation |
+|---|----------|---------|------------|
+| 1 | Harness | From `scion harness-config list`; default `gemini-cli` (the worker template's pairing), else Scion's `default_harness_config` | Must be installed |
+| 2 | Model | Harness aliases (`small`, `medium`, `large`, …) with resolved IDs, or the harness default. `opencode` also lists `google-vertex/` Gemini IDs and defaults to one: its own default picks a non-Vertex model | No quotes or backslashes |
+| 3 | Google Cloud project | Detected from `GOOGLE_CLOUD_PROJECT` or `gcloud`. Skipped for `gemini-cli` | Project ID format |
+| 4 | Vertex AI location | `europe-west3` (Frankfurt, default), `global`, `eu`, `europe-west4`, `us-central1`, `us-east5`. Skipped for `gemini-cli` | Google Cloud location; AWS-style names like `eu-central1` are rejected with a hint |
+| 5 | Opt-in tag | `taskforce` | Letters, digits, `-_.` |
+| 6 | Max concurrent workers | 1 (recommended), 2, 3 | 1–10 |
+
+**Auth follows the harness.** `gemini-cli` gets `--harness-auth api-key` and reads `GEMINI_API_KEY` from Scion secrets (`scion hub secret list --scope=hub`). Other harnesses get `--harness-auth vertex-ai`; the project and location are saved as `provider.gcp_project` / `provider.gcp_region` and passed to every `scion start` as `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_REGION` (they override the shell).
+
+**Standard worker template.** `init` seeds `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/`, modelled on a hand-made Scion agent that ran successfully with `gemini-cli`, API-key auth and `gemini-3.5-flash` (the `medium` alias):
+
+| File | Content |
+|------|---------|
+| `scion-agent.yaml` | `schema_version`, `description`, `agent_instructions`, `system_prompt`. No `harness`/`harness_config`: Scion's template rules reserve those for the launch config |
+| `agents.md` | Own one ticket; smallest verified change; report via a ticket note plus the review tag; commit on the ticket branch only |
+| `system-prompt.md` | Careful senior engineer persona |
+
+`init` also writes `.scion-taskforce/scion-taskforce.yaml` and `prompt.md`. Projects set up earlier keep `taskforce-worker` until you re-run `init`; `uninit` removes both template folders.
+
+### 2. End-to-End Check (`tk scion-taskforce test`)
+
+`init` offers to run this when it finishes. It verifies the whole pipeline with a real ticket instead of a side channel:
 
 ```bash
-# Run standard test worker
-tk scion-taskforce test
-
-# Or run with a custom test prompt
-tk scion-taskforce test --prompt "Create a hello.txt file and exit"
+tk scion-taskforce test                  # ticket-based check (default timeout 600 s)
+tk scion-taskforce test --keep           # leave the check ticket open afterwards
+tk scion-taskforce test --raw            # old check: launch a worker directly, no ticket or hook
 ```
 
-The test runner:
-1. Provisions an isolated test worker through the SCION Hub (`http://127.0.0.1:8080`).
-2. Automatically accepts container workspace trust prompts.
-3. Watches the agent write `poem.md` (default: 4-line poem about the latest Google Gemini model).
-4. Verifies the generated file in the local workspace.
-5. Cleans up the test worker container and temporary test artifacts.
+1. Creates a ticket tagged `init` and `taskforce` that asks the worker to report its harness, model, branch and `ls`, change nothing, and add the review tag.
+2. The save hook dispatches it: status notes, a Scion worker with the project template.
+3. Prints each new ticket note while it waits, merging the worker's report back every 10 s.
+4. Succeeds when the review tag arrives, then closes the ticket, which stops the worker. The ticket keeps the report.
+
+It fails fast if dispatch fails, and stops at the timeout with `attach`/`logs` hints. In both cases the ticket stays open for inspection. If another worker holds the project's only slot, the check waits in the queue.
 
 ---
 
@@ -2675,7 +2690,9 @@ sequenceDiagram
 | tagged, deps still open | Note "waiting on dependencies: …"; starts when the blocker closes |
 | with an active worker, after `tk add-note` by a human | Forward the note to the worker (`scion message --wake`) |
 | whose worker added `waiting-for-review` | Pause the worker, free its slot, start the next queued ticket |
-| closed | Stop its worker, then start the next queued ticket |
+| closed | Stop its worker (`scion stop`), then start the next queued ticket |
+| with a worker, after `taskforce` is removed or `no-taskforce` added | Stop and delete the worker (branch kept); note it on the ticket |
+| deleted (file removed; seen on the next save or `sync`) | Stop and delete its worker (branch kept), free its slot |
 | not tagged | Nothing |
 
 Notes are written straight to the ticket file with a `**Task Force:**` prefix, so they never re-trigger the hook and are never forwarded to workers. A per-project lock prevents two quick saves from starting two workers.
@@ -2692,15 +2709,15 @@ Notes are written straight to the ticket file with a `**Task Force:**` prefix, s
 
 | Command | Description |
 | :--- | :--- |
-| `tk scion-taskforce init [--defaults] [--force]` | Initialize config and worker template, link the folder to the SCION Hub, install the save hook |
+| `tk scion-taskforce init [--defaults\|--interactive] [--force]` | Run `tk init`/`scion init` if needed, then the setup wizard: config, worker template, Hub link, save hook |
 | `tk scion-taskforce hook install\|uninstall\|status` | Manage the `tk` post-write hook for this project |
 | `tk scion-taskforce on-save <id> [--event <e>]` | Handle one ticket save (called by the hook) |
 | `tk scion-taskforce sync [dir]` | Catch up on saves the hook missed; flag dead workers; start queued tickets |
-| `tk scion-taskforce test [--prompt "<text>"]` | Run end-to-end test worker to verify SCION Hub & LLM credentials |
+| `tk scion-taskforce test [--timeout <s>] [--keep] [--raw]` | End-to-end check: ticket tagged `init`+`taskforce`, wait for its worker to report back, then close it |
 | `tk scion-taskforce dispatch <id>` | Start a verified worker for one opted-in ticket now |
 | `tk scion-taskforce status` | Save hook, provider health and workers for this project |
 | `tk scion-taskforce list` | All tracked workers across projects |
-| `tk scion-taskforce feedback <id> "<msg>"` | Add review feedback, remove `waiting-for-review`, and wake worker |
+| `tk scion-taskforce feedback <id> "<msg>"` | Wake the ticket's active worker with a review note, then remove `waiting-for-review` |
 | `tk scion-taskforce attach <id>` | Attach interactively to worker terminal session |
 | `tk scion-taskforce pause <id>` | Manually pause worker container |
 | `tk scion-taskforce logs [<id>]` | View OpenTelemetry logs (including rotated `.gz`) |
@@ -2734,10 +2751,12 @@ watcher:
 provider:
   driver: scion                   # Backend driver
   binary: scion                   # Provider CLI command
-  template: taskforce-worker      # SCION template in .scion/templates/
-  harness_config: claude          # Harness engine (claude or opencode)
-  model: ""                       # Model ID (blank for Vertex AI default)
-  extra_start_args: ["--harness-auth", "vertex-ai"]
+  template: tk-worker-gemini-cli-with-api-key-auth      # SCION template in .scion/templates/
+  harness_config: gemini-cli      # Scion harness-config (`scion harness-config list`)
+  model: medium                   # Model ID or Scion alias; blank = harness default
+  gcp_project: my-project         # Vertex AI project; blank = inherit GOOGLE_CLOUD_PROJECT
+  gcp_region: europe-west3        # Vertex AI location; blank = shell env or harness fallback
+  extra_start_args: ["--harness-auth", "api-key"]  # init: api-key for gemini-cli, vertex-ai otherwise
   auto_accept_prompts: true       # Auto-confirm workspace trust prompts
 
 telemetry:
@@ -3105,22 +3124,21 @@ tk scion-taskforce init --defaults
 
 This creates:
 - `.scion-taskforce/scion-taskforce.yaml`: Project orchestrator configuration.
-- `.scion/templates/taskforce-worker/`: Worker template with custom instructions.
+- `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/`: Worker template with custom instructions.
 - `.tickets/.hooks/post-write.d/scion-taskforce`: Hook that dispatches on each ticket save.
 - A one-time Scion Hub link for the project folder.
 
-### 2. Verify Hub & Model Credentials
+### 2. Verify the Pipeline End to End
 
-Run the end-to-end verification test before delegating real tasks:
+`init` offers this check at the end. Run it any time with:
 
 ```bash
-tk scion-taskforce test
+tk scion-taskforce test            # --timeout 600, --keep to leave the ticket open
 ```
 
-This verifies that:
-- Your local container runtime and SCION Hub (`http://127.0.0.1:8080`) are active.
-- Google Cloud Application Default Credentials (ADC) or API keys are valid.
-- The worker can read/write files in the mounted repository workspace.
+It creates a ticket tagged `init,taskforce` and waits for the real path to complete: save hook, `on-save`, worker start, worker note plus `waiting-for-review` merged back. The ticket is closed on success. A failure usually means the Hub or runtime is down, or the worker lacks credentials (`GEMINI_API_KEY` as a Hub secret for gemini-cli; ADC for Vertex AI).
+
+If another worker holds the only slot, the check queues until it frees. Use `tk scion-taskforce test --raw` to launch a worker directly without a ticket.
 
 ### 3. Tag Actionable Work for Autonomous Execution
 
