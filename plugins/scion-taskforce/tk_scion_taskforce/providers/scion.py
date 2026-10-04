@@ -16,6 +16,8 @@ from tk_scion_taskforce.tickets import validate_ticket_id
 from tk_scion_taskforce.wizard import resolve_model_alias
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# Scion `activity` values that mean the harness stopped and waits on someone (phase stays `running`).
+TURN_DONE_ACTIVITIES = ("completed", "waiting_for_input", "limits_exceeded")
 
 
 @dataclass
@@ -23,16 +25,28 @@ class WorkerStatus:
     worker_id: str      # 1:1 with ticket_id (e.g. "tic-a1b2")
     project_dir: str    # Project root path
     state: str          # "running" | "paused" | "stopped" | "error" | "unknown"
+    activity: str = ""  # Scion `activity` (working, completed, waiting_for_input, ...); "" if not reported
 
     @property
     def is_running(self) -> bool:
         return self.state == "running"
+
+    @property
+    def turn_done(self) -> bool:
+        """The pod is up but its harness finished its turn (phase stays ``running``)."""
+        return self.is_running and self.activity in TURN_DONE_ACTIVITIES
 
 
 @dataclass
 class ProviderResult:
     ok: bool
     message: str = ""
+    reason: str = ""  # preflight failures: "runtime_down" | "hub_unlinked" | ""
+
+
+def _runtime_down(detail: str) -> bool:
+    low = detail.lower()
+    return "podman" in low and ("failed" in low or "cannot connect" in low or "exit status 125" in low)
 
 
 def _hint_for(detail: str, project_dir: str) -> str:
@@ -40,7 +54,7 @@ def _hint_for(detail: str, project_dir: str) -> str:
     low = detail.lower()
     if "must be in .gitignore" in low or "run 'scion init'" in low:
         return f" → HINT: add `/.scion/agents/` to .git/info/exclude in {project_dir}'s repo, then retry."
-    if "podman" in low and ("failed" in low or "cannot connect" in low or "exit status 125" in low):
+    if _runtime_down(detail):
         return " → HINT: the container runtime is down; start it (`podman machine start`) and retry."
     if "no such file" in low and "scion" in low or "not found" in low and "binary" in low:
         return " → HINT: install the scion CLI or set provider.binary in scion-taskforce.yaml."
@@ -182,9 +196,11 @@ class ScionProvider:
             timeout=60,
         )
         if res.returncode != 0:
-            return ProviderResult(ok=False, message=self.last_error)
+            return ProviderResult(
+                ok=False, message=self.last_error, reason="runtime_down" if _runtime_down(self.last_error) else ""
+            )
 
-        # Dispatch must never create a Hub project (that is `init`'s job): refuse an unlinked folder.
+        # Preflight never links a folder; dispatch may (configured projects only, `provider.auto_link_hub`).
         if self._hub_unlinked(self._hub_status(binary, proj)):
             return ProviderResult(
                 ok=False,
@@ -192,9 +208,25 @@ class ScionProvider:
                     f"project {proj} is not linked to the Scion Hub"
                     f" → HINT: run `tk scion-taskforce init` in {proj} once to link it, then retry."
                 ),
+                reason="hub_unlinked",
             )
 
         return ProviderResult(ok=True, message="ok")
+
+    def start_runtime(self) -> ProviderResult:
+        """Start the Podman machine (`podman machine start`). tk never stops it."""
+        podman = shutil.which("podman")
+        if self.dry_run or not podman:
+            return ProviderResult(ok=False, message="no `podman` to start")
+        try:
+            res = subprocess.run([podman, "machine", "start"], capture_output=True, text=True, timeout=180)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return ProviderResult(ok=False, message=f"`podman machine start` failed: {exc}")
+        out = _ANSI_RE.sub("", res.stderr or res.stdout or "").strip()
+        if res.returncode == 0 or "already running" in out.lower():
+            return ProviderResult(ok=True, message="started the Podman machine (`podman machine start`)")
+        first = out.splitlines()[0][:200] if out else f"exit {res.returncode}"
+        return ProviderResult(ok=False, message=f"`podman machine start` failed: {first}")
 
     def _hub_status(self, binary: str, proj: str) -> str | None:
         """Read-only `scion hub status` output, or ``None`` if the command failed."""
@@ -277,9 +309,11 @@ class ScionProvider:
         branch: str,
         env: dict[str, str],
         template: str = "",
+        config_file: str = "",
     ) -> bool:
         """Start a worker. ``branch`` is passed only when set (``worker.git: branch``); ``template``
-        overrides ``provider.template`` (role templates) and is used only if it exists in the project."""
+        overrides ``provider.template`` (role templates) and is used only if it exists in the project.
+        ``config_file`` is a Scion inline config (``--config``) layered over the template at launch."""
         clean_id = validate_ticket_id(worker_id)
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
@@ -291,6 +325,8 @@ class ScionProvider:
         tmpl = template or self.template
         if tmpl and (Path(proj) / ".scion" / "templates" / tmpl).is_dir():
             cmd.extend(["-t", tmpl])
+        if config_file:
+            cmd.extend(["--config", config_file])
         if self.profile:
             cmd.extend(["--profile", self.profile])
         if self.harness_config:
@@ -415,7 +451,10 @@ class ScionProvider:
             if not wid:
                 continue
             raw_status = str(item.get("phase") or item.get("status") or item.get("state") or "unknown")
-            workers[wid] = WorkerStatus(worker_id=wid, project_dir=proj, state=_normalize_state(raw_status))
+            activity = str(item.get("activity") or "").strip().lower()
+            workers[wid] = WorkerStatus(
+                worker_id=wid, project_dir=proj, state=_normalize_state(raw_status), activity=activity
+            )
         return workers
 
     def workspace_path(self, project_dir: str, worker_id: str) -> Path | None:

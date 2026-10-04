@@ -47,8 +47,11 @@ confidentiality in this project.
 
 ## tk contract (wins over the role guidance below)
 - Work alone. There is no coordinator, manager or other agent to message; the ticket is your only channel.
-- Report in the ticket: add a note with what you did, how you verified it and any open questions, then
-  add the review tag named in your task prompt (default `waiting-for-review`) and stop.
+- Use `tk` for updates (normally on your PATH; check `command -v tk`). Read the ticket and new feedback
+  with `tk show <id>`, again whenever you resume. Share progress and questions with `tk add-note <id> "..."`.
+- Report with `tk add-note`: what you did, how you verified it and any open questions. Then add the review
+  tag named in your task prompt (default `waiting-for-review`) with `tk update <id> --tags ...`, keeping the
+  existing tags, and stop. Change only your own ticket; never close, reopen or create tickets.
 - Follow the git rule in your task prompt. Never run `git init`. Never push unless the ticket asks for it.
 - Where the role guidance says to message a coordinator, push to signal completion, or write to
   `.design/` or a project log, put that content in your ticket report instead.

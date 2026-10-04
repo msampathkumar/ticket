@@ -14,12 +14,14 @@ catches up on worker reports, then decides what to do for the saved ticket:
 - otherwise                                           -> nothing
 
 Status notes are written straight to the ticket file (not via ``tk``), so they never re-trigger
-the hook. ``sync`` runs the same catch-up for saves the hook cannot see (hand edits, ``git pull``,
-worker edits) and also flags workers whose pods died.
+the hook. ``sync`` (and ``watch``, which repeats it) runs the same catch-up for saves the hook cannot
+see (hand edits, ``git pull``, worker edits), flags workers whose pods died, and pauses workers whose
+Scion activity says their turn ended without a report.
 """
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -141,12 +143,27 @@ def _remove_worker(ctx: _Ctx, tid: str, entry: dict[str, Any], reason: str, tick
         _log_failure(ctx, tid, f"{reason}, removing the worker failed", ctx.provider.last_error)
 
 
+def _merge_report(ctx: _Ctx, ticket: TicketInfo, review_tag: str) -> TicketInfo:
+    """Merge the worker's workspace copy of the ticket (notes + review tag) into the project ticket."""
+    workspace = ctx.provider.workspace_path(ctx.proj_str, ticket.id)
+    if workspace is None:
+        return ticket
+    merged = merge_worker_ticket_copy(ticket.path, workspace / ".tickets" / ticket.path.name, review_tag)
+    if not (merged["notes"] or merged["review_tag"]):
+        return ticket
+    ctx.telemetry.log_event(
+        "INFO",
+        f"{ticket.id}: merged {merged['notes']} note(s)"
+        + (f" and the '{review_tag}' tag" if merged["review_tag"] else "")
+        + " from the worker workspace",
+        ticket_id=ticket.id,
+    )
+    return parse_ticket_file(ticket.path, project_dir=ctx.project)
+
+
 def _refresh(ctx: _Ctx) -> None:
     """Keep each worker in step with its ticket: merge reports, pause reviewed workers, stop workers of
     closed tickets, remove workers whose ticket opted out or was deleted."""
-    # shortcut: worker reports are picked up on the next save or `sync`, not when written; subscribe to
-    # Scion notifications (`scion notifications subscribe --triggers COMPLETED,WAITING_FOR_INPUT`) when
-    # review latency matters.
     claim_tag, ignore_tag, review_tag = tags(ctx.cfg)
     tickets = load_all_tickets(ctx.project)
     for entry in _project_workers(ctx, LIVE_STATES):
@@ -156,18 +173,8 @@ def _refresh(ctx: _Ctx) -> None:
             _remove_worker(ctx, tid, entry, "ticket file deleted", None)
             continue
         active = entry.get("state") in ACTIVE_STATES
-        workspace = ctx.provider.workspace_path(ctx.proj_str, tid) if active else None
-        if workspace is not None:
-            merged = merge_worker_ticket_copy(ticket.path, workspace / ".tickets" / ticket.path.name, review_tag)
-            if merged["notes"] or merged["review_tag"]:
-                ctx.telemetry.log_event(
-                    "INFO",
-                    f"{tid}: merged {merged['notes']} note(s)"
-                    + (f" and the '{review_tag}' tag" if merged["review_tag"] else "")
-                    + " from the worker workspace",
-                    ticket_id=tid,
-                )
-                ticket = parse_ticket_file(ticket.path, project_dir=ctx.project)
+        if active:
+            ticket = _merge_report(ctx, ticket, review_tag)
         if claim_tag not in ticket.tags or ignore_tag in ticket.tags:
             reason = f"`{claim_tag}` tag removed" if claim_tag not in ticket.tags else f"`{ignore_tag}` tag added"
             _remove_worker(ctx, tid, entry, reason, ticket)
@@ -347,31 +354,63 @@ def collect_reports(project_dir: str | Path, explicit_config: str | None = None)
         _refresh(ctx)
 
 
+def _check_pods(ctx: _Ctx, stats: dict[str, int]) -> None:
+    """After refresh, check each still-running worker's pod.
+
+    - Pod missing or not running: mark the worker lost (note on the ticket, slot freed).
+    - Pod up but its Scion activity says the turn ended (``TURN_DONE_ACTIVITIES``), past
+      ``watcher.turn_grace_seconds`` (a stale ``completed`` can linger right after a wake): merge the
+      workspace report again, since it may have landed after refresh, then pause the worker. Without a
+      report the ticket gets a note asking for direction.
+    """
+    review_tag = tags(ctx.cfg)[2]
+    grace = float(ctx.cfg.get("watcher", {}).get("turn_grace_seconds", 60))
+    tickets = load_all_tickets(ctx.project)
+    for entry in _project_workers(ctx, ("running",)):
+        ticket = tickets.get(str(entry.get("ticket_id", "")))
+        if ticket is None:
+            continue
+        live = ctx.provider.health(ctx.proj_str, ticket.id)
+        if live is None or not live.is_running:
+            mark_worker_lost(ctx.project, ticket, ctx.telemetry, ctx.state, live.state if live else "missing")
+            stats["lost"] += 1
+            continue
+        if not live.turn_done or time.time() - float(entry.get("turn_started") or 0) < grace:
+            continue
+        ticket = _merge_report(ctx, ticket, review_tag)
+        reported = review_tag in ticket.tags
+        reason = review_tag if reported else f"turn {live.activity}"
+        if not pause_worker_for_ticket(ctx.project, ticket, ctx.telemetry, ctx.provider, ctx.state, reason=reason):
+            continue
+        ctx.paused += 1
+        if not reported:
+            _note(
+                ticket.path,
+                f"worker `{ticket.id}` stopped without a report (Scion activity: {live.activity}); paused it. "
+                f"Add a note to answer or redirect it, or run `tk scion-taskforce attach {ticket.id}` to see "
+                "its session.",
+            )
+
+
 def sync_project(
     project_dir: str | Path,
     explicit_config: str | None = None,
     dry_run: bool = False,
     check_liveness: bool = True,
+    retry_errors: bool = True,
 ) -> dict[str, int]:
-    """One-shot catch-up for saves the hook could not see."""
+    """One-shot catch-up for saves the hook could not see. ``watch`` passes ``retry_errors=False`` so a
+    broken runtime is not retried (and noted) on every pass."""
     ctx = _context(project_dir, explicit_config, dry_run)
     stats = {"started": 0, "paused": 0, "lost": 0, "errors": 0}
     with project_lock(ctx.project), state_lock():
         ctx.state = load_state()
         _refresh(ctx)
-        # shortcut: dead pods are detected only by `sync`; run it from cron or a Scion notification when
-        # lost workers holding slots becomes a problem.
+        # shortcut: pods are checked only by `sync`/`watch`, not on every save (one `scion list` per
+        # worker); subscribe to Scion Hub notifications when reports must be picked up instantly.
         if check_liveness:
-            tickets = load_all_tickets(ctx.project)
-            for entry in _project_workers(ctx, ("running",)):
-                ticket = tickets.get(str(entry.get("ticket_id", "")))
-                if ticket is None:
-                    continue
-                live = ctx.provider.health(ctx.proj_str, ticket.id)
-                if live is None or not live.is_running:
-                    mark_worker_lost(ctx.project, ticket, ctx.telemetry, ctx.state, live.state if live else "missing")
-                    stats["lost"] += 1
-        stats["started"] = _start_queued(ctx, retry_errors=True)
+            _check_pods(ctx, stats)
+        stats["started"] = _start_queued(ctx, retry_errors=retry_errors)
         stats["paused"], stats["errors"] = ctx.paused, ctx.errors + stats["lost"]
         save_state(ctx.state)
     return stats

@@ -39,7 +39,7 @@ If the ticket has open dependencies, it waits for them. If all worker slots are 
 
 ## 2. Review the report
 
-The worker leaves its changes in the working tree, adds a report note listing the changed files and tags the ticket `waiting-for-review`. With `worker.git: branch` it commits on a branch named after the ticket instead. The next save in the project, or `tk scion-taskforce sync`, merges the report and pauses the worker.
+The worker leaves its changes in the working tree, adds a report note listing the changed files and tags the ticket `waiting-for-review`. With `worker.git: branch` it commits on a branch named after the ticket instead. The next save in the project, or `tk scion-taskforce sync`, merges the report and pauses the worker. To have reports picked up without saving, keep `tk scion-taskforce watch` running in a spare terminal.
 
 ```bash
 tk scion-taskforce sync

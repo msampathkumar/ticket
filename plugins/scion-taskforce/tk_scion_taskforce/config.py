@@ -37,6 +37,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "max_concurrent_per_project": 1,
         "spawn_verify_timeout_seconds": 30,
         "spawn_verify_poll_seconds": 2,
+        "turn_grace_seconds": 60,
         "gc_retention_days": 5,
     },
     "worker": {
@@ -57,6 +58,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "branch_prefix": "",
         "extra_start_args": [],
         "extra_resume_args": [],
+        "auto_start_runtime": True,
+        "auto_link_hub": True,
+        "mount_tk": True,
     },
     "telemetry": {
         "enabled": True,
@@ -96,6 +100,8 @@ watcher:
                                   # tree and can fight over branches. Raise above 1 only if you accept that.
   spawn_verify_timeout_seconds: 30 # Wait up to N s for a spawned pod to report 'running' before claiming
   spawn_verify_poll_seconds: 2    # Poll interval while verifying a freshly spawned pod
+  turn_grace_seconds: 60          # `sync`/`watch` treat a worker whose Scion activity is completed or
+                                  # waiting_for_input as done only this long after its turn began
   gc_retention_days: 5            # Days after a ticket closes before `gc` deletes its stopped worker
 
 # 3. Worker Prompt Settings
@@ -128,6 +134,10 @@ provider:
   branch_prefix: ""               # Branch prefix for worker.git: branch (default branch: <ticket-id>)
   extra_start_args: ["--harness-auth", "api-key"] # gemini-cli: GEMINI_API_KEY (Scion secret); other harnesses: vertex-ai
   extra_resume_args: []           # Additional flags passed to 'scion resume'
+  auto_start_runtime: true        # Run `podman machine start` when the container runtime is down (never stops it)
+  auto_link_hub: true             # Link this configured project to the Scion Hub if it is unlinked at dispatch
+  mount_tk: true                  # Mount this machine's `tk` (found at each start) read-only at /usr/local/bin/tk
+                                  # in every worker; set false for remote runtime brokers
 
 # 5. OpenTelemetry & Local Log Rotation Settings
 telemetry:
@@ -338,10 +348,14 @@ You own exactly one `tk` ticket. Its ID and full details are in your task prompt
 2. Make the smallest change that meets them. Follow the repository's AGENTS.md / CONTRIBUTING.md.
 3. Run the project's tests and linters; fix what you broke.
 
-## Report back
-- Record what you changed, how you verified it and any open questions as a note in
-  `.tickets/<id>.md` (use `tk add-note <id> "..."` when `tk` is installed).
-- Add the review tag named in your task prompt (default `waiting-for-review`), then stop. Review feedback arrives as a new note.
+## Use tk for updates
+- The ticket is your only channel. `tk` is normally on your PATH (check: `command -v tk`); if it is
+  missing, follow the fallback in your task prompt.
+- Read updates with `tk show <id>`, again whenever you resume: feedback and answers arrive as new notes.
+- Share progress, questions and your final report with `tk add-note <id> "..."`.
+- When done or blocked, add the review tag named in your task prompt (default `waiting-for-review`) with
+  `tk update <id> --tags ...`, keeping the existing tags, then stop.
+- Change only your own ticket. Never close, reopen or create tickets.
 
 ## Git and confidentiality
 - Follow the git and confidentiality rules in your task prompt. Git is optional: never run `git init`.
@@ -357,7 +371,7 @@ changes over broad rewrites, state assumptions explicitly, and report honestly w
 
 def seed_project_scion_template(project_dir: Path, force: bool = False) -> Path:
     """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/. Existing files are kept unless ``force``,
-    except that the pre-2026-10 git section of agents.md is replaced in place (other edits are kept)."""
+    except that the pre-2026-10 git and report sections of agents.md are replaced in place (other edits are kept)."""
     tmpl_dir = project_dir / ".scion" / "templates" / WORKER_TEMPLATE
     tmpl_dir.mkdir(parents=True, exist_ok=True)
     for name, content in WORKER_TEMPLATE_FILES.items():
@@ -366,8 +380,12 @@ def seed_project_scion_template(project_dir: Path, force: bool = False) -> Path:
             target.write_text(content, encoding="utf-8")
     agents = tmpl_dir / "agents.md"
     text = agents.read_text(encoding="utf-8")
+    original = text
     if _OLD_GIT_SECTION in text:
         text = text.replace(_OLD_GIT_SECTION + _OLD_GIT_EXTRA, _OLD_GIT_SECTION).replace(_OLD_GIT_SECTION, _NEW_GIT_SECTION)
+    if _OLD_REPORT_SECTION in text:
+        text = text.replace(_OLD_REPORT_SECTION, _NEW_REPORT_SECTION)
+    if text != original:
         agents.write_text(text, encoding="utf-8")
     return tmpl_dir
 
@@ -379,6 +397,16 @@ _OLD_GIT_SECTION = """## Git
 """
 _OLD_GIT_EXTRA = "- If the workspace is not a git repository, never run `git init`: skip committing and say so in your report.\n"
 _NEW_GIT_SECTION = "## Git and confidentiality" + WORKER_TEMPLATE_FILES["agents.md"].split("## Git and confidentiality", 1)[1]
+# deprecated: report section seeded before tk was mounted in workers (it allowed file edits); remove after 2027-01-01
+_OLD_REPORT_SECTION = """## Report back
+- Record what you changed, how you verified it and any open questions as a note in
+  `.tickets/<id>.md` (use `tk add-note <id> "..."` when `tk` is installed).
+- Add the review tag named in your task prompt (default `waiting-for-review`), then stop. Review feedback arrives as a new note.
+"""
+_NEW_REPORT_SECTION = (
+    "## Use tk for updates"
+    + WORKER_TEMPLATE_FILES["agents.md"].split("## Use tk for updates", 1)[1].split("## Git and confidentiality", 1)[0]
+).rstrip("\n") + "\n"
 
 
 def set_yaml_value(text: str, section: str, key: str, value: str) -> str:

@@ -58,6 +58,7 @@ def after_scenario(context, scenario):
     if hasattr(context, 'plugin_dir') and os.path.exists(context.plugin_dir):
         shutil.rmtree(context.plugin_dir)
     for var in ('FAKE_SCION_STATE', 'FAKE_SCION_MODE', 'FAKE_SCION_HUB', 'FAKE_SCION_WORKER_REPORT', 'FAKE_SCION_FAIL_CMDS',
+                'FAKE_SCION_ACTIVITY',
                 'XDG_CONFIG_HOME', 'TK_SCION_TASKFORCE_SCION_HOME', 'TK_HOOKS_SYNC', 'TK_HOOK_DEPTH', 'TK_NO_HOOKS'):
         os.environ.pop(var, None)
 

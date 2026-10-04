@@ -44,6 +44,18 @@ Feature: SCION Task Force Plugin
     Then the file ".scion-taskforce/scion-taskforce.yaml" should contain "gc_retention_days: 5"
     And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should not contain "# my edit"
 
+  Scenario: Re-running init replaces the old report section of the worker template with tk instructions
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    And I run "printf '%s\n' '# tk Task Force Worker' '' '## Report back' '- Record what you changed, how you verified it and any open questions as a note in' '  `.tickets/<id>.md` (use `tk add-note <id> \"...\"` when `tk` is installed).' '- Add the review tag named in your task prompt (default `waiting-for-review`), then stop. Review feedback arrives as a new note.' '' '# my edit' > .scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md"
+    And I run "ticket scion-taskforce init"
+    Then the command should succeed
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "## Use tk for updates"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "Read updates with `tk show <id>`"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "# my edit"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should not contain "## Report back"
+
   Scenario: test --raw was removed and points to the ticket-based test
     Given a clean tickets directory
     When I run "ticket scion-taskforce test --raw"
@@ -375,9 +387,12 @@ Feature: SCION Task Force Plugin
     And the fake scion prompt for "tf-0071" should contain "Do not check out the PR branch"
     And the fake scion prompt for "tf-0071" should not contain "gh pr comment"
     And the fake scion prompt for "tf-0071" should not contain "Your Job: Implementation"
+    And the fake scion prompt for "tf-0071" should contain "tk update tf-0071 --tags github-sync,pr,taskforce,waiting-for-review"
     And the fake scion prompt for "tf-0072" should contain "Your Job: Implementation"
-    And the fake scion prompt for "tf-0072" should contain "tk` may NOT be installed in this pod"
-    And the fake scion prompt for "tf-0072" should contain "tags: [taskforce, waiting-for-review]"
+    And the fake scion prompt for "tf-0072" should contain "The ticket is your channel: use `tk`"
+    And the fake scion prompt for "tf-0072" should contain "tk show tf-0072"
+    And the fake scion prompt for "tf-0072" should contain "tk add-note tf-0072"
+    And the fake scion prompt for "tf-0072" should contain "tk update tf-0072 --tags taskforce,waiting-for-review"
     And the fake scion prompt for "tf-0072" should contain "Git is optional here. Do not change git state"
     And the fake scion prompt for "tf-0072" should contain "Do not commit; list the files you changed"
     And the fake scion prompt for "tf-0072" should contain "Confidentiality (this project is confidential)"
@@ -520,7 +535,7 @@ Feature: SCION Task Force Plugin
     And the output should contain "started=1"
     And the fake scion runtime should have 1 pod(s)
 
-  Scenario: Dispatch never links an unlinked project folder to the Scion Hub
+  Scenario: Dispatch never links an unconfigured project folder to the Scion Hub
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
     And the fake Scion Hub reports the project as "unlinked"
@@ -533,6 +548,43 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0111" should have field "status" with value "open"
     And the fake Scion Hub should have received "link" 0 time(s)
     And the fake scion runtime should have 0 pod(s)
+
+  Scenario: Dispatch links a configured project to the Scion Hub and records the auto-fix
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the fake Scion Hub reports the project as "unlinked"
+    And the scion-taskforce setting "tags.claim" is "taskforce"
+    And a ticket exists with ID "tf-0112" and title "Configured project task"
+    And ticket "tf-0112" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0112"
+    Then the command should succeed
+    And the fake Scion Hub should have received "link" 1 time(s)
+    And the fake scion runtime should have 1 pod(s)
+    When I run "ticket scion-taskforce status"
+    Then the output should contain "auto-fix: linked this configured project to the Scion Hub"
+
+  Scenario: Dispatch starts a stopped Podman machine, then the worker
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "fail"
+    And the environment variable "FAKE_PODMAN_MODE" is "ok"
+    And a ticket exists with ID "tf-0113" and title "Runtime was down"
+    And ticket "tf-0113" has tags "taskforce"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "started=1"
+    And ticket "tf-0113" should have field "status" with value "in_progress"
+    When I run "ticket scion-taskforce status"
+    Then the output should contain "auto-fix: started the Podman machine"
+
+  Scenario: Podman auto-start can be turned off
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "fail"
+    And the environment variable "FAKE_PODMAN_MODE" is "ok"
+    And the scion-taskforce setting "provider.auto_start_runtime" is "false"
+    And a ticket exists with ID "tf-0114" and title "Stay down"
+    And ticket "tf-0114" has tags "taskforce"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "started=0"
+    And ticket "tf-0114" should have field "status" with value "open"
 
   Scenario: Init links the project folder to the Scion Hub exactly once
     Given a clean tickets directory
@@ -842,3 +894,81 @@ Feature: SCION Task Force Plugin
     When I run "ticket scion-taskforce sync"
     Then the command should fail
     And the output should contain "is not valid JSON; a copy is at"
+
+  Scenario: sync pauses a worker whose turn ended without a report and frees its slot
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And the scion-taskforce setting "watcher.turn_grace_seconds" is "0"
+    And a ticket exists with ID "tf-0301" and title "Stops without a report"
+    And a ticket exists with ID "tf-0302" and title "Queued behind it"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0301 --tags taskforce"
+    And I run "ticket update tf-0302 --tags taskforce"
+    Then ticket "tf-0302" should have field "status" with value "open"
+    Given the environment variable "FAKE_SCION_ACTIVITY" is "completed"
+    When I run "ticket scion-taskforce sync"
+    Then the command should succeed
+    And the output should contain "paused=1"
+    And the output should contain "started=1"
+    And ticket "tf-0301" should contain "stopped without a report (Scion activity: completed); paused it"
+    And the fake scion pod "tf-0301" should be in state "suspended"
+    And ticket "tf-0302" should have field "status" with value "in_progress"
+
+  Scenario: sync ignores a finished turn during the grace period
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0303" and title "Just started"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0303 --tags taskforce"
+    Given the environment variable "FAKE_SCION_ACTIVITY" is "completed"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "paused=0"
+    And ticket "tf-0303" should not contain "stopped without a report"
+    And the fake scion pod "tf-0303" should be in state "running"
+
+  Scenario: sync merges the report of a worker whose turn ended and adds no extra note
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And the environment variable "FAKE_SCION_WORKER_REPORT" is "1"
+    And the scion-taskforce setting "watcher.turn_grace_seconds" is "0"
+    And a ticket exists with ID "tf-0304" and title "Reports in its workspace"
+    When I run "ticket scion-taskforce hook install"
+    And I run "TK_NO_HOOKS=1 ticket update tf-0304 --tags taskforce"
+    And I run "ticket scion-taskforce dispatch tf-0304"
+    Given the environment variable "FAKE_SCION_ACTIVITY" is "completed"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "paused=1"
+    And ticket "tf-0304" should contain "fake worker report"
+    And ticket "tf-0304" should not contain "stopped without a report"
+    And the fake scion pod "tf-0304" should be in state "suspended"
+
+  Scenario: watch rejects an interval below 10 seconds
+    Given a clean tickets directory
+    When I run "ticket scion-taskforce watch --interval 5"
+    Then the command should fail
+    And the output should contain "--interval takes a number of seconds >= 10"
+
+  Scenario: Workers get this machine's tk, found at launch and mounted read-only
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0311" and title "Needs tk in the pod"
+    And ticket "tf-0311" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0311"
+    Then the command should succeed
+    And the fake scion start for "tf-0311" should include "--config"
+    And the fake scion launch config for "tf-0311" should contain "{tk}"
+    And the fake scion launch config for "tf-0311" should contain "/usr/local/bin/tk"
+    And the fake scion launch config for "tf-0311" should contain "TK_NO_HOOKS"
+
+  Scenario: provider.mount_tk false starts workers without the tk mount
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the scion-taskforce setting "provider.mount_tk" is "false"
+    And a ticket exists with ID "tf-0312" and title "No tk mount"
+    And ticket "tf-0312" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0312"
+    Then the command should succeed
+    And the fake scion start for "tf-0312" should not include "--config"

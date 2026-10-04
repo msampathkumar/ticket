@@ -91,7 +91,10 @@ Setup:
 Dispatch:
   on-save <id> [--event <e>]       Handle one ticket save (called by the hook)
   sync [dir]                       Catch up on saves the hook missed (hand edits, git pull,
-                                   worker reports), flag dead workers, start queued tickets
+                                   worker reports), flag dead workers, pause workers that stopped
+                                   without a report, start queued tickets
+  watch [dir] [--interval <s>]     Opt-in foreground loop: `sync` every <s> seconds (default 60, min 10)
+                                   without retrying failed starts; Ctrl-C stops it
   dispatch <id>                    Start a worker for one ready, opted-in ticket now (ignores the worker limit)
 
 Workers:
@@ -118,7 +121,6 @@ REMOVED_COMMANDS = {
     "start": _HOOK_HINT,
     "restart": _HOOK_HINT,
     "server": _HOOK_HINT,
-    "watch": _HOOK_HINT,
     "project": "Each project uses its own save hook (`tk scion-taskforce hook install`); nothing to register.",
     "stop": "To stop a worker, use `tk scion-taskforce pause <id>` or close its ticket; `hook uninstall` stops dispatch.",
 }
@@ -192,7 +194,7 @@ def _detect_default_gcp_project() -> str:
 def _ensure_runtime_project(project_dir: Path, explicit_config: str | None = None, dry_run: bool = False) -> None:
     """Register the project folder with the runtime once (Scion: link it to the Hub).
 
-    Only `init` calls this; dispatch never creates runtime/Hub projects.
+    `init` calls this; dispatch links only configured projects (`provider.auto_link_hub`).
     Best effort: a failure is reported but never aborts the calling command.
     """
     try:
@@ -480,6 +482,41 @@ def cmd_sync(args: list[str], project_dir: Path, explicit_config: str | None, dr
         f"✅ Sync complete: started={stats['started']}, paused={stats['paused']}, "
         f"lost={stats['lost']}, errors={stats['errors']}"
     )
+    return 0
+
+
+WATCH_MIN_INTERVAL = 10
+
+
+def cmd_watch(args: list[str], project_dir: Path, explicit_config: str | None, dry_run: bool) -> int:
+    """Foreground loop: `sync` every N seconds without retrying failed starts. Opt-in, never installed as a
+    service; Ctrl-C ends it."""
+    interval, target, it = 60.0, project_dir, iter(args)
+    for arg in it:
+        if arg == "--interval":
+            try:
+                interval = float(next(it, ""))
+            except ValueError:
+                interval = -1
+        elif not arg.startswith("-"):
+            target = Path(arg)
+    if interval < WATCH_MIN_INTERVAL:
+        print(f"--interval takes a number of seconds >= {WATCH_MIN_INTERVAL}.", file=sys.stderr)
+        return 2
+    if not hook_path(target).exists():
+        print("⚠️  Save hook not installed: ticket saves will not start workers. Run `tk scion-taskforce hook install`.")
+    print(f"Watching {target} every {interval:.0f}s for finished or dead workers. Ctrl-C stops watching.")
+    try:
+        while True:
+            try:
+                stats = sync_project(target, explicit_config=explicit_config, dry_run=dry_run, retry_errors=False)
+                if any(stats.values()):
+                    print(f"[{time.strftime('%H:%M:%S')}] " + ", ".join(f"{k}={v}" for k, v in stats.items()))
+            except Exception as exc:  # keep watching; the next pass may succeed
+                print(f"[{time.strftime('%H:%M:%S')}] sync failed: {exc}", file=sys.stderr)
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\nStopped watching.")
     return 0
 
 
@@ -873,6 +910,9 @@ def _main(argv: list[str] | None = None) -> int:
 
     if subcmd == "sync":
         return cmd_sync(subargs, project_dir, explicit_config, dry_run)
+
+    if subcmd == "watch":
+        return cmd_watch(subargs, project_dir, explicit_config, dry_run)
 
     if subcmd == "status":
         return cmd_status(project_dir, explicit_config)

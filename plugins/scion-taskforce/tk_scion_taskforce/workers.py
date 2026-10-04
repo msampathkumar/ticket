@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import json
+import os
+import shutil
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -11,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from tk_scion_taskforce.config import project_config_path
 from tk_scion_taskforce.providers.scion import ScionProvider
 from tk_scion_taskforce.roles import role_template_for
 from tk_scion_taskforce.state import get_state_dir, normalize_project_dir, save_state
@@ -54,6 +58,36 @@ def failure_hint(detail: str, ticket_id: str) -> str:
     first = next((line.strip() for line in str(detail or "").splitlines() if line.strip()), "unknown error")
     short = first if len(first) <= 120 else first[:117] + "..."
     return f"{short} (see `tk scion-taskforce logs {ticket_id}`)"
+
+
+TK_IN_WORKER = "/usr/local/bin/tk"
+
+
+def find_tk() -> Path | None:
+    """The `tk` script on this machine: the one running this plugin (``$TK_SCRIPT``), else `tk` or
+    `ticket` on PATH. Resolved through symlinks, so the mount points at the real file."""
+    for candidate in (os.environ.get("TK_SCRIPT"), shutil.which("tk"), shutil.which("ticket")):
+        if candidate and Path(candidate).resolve().is_file():
+            return Path(candidate).resolve()
+    return None
+
+
+def worker_launch_config(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Scion inline config (``scion start --config``) that mounts this machine's `tk` read-only at
+    ``/usr/local/bin/tk`` and sets ``TK_NO_HOOKS=1`` (the shared checkout's save hook calls
+    `tk scion-taskforce`, which the container lacks). Looked up per launch, so no machine-specific
+    path is stored in templates. ``None`` when ``provider.mount_tk`` is off or `tk` is not found."""
+    # shortcut: a host bind mount works only with a local runtime broker; ship tk in the worker image
+    # (or a Scion volume) when workers run on remote brokers.
+    if not config.get("provider", {}).get("mount_tk", True):
+        return None
+    tk = find_tk()
+    if tk is None:
+        return None
+    return {
+        "volumes": [{"source": str(tk), "target": TK_IN_WORKER, "read_only": True}],
+        "env": {"TK_NO_HOOKS": "1"},
+    }
 
 
 class DispatchError(Exception):
@@ -145,18 +179,37 @@ def _privacy_rules(level: str) -> str:
     )
 
 
+def _review_tags(ticket: TicketInfo, claim_tag: str, review_tag: str) -> str:
+    """The ticket's tags plus the review tag, comma-separated (``tk update --tags`` replaces the list)."""
+    keep = [t for t in ticket.tags if t != review_tag] or [claim_tag]
+    if claim_tag not in keep:
+        keep.insert(0, claim_tag)
+    return ",".join(keep + [review_tag])
+
+
 def _reporting_protocol(ticket: TicketInfo, claim_tag: str, review_tag: str, git_rules: str) -> str:
     rel_path = f".tickets/{ticket.path.name}"
+    tid = ticket.id
     return (
-        "### Reporting Back (mandatory — the orchestrator watches the ticket file)\n"
-        f"The ticket lives at `{rel_path}` inside this workspace. `tk` may NOT be installed in this pod.\n"
-        f"- If `tk` is available: `tk add-note {ticket.id} \"## Task Force Worker Report ...\"` then\n"
-        f"  `tk update {ticket.id} --tags {claim_tag},{review_tag}`.\n"
-        f"- Otherwise edit `{rel_path}` directly: append under a `## Notes` heading a block of the form\n"
-        "  `**<UTC timestamp YYYY-MM-DDTHH:MM:SSZ>**` followed by a blank line and your report, and set the\n"
-        f"  frontmatter to `tags: [{claim_tag}, {review_tag}]` while keeping `status: in_progress`.\n"
-        "- Never set `status: closed` yourself; a human closes the ticket after review.\n"
+        "### The ticket is your channel: use `tk` (mandatory)\n"
+        f"`tk` is normally mounted at `{TK_IN_WORKER}` (check: `command -v tk`); run it from the workspace root.\n"
+        "The human reads only the ticket.\n"
+        f"- Read: `tk show {tid}` shows the description, acceptance criteria and every note. Run it again\n"
+        "  whenever you resume: review feedback and answers arrive as new notes at the end.\n"
+        f"- Context: `tk dep tree {tid}` and `tk show <other-id>` for related tickets. Change only your own ticket.\n"
+        f"- Progress: on longer tasks, add short notes as you go: `tk add-note {tid} \"Progress: ...\"`.\n"
+        f"- Questions: if you are blocked, `tk add-note {tid} \"Question: ...\"`, add the review tag (below) and\n"
+        "  stop. The human answers in a note and you are woken.\n"
+        f"- Report: `tk add-note {tid} <<'EOF'` ... `EOF` with a `## Task Force Worker Report` heading, then\n"
+        f"  `tk update {tid} --tags {_review_tags(ticket, claim_tag, review_tag)}` (keeps the current tags, adds\n"
+        f"  `{review_tag}`; `--tags` replaces the list, so re-check them with `tk show` first).\n"
+        "- Never close, reopen, create, delete or re-status tickets, and never edit other tickets.\n"
+        f"- Only if `command -v tk` finds nothing: edit `{rel_path}` directly. Append under `## Notes` a block\n"
+        "  `**<UTC timestamp YYYY-MM-DDTHH:MM:SSZ>**`, a blank line and your text, and add the review tag to the\n"
+        "  frontmatter `tags:` list while keeping `status: in_progress`.\n"
         f"{git_rules}"
+        "- If `sciontool` exists, run `sciontool status task_completed \"<one-line summary>\"` so the\n"
+        "  orchestrator notices the report promptly. Keep confidential detail out of that summary.\n"
         "- Then stop. The orchestrator pauses your pod and wakes you with any review feedback as a new note.\n"
     )
 
@@ -198,7 +251,7 @@ def _default_prompt(
             "2. Review the full diff against the base branch: correctness, tests, security, API/spec "
             "compatibility, docs, and style consistent with this repository.\n"
             f"{run_tests}"
-            "4. Write a structured review report into the ticket (see Reporting Back): "
+            "4. Write a structured review report into the ticket with `tk add-note` (see The ticket is your channel): "
             "**Summary**, **Blocking issues**, **Suggestions**, **Verdict** (approve / request changes), "
             "each finding with `path:line`.\n"
             f"{may_comment}"
@@ -218,7 +271,7 @@ def _default_prompt(
             "2. Keep changes minimal and focused on the ticket; follow the repo's conventions and AGENTS/CLAUDE guides.\n"
             "3. Run the project test suite (e.g. `make test`) and lints; fix what you break.\n"
             f"{finish}"
-            "5. Write a completion report into the ticket (see Reporting Back): "
+            "5. Write a completion report into the ticket with `tk add-note` (see The ticket is your channel): "
             "**Summary of changes**, **Files touched**, **Verification results**, **Open questions**.\n\n"
         )
     return (
@@ -361,6 +414,35 @@ def _record(
     return span_id
 
 
+def _auto_fix_preflight(
+    reason: str,
+    config: dict[str, Any],
+    provider: ScionProvider,
+    proj_str: str,
+    telemetry: TelemetryManager,
+    trace_id: str,
+    ticket_id: str,
+) -> bool:
+    """Fix a failed preflight when it is safe: start a stopped Podman machine (`provider.auto_start_runtime`)
+    or link a configured project to the Hub (`provider.auto_link_hub`). Every attempt is logged with
+    ``autofix`` so `status` lists it. Returns True when a fix was applied (the caller re-runs preflight)."""
+    prov = config.get("provider") or {}
+    if reason == "runtime_down" and prov.get("auto_start_runtime", True):
+        res = provider.start_runtime()
+    elif reason == "hub_unlinked" and prov.get("auto_link_hub", True) and project_config_path(proj_str).exists():
+        res = provider.ensure_project_registered(proj_str)
+        if res.ok:
+            res.message = "linked this configured project to the Scion Hub (`scion hub link`)"
+    else:
+        return False
+    telemetry.log_event(
+        "INFO" if res.ok else "WARNING",
+        f"auto-fix: {res.message}" if res.ok else f"auto-fix failed: {res.message}",
+        trace_id=trace_id, ticket_id=ticket_id, project=proj_str, autofix=True,
+    )
+    return res.ok
+
+
 def dispatch_ticket(
     project_dir: Path,
     ticket: TicketInfo,
@@ -389,6 +471,8 @@ def dispatch_ticket(
 
     # 0. Pre-flight: is the provider runtime (podman/docker/k8s) reachable at all?
     pre = provider.preflight(proj_str)
+    if not pre.ok and _auto_fix_preflight(pre.reason, config, provider, proj_str, telemetry, trace_id, ticket.id):
+        pre = provider.preflight(proj_str)
     _record_project_health(state, telemetry, proj_str, pre.ok, pre.message)
     if not pre.ok:
         telemetry.log_worker(project_dir, ticket.id, f"Provider preflight failed: {pre.message}", trace_id=trace_id)
@@ -441,6 +525,18 @@ def dispatch_ticket(
         )
     prompt = build_worker_prompt(ticket, config, branch=branch)
     telemetry.save_worker_brief(project_dir, ticket.id, prompt)
+    launch = worker_launch_config(config)
+    launch_file = (
+        telemetry.save_worker_file(project_dir, ticket.id, ".scion-config.json", json.dumps(launch, indent=2) + "\n")
+        if launch
+        else None
+    )
+    tk_mount = launch["volumes"][0]["source"] if launch and launch_file else ""
+    if not tk_mount:
+        telemetry.log_event(
+            "INFO", f"{ticket.id}: tk not mounted into the worker (provider.mount_tk off or tk not found); "
+            "the worker edits the ticket file directly", ticket_id=ticket.id,
+        )
     worker_env = {
         "OTEL_EXPORTER_OTLP_TRACES_FILE": str(telemetry.traces_file),
         "OTEL_EXPORTER_OTLP_METRICS_FILE": str(telemetry.metrics_file),
@@ -455,13 +551,15 @@ def dispatch_ticket(
         _record(
             telemetry, project_dir, ticket.id, "taskforce.worker.spawn", ok, message,
             trace_id=trace_id, parent_span_id=lifecycle_span_id,
-            attrs={"worker.branch": branch, "worker.template": template or provider.template, **attrs},
+            attrs={"worker.branch": branch, "worker.template": template or provider.template,
+                   "worker.tk_mount": tk_mount, **attrs},
             worker_line=worker_line, metric=metric,
         )
 
     # 2. Spawn (request accepted by provider?)
     if existing is None and not provider.spawn(
-        project_dir=proj_str, worker_id=ticket.id, prompt=prompt, branch=branch, env=worker_env, template=template
+        project_dir=proj_str, worker_id=ticket.id, prompt=prompt, branch=branch, env=worker_env, template=template,
+        config_file=str(launch_file) if tk_mount else "",
     ):
         err = provider.last_error or "provider.spawn returned False"
         record_spawn(
@@ -548,7 +646,7 @@ def dispatch_ticket(
         "taskforce.workers.spawned",
         {"worker.state": "running", "worker.verified": True},
     )
-    workers[wkey] = {**entry, "state": "running", "feedback_cycles": 0}
+    workers[wkey] = {**entry, "state": "running", "feedback_cycles": 0, "turn_started": time.time()}
     save_state(state)
     return True
 
@@ -653,7 +751,6 @@ def send_feedback_to_worker(
         raise ValueError(f"Ticket {ticket_id!r} not found in {project_dir}")
 
     ticket = parse_ticket_file(t_path, project_dir=project_dir)
-    review_tag = tags(config)[2]
 
     note_ts = utc_now_iso()
     if not (append_note_to_ticket and feedback_message) and ticket.notes:
@@ -667,11 +764,13 @@ def send_feedback_to_worker(
     w_entry = workers.get(wkey, {})
     trace_id = str(w_entry.get("trace_id") or new_trace_id())
 
+    claim_tag, _, review_tag = tags(config)
     prompt_msg = (
         f"New review feedback was added to ticket `{ticket.id}` at {note_ts}:\n\n"
         f"{feedback_message or 'Please inspect the latest note in `tk show ' + ticket.id + '`.'}\n\n"
-        f"Address the feedback, run tests, append an updated report via `tk add-note {ticket.id}`, "
-        f"and re-add the `{review_tag}` tag when ready for review."
+        f"Run `tk show {ticket.id}` to read the full thread. Address the feedback, run tests, add an "
+        f"updated report with `tk add-note {ticket.id}`, then add the review tag while keeping the other "
+        f"tags: `tk update {ticket.id} --tags {_review_tags(ticket, claim_tag, review_tag)}`. Then stop."
     )
 
     # Wake first: the ticket changes only once the worker has actually received the feedback.
@@ -717,6 +816,8 @@ def send_feedback_to_worker(
             "feedback_cycles": cycles,
         }
     )
+    if ok:
+        w_entry["turn_started"] = time.time()
     workers[wkey] = w_entry
     save_state(state)
     return ok

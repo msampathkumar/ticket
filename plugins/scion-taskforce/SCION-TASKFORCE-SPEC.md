@@ -37,7 +37,7 @@ Tickets are passive state. This plugin hands opted-in tickets to SCION coding ag
 | Save hook, no daemon (2026-10) | A singleton daemon polled every project every 15 s. | Every write goes through `tk` (the Web UI shells out to it), so a post-write hook sees each change with no process to run. | Writes that bypass `tk` need `sync`. Daemon commands exit 2 with a migration hint. |
 | Claim only after verification | Fire-and-forget launches left tickets `in_progress` with no worker. | `spawn` success means only that Scion accepted the request. | A ticket stays `open` until `scion list` reports the pod `running`. |
 | Direct file writes for claims and notes | `tk start` and `tk add-note` would fire the hook again. | Writing the frontmatter and notes directly never triggers another `on-save`, even when `sync` or `dispatch` runs outside a hook. | Notes carry a `**Task Force:**` prefix, so they are never forwarded to workers. |
-| Only `init` links a folder to the Hub | Dispatch once linked any folder, so test temp dirs became Hub projects. | One Hub project per real project folder. | An unlinked folder fails preflight with a hint to run `init`. |
+| Only configured projects are linked to the Hub | Dispatch once linked any folder, so test temp dirs became Hub projects. | One Hub project per real project folder. | `init` links; dispatch re-links only a folder with `.scion-taskforce/scion-taskforce.yaml`. Others fail preflight with a hint to run `init`. |
 | Pause on review | Idle workers held runtime resources and slots. | `scion suspend` keeps the worktree and harness session for a fast resume. | A forwarded note or `feedback` wakes the worker. |
 | Resolve model aliases at start | Scion resolves an alias on `start` but passes it verbatim on `resume` (`--model medium`), which the harness rejects. | Starting with the concrete ID keeps resumed workers on a valid model. | `provider.model` may still hold an alias. |
 | Two locks: per project, then global state | Background hooks and manual commands write one shared state file. | `flock` is in the standard library and needs no server. | A slow spawn in one project delays hook runs in others (§11). |
@@ -67,7 +67,7 @@ flowchart LR
 5. **Decide** acts on the saved ticket: start, queue, note "waiting on dependencies", or forward a human note. The saved ID must match `.tickets/<id>.md` exactly.
 6. **Start queued** fills free slots with opted-in ready tickets, in `tk ready` order.
 
-`sync` runs refresh, a liveness check and start-queued once, for writes the hook cannot see. `dispatch <id>` runs the decide checks for one ticket and ignores the worker limit.
+`sync` runs once, for writes the hook cannot see: refresh, a pod check (§8 Liveness), then start-queued. `watch` repeats `sync` in the foreground every `--interval` seconds (default 60) and skips retries of failed starts, so a broken runtime is not re-noted on every pass. `dispatch <id>` runs the decide checks for one ticket and ignores the worker limit.
 
 ### Package layout
 
@@ -115,9 +115,10 @@ The project lock stops two quick saves from starting two workers. The state lock
 | Method | `scion` command |
 | :--- | :--- |
 | `preflight` | `list --format json`, then `hub status`; fails when the Hub is reachable and reports `Linked: no` |
-| `ensure_project_registered` | `hub status`, then `hub link --yes` and `hub enable`. `init` only |
-| `spawn` | `start <id> <brief> [--branch <b>] -w <dir> --enable-telemetry [-t <template>] [--profile <p>] [--harness-config <h>] [--model <resolved>] [extra_start_args]` |
-| `health`, `wait_until_running` | `list --format json`, matched case-insensitively; polled until `running` or `error` |
+| `ensure_project_registered` | `hub status`, then `hub link --yes` and `hub enable`. `init`, or dispatch for a configured project |
+| `start_runtime` | `podman machine start` (not a scion command) |
+| `spawn` | `start <id> <brief> [--branch <b>] -w <dir> --enable-telemetry [-t <template>] [--config <launch.json>] [--profile <p>] [--harness-config <h>] [--model <resolved>] [extra_start_args]` |
+| `health`, `wait_until_running` | `list --format json`, matched case-insensitively; reads `phase` and `activity`; polled until `running` or `error` |
 | `pause` | `suspend <id>`, falling back to `stop <id>` |
 | `stop` | `stop <id>` |
 | `wake_with_message` | `message <id> <text> --wake`, falling back to `resume <id> <text> --enable-telemetry [extra_resume_args]` |
@@ -125,7 +126,7 @@ The project lock stops two quick saves from starting two workers. The state lock
 | `delete` | `delete <id> --preserve-branch` |
 | `workspace_path` | No call. Returns `<project>/.scion/agents/<id>/workspace` if it exists, else `None` |
 
-`--branch` is passed only with `worker.git: branch`. `-t <template>` is the ticket's role template (`role:<name>` -> `tk-<name>`) or `provider.template`, passed only when `.scion/templates/<template>/` exists. Before `start`, dispatch adds `/.scion/agents/` to `.git/info/exclude` when the project is in a git repo that does not ignore it (Scion's `CheckAgentsGitignore`); the change is logged with `autofix: true` and listed by `status`. Scion state names map to `running` (running, thinking, idle, waiting_for_input), `paused` (suspended, paused, stopped) or `error`.
+Preflight failures carry a `reason`. Dispatch fixes two of them once, then re-runs preflight: `runtime_down` -> `podman machine start` (`provider.auto_start_runtime`; tk never stops the machine) and `hub_unlinked` -> `scion hub link` for projects with a task force config (`provider.auto_link_hub`). Each attempt is logged with `autofix: true`. `--branch` is passed only with `worker.git: branch`. `-t <template>` is the ticket's role template (`role:<name>` -> `tk-<name>`) or `provider.template`, passed only when `.scion/templates/<template>/` exists. Before `start`, dispatch adds `/.scion/agents/` to `.git/info/exclude` when the project is in a git repo that does not ignore it (Scion's `CheckAgentsGitignore`); the change is logged with `autofix: true` and listed by `status`. Scion state names map to `running` (running, thinking, idle, waiting_for_input), `paused` (suspended, paused, stopped) or `error`.
 
 ## 6. State machine
 
@@ -141,6 +142,7 @@ stateDiagram-v2
     Launching --> Running: verified, ticket in_progress
     Error --> Launching: own save or sync retries
     Running --> Paused: waiting-for-review merged, scion suspend
+    Running --> Paused: sync sees the turn ended without a report
     Paused --> Running: human note or feedback, scion message --wake
     Running --> Error: sync finds the pod dead (lost)
     Running --> Stopped: tk close, scion stop
@@ -162,7 +164,7 @@ stateDiagram-v2
 
 1. **Preflight.** On failure, record the health change (logged and metered only on transitions) and raise `DispatchError`.
 2. **Idempotency.** A running pod with the ticket's ID is adopted. A dead pod is deleted (`--preserve-branch`) and relaunched when the previous entry is `error`, `deleted` or `stopped`, or missing. Otherwise the start is refused: "a worker named `<id>` already exists".
-3. **Brief.** Build the brief (§10) and save it as `workers/<project>/<id>.brief.md`.
+3. **Brief and launch config.** Build the brief (§10) and save it as `workers/<project>/<id>.brief.md`. With `provider.mount_tk` (default on), resolve `tk` on this machine (`$TK_SCRIPT`, then `tk`/`ticket` on `PATH`, symlinks followed) and save a Scion inline config as `<id>.scion-config.json`: a read-only volume from that file to `/usr/local/bin/tk` and `TK_NO_HOOKS=1`. Spawn passes it with `--config`, which Scion layers over the template. The path is resolved per launch, so templates stay machine-independent. If `tk` is not found, no `--config` is passed and an INFO line is logged.
 4. **Spawn.** Pass the worker `OTEL_EXPORTER_OTLP_TRACES_FILE`, `OTEL_EXPORTER_OTLP_METRICS_FILE`, `OTEL_RESOURCE_ATTRIBUTES` (`service.name=scion-worker`, ticket and project) and `TRACEPARENT`. A model alias is resolved first: `wizard.resolve_model_alias` reads `model_aliases` from `~/.scion/harness-configs/<harness>/config.yaml`.
 5. **Verify.** Poll `health` every `spawn_verify_poll_seconds` (2) for up to `spawn_verify_timeout_seconds` (30). If the pod never runs, record the entry as `error` with `agent: true` and raise `DispatchError`.
 6. **Claim.** Write `status: in_progress` into the frontmatter. The user's tags are left as they are.
@@ -183,7 +185,11 @@ stateDiagram-v2
 
 **Remove.** When the opt-in tag is removed, `no-taskforce` is added or the ticket file is deleted, the worker is stopped (if active) and deleted with `--preserve-branch`. The entry is marked `deleted` even when the delete fails, so a missing agent is not retried on every save. An entry without an agent is marked `deleted` with no Scion call and no note.
 
-**Liveness.** Only `sync` checks liveness. A `running` worker whose pod is missing or not running becomes `error` and frees its slot. The ticket stays `in_progress` with a "worker lost" note that explains how to retry or abandon.
+**Liveness.** Only `sync` (and `watch`) checks pods, after refresh, for workers still `running`.
+
+- A pod that is missing or not running becomes `error` and frees its slot. The ticket stays `in_progress` with a "worker lost" note that explains how to retry or abandon.
+- A pod stays phase `running` after its harness finishes a turn; only Scion's `activity` changes. `completed`, `waiting_for_input` or `limits_exceeded` means the turn ended. The workspace report is merged again (it may have landed after refresh), then the worker is paused. Without a review tag the reason is `turn <activity>` and the ticket gets a note asking for direction. The brief asks workers to run `sciontool status task_completed` after reporting, so activity reflects the report.
+- `turn_started` is set on spawn and on each successful wake. A finished-turn activity within `watcher.turn_grace_seconds` (60) of it is ignored, because Scion may still show the previous turn's `completed`.
 
 **Garbage collection.** `gc` visits the current project and every project in the state file. It deletes the agents of tickets closed for at least `gc_retention_days`, using the `closed` timestamp or the file's mtime (`--force` ignores the age). A failed delete keeps the entry for the next `gc`. It then purges rotated logs older than `telemetry.rotation.retention_days`.
 
@@ -202,7 +208,7 @@ Spawns pass `-w <project>`, so workers in one project share the checkout. The co
 | `review` | A tag in `worker.review_tags` (`pr`, `review`) or an `external-ref` starting with a `worker.review_ref_prefixes` entry (`gh-pr-`), as created by `tk github sync --prs` | `off`: read `gh pr view`/`gh pr diff` without checkout. `branch`: check out the PR and run the suite. Report Summary, Blocking issues, Suggestions and Verdict with `path:line` findings. `standard` privacy may post a PR comment; never approves or merges |
 | `implement` | Everything else | Implement, run tests and lints, report Summary, Files touched, Verification and Open questions. `worker.git: off`: no commits, list changed files. `branch`: commit on the ticket branch |
 
-Both end with a reporting protocol written for a pod without `tk`: append a timestamped note under `## Notes`, set `tags: [<claim>, <review>]`, keep `status: in_progress`, never close the ticket, and follow the `worker.git` rule (never push). `worker.privacy: confidential` (default) appends a confidentiality section: no uploads, public links, pushes or external comments. `worker.prompt_file` replaces the brief; it accepts `{ticket_id} {ticket_title} {project_dir} {branch} {work_type} {claim_tag} {review_tag} {external_ref} {ticket_details}`.
+Both end with a reporting protocol built on the mounted `tk`: read the ticket and new feedback with `tk show <id>`, post progress, questions and the report with `tk add-note`, then add the review tag with `tk update <id> --tags <current tags>,<review>` (the brief lists the current tags because `--tags` replaces the list). Workers never close, reopen, create or re-status tickets. If `tk` is missing, the fallback is a direct edit: a timestamped note under `## Notes` plus the review tag, keeping `status: in_progress`. The protocol also states the `worker.git` rule (never push) and asks for `sciontool status task_completed`. `worker.privacy: confidential` (default) appends a confidentiality section: no uploads, public links, pushes or external comments. The seeded template `agents.md` and the role-template contract repeat the tk rules. `worker.prompt_file` replaces the brief; it accepts `{ticket_id} {ticket_title} {project_dir} {branch} {work_type} {claim_tag} {review_tag} {external_ref} {ticket_details}`.
 
 The seeded template `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/` adds `agents.md` and `system-prompt.md`. Its `scion-agent.yaml` sets no harness, because Scion's template rules reserve that for the launch config.
 
@@ -256,8 +262,8 @@ Every span carries `ticket.id`, `project.path`, `project.name` and `worker.id`. 
 
 The first five items are marked `shortcut:` in the code.
 
-- Worker reports land on the next save or `sync`, not when written. Subscribing to Scion notifications (`COMPLETED`, `WAITING_FOR_INPUT`) would remove the delay.
-- Only `sync` detects dead pods. Run it from cron if lost workers hold slots too long.
+- Pods are checked only by `sync` and `watch`, not on every save, because each check is one `scion list` call. Subscribing to Scion Hub notifications (`COMPLETED`, `WAITING_FOR_INPUT`) would pick reports up instantly without a foreground loop.
+- The `tk` mount is a host bind mount, so it works only with a local runtime broker. Ship `tk` in the worker image or a Scion volume when workers run on remote brokers.
 - One state lock serves all projects. Split the state file per project if parallel multi-project dispatch matters.
 - The `watcher:` config section is named after the removed daemon. Rename it, reading the old name as a fallback, at the next schema change.
 - `opencode` Vertex model IDs in the wizard are hand-maintained.

@@ -67,7 +67,7 @@ Auth follows the harness:
 | `.tickets/.hooks/post-write.d/scion-taskforce` | The save hook |
 | `.tickets/.hooks/.gitignore`, `.tickets/.gitignore` | Ignore the hook log, the hook and the log symlink |
 
-`init` also links the folder to the Scion Hub once (`scion hub link`); dispatch never does. Re-running `init` keeps your config values and template edits. `--defaults` skips the questions and installs no role templates; `--force` starts over.
+`init` also links the folder to the Scion Hub once (`scion hub link`). Dispatch links only a project that has a task force config and became unlinked. Re-running `init` keeps your config values and template edits. `--defaults` skips the questions and installs no role templates; `--force` starts over.
 
 ## Lifecycle
 
@@ -88,7 +88,12 @@ Every successful ticket write (CLI or Web UI) runs `tk scion-taskforce on-save <
 
 Status notes start with `**Task Force:**`. They are written straight to the file, so they never re-trigger the hook and are never forwarded.
 
-Writes that bypass `tk` fire no hook: hand edits, `git pull` and worker edits. A worker's report therefore lands on the next save of any ticket in the project. Run `tk scion-taskforce sync` to catch up at once. It also flags workers whose pods died.
+Writes that bypass `tk` fire no hook: hand edits, `git pull` and worker edits. A worker's report therefore lands on the next save of any ticket in the project, or when you run `tk scion-taskforce sync`. `sync` also checks each running pod:
+
+- A dead pod gets a "worker lost" note.
+- A pod whose Scion activity is `completed`, `waiting_for_input` or `limits_exceeded` has finished its turn. Its report is merged; without one, the worker is paused with a note, which frees its slot. Add a note to answer or redirect it.
+
+To pick up reports without saving anything, keep `tk scion-taskforce watch` running in a terminal. It repeats `sync` every 60 seconds until you press Ctrl-C. Nothing runs in the background after that.
 
 ## Git, privacy and role templates
 
@@ -118,6 +123,23 @@ Writes that bypass `tk` fire no hook: hand edits, `git pull` and worker edits. A
 
 A `role:` tag whose template is missing gets a note, and the worker runs on the default template.
 
+### tk inside workers
+
+Worker images do not ship `tk`. At each start the task force finds `tk` on this machine and mounts it read-only at `/usr/local/bin/tk` in the worker. It checks `$TK_SCRIPT` (the `tk` that is running) first, then `tk` and `ticket` on `PATH`, so nothing machine-specific is stored in the project. The mount travels as a Scion launch config (`scion start --config`), saved next to the brief as `<id>.scion-config.json`. It also sets `TK_NO_HOOKS=1` inside the worker, because the shared checkout's save hook needs the plugin, which the container lacks.
+
+If `tk` is not found, or `provider.mount_tk` is `false`, the worker edits `.tickets/<id>.md` directly. Turn the mount off when workers run on a remote Scion broker, where your local path does not exist.
+
+The brief, the seeded template and the role templates tell workers to use `tk` as their only channel:
+
+| Worker step | Command |
+| :--- | :--- |
+| Read the ticket and new feedback (again on each resume) | `tk show <id>`, `tk dep tree <id>` |
+| Share progress or ask a question | `tk add-note <id> "..."` |
+| Report | `tk add-note <id>` with a `## Task Force Worker Report` heading |
+| Hand back for review | `tk update <id> --tags <current tags>,waiting-for-review` |
+
+Workers never close, reopen or create tickets. `init` updates the old report section of an existing worker template in place; role templates update with `templates install --force`.
+
 ## Automatic actions
 
 The task force fixes safe, reversible plumbing on its own and records each fix. `status` lists the latest five under *Automatic actions*; `logs` has them all.
@@ -126,11 +148,12 @@ The task force fixes safe, reversible plumbing on its own and records each fix. 
 | :--- | :--- | :--- |
 | Add `/.scion/agents/` to `.git/info/exclude` (Scion requires it in git repos; local, never committed) | `init`, and before each start | Delete the line |
 | Run `tk init` / `scion init` | `init`, when missing | Remove `.tickets/` or `.scion/` |
-| Seed the worker template; update its old git section | `init` | Edit or delete the template |
-| Link the folder to the Scion Hub | `init` only | `scion hub unlink` |
+| Seed the worker template; update its old git and report sections | `init` | Edit or delete the template |
+| Link the folder to the Scion Hub | `init`; at dispatch only for a configured, unlinked project (`provider.auto_link_hub`) | `scion hub unlink` |
+| Start the Podman machine (`podman machine start`); tk never stops it | Before a start, when the runtime is down (`provider.auto_start_runtime`) | `podman machine stop` |
 | Stop or delete a worker | Close, untag, file delete, `gc` | Re-tag the ticket |
 
-What only you can fix (container runtime down, Hub down, missing credentials) appears as one ticket note with the next step, and under *Needs you* in `status`. Saving the ticket or running `sync` retries.
+What only you can fix (Hub down, a runtime that will not start, missing credentials) appears as one ticket note with the next step, and under *Needs you* in `status`. Saving the ticket or running `sync` retries.
 
 ## Commands
 
@@ -149,7 +172,8 @@ tk scion-taskforce [--config <path>] [--dry-run] <subcommand> [args...]
 | `tk scion-taskforce templates install [<role>...] [--force] [--from <dir>] [--ref <sha>]` | Install agent-team role templates (default set) with vendored skills; see [Role templates](#role-templates) |
 | `tk scion-taskforce templates list` | Installed role templates and their sources |
 | `tk scion-taskforce on-save <id> [--event <e>]` | Handle one ticket save. The hook calls it |
-| `tk scion-taskforce sync [dir]` | Merge worker reports, pause reviewed workers, flag dead workers, start queued tickets |
+| `tk scion-taskforce sync [dir]` | Merge worker reports, pause reviewed workers and workers that stopped without a report, flag dead workers, start queued tickets |
+| `tk scion-taskforce watch [dir] [--interval <s>]` | Foreground loop: `sync` every `<s>` seconds (default 60, minimum 10) without retrying failed starts. Ctrl-C stops it |
 | `tk scion-taskforce dispatch <id>` | Start a worker for one ready, opted-in ticket now, ignoring the worker limit |
 | `tk scion-taskforce status` | Settings, save hook, provider health, workers, *Needs you* and the latest automatic actions |
 | `tk scion-taskforce list \| ps` | All tracked workers across projects |
@@ -162,7 +186,7 @@ tk scion-taskforce [--config <path>] [--dry-run] <subcommand> [args...]
 | `tk scion-taskforce gc [--force]` | Delete workers of tickets closed more than 5 days ago; purge rotated logs older than 30 days |
 | `tk scion-taskforce version \| help` | Version and active config file, or usage |
 
-The removed daemon commands (`start`, `stop`, `restart`, `server`, `watch`, `project`) exit with code 2 and print what to use instead.
+The removed daemon commands (`start`, `stop`, `restart`, `server`, `project`) exit with code 2 and print what to use instead.
 
 ## Configuration
 
@@ -185,6 +209,8 @@ Commonly edited keys:
 | `provider.harness_config` | `gemini-cli` | Scion harness |
 | `provider.model` | blank | Model ID or Scion alias; aliases are resolved to an ID at start |
 | `provider.gcp_project`, `provider.gcp_region` | blank | Vertex AI project and location |
+| `provider.auto_start_runtime`, `provider.auto_link_hub` | `true` | Automatic Podman start and Hub link; see [Automatic actions](#automatic-actions) |
+| `provider.mount_tk` | `true` | Mount this machine's `tk` into each worker; see [tk inside workers](#tk-inside-workers) |
 | `worker.git` | `off` | `off`: no git state changes; `branch`: commit on the ticket branch |
 | `worker.privacy` | `confidential` | `confidential` or `standard`; see [Privacy](#privacy) |
 | `worker.prompt_file` | blank | Custom brief template |
@@ -208,12 +234,13 @@ Logs rotate daily (UTC) or at 100 MB. Set `TK_SCION_TASKFORCE_LOG_DIR` or `TK_SC
 | Symptom | Cause | Fix |
 | :--- | :--- | :--- |
 | Saving a tagged ticket does nothing | Hook missing, ticket not ready, or `TK_NO_HOOKS` set | Run `tk scion-taskforce status`, read `.tickets/.hooks/hooks.log`, then `hook install` or `sync` |
-| Note: "could not start a Scion worker … podman" | Container runtime down | `podman machine start`, then save the ticket again or run `sync` |
-| Note: "not linked to the Scion Hub" | Folder never linked | Run `tk scion-taskforce init` once |
+| Note: "could not start a Scion worker … podman" | Container runtime down and `podman machine start` failed or is disabled | Start the runtime, then save the ticket again or run `sync` |
+| Note: "not linked to the Scion Hub" | Folder has no task force config, or the link failed | Run `tk scion-taskforce init` once |
 | Note: "'.scion/agents/' must be in .gitignore" | The automatic `.git/info/exclude` fix failed (for example, a read-only `.git`) | Add `/.scion/agents/` to `.git/info/exclude`, then save the ticket again |
 | Note: "role `x` has no template" | The `role:x` template is not installed | `tk scion-taskforce templates install x` |
 | `templates install` cannot download | No network or GitHub rate limit | Set `GITHUB_TOKEN`, or use `--from <mirror>` |
-| Worker reported, but the ticket shows nothing | Reports land on the next save | Run `tk scion-taskforce sync` |
+| Worker reported, but the ticket shows nothing | Reports land on the next save | Run `tk scion-taskforce sync`, or keep `watch` running |
+| Note: "stopped without a report" | The worker's turn ended (finished, asked a question, or hit a limit) without the review tag | Add a note to answer or redirect it; `attach <id>` shows the session |
 | Note: "worker lost" | The pod died without reporting | Inspect with `logs <id>`. `tk reopen <id>` (tag kept) relaunches; remove the tag to abandon |
 | `test` times out | Worker slow, stuck or queued | `tk scion-taskforce attach <id>` or `logs <id>`; the ticket stays open |
 | Resumed worker fails with a model error such as `--model medium` | Older versions passed the alias to `scion resume` | Fixed: `start` now resolves aliases. To restart an old worker, remove `taskforce` and `waiting-for-review`, run `tk reopen <id>`, then add `taskforce` again |

@@ -110,13 +110,19 @@ class TelemetryManager:
     def worker_log_path(self, project_dir: Path, ticket_id: str) -> Path:
         return self._worker_file(project_dir, ticket_id, ".log")
 
-    def save_worker_brief(self, project_dir: Path, ticket_id: str, brief_content: str) -> None:
-        b_path = self._worker_file(project_dir, ticket_id, ".brief.md")
+    def save_worker_file(self, project_dir: Path, ticket_id: str, suffix: str, content: str) -> Path | None:
+        """Write a per-worker file next to its log (brief, launch config). ``None`` if the write failed."""
+        path = self._worker_file(project_dir, ticket_id, suffix)
         try:
-            b_path.parent.mkdir(parents=True, exist_ok=True)
-            b_path.write_text(brief_content, encoding="utf-8")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
         except OSError as exc:
             self._warn(exc)
+            return None
+        return path
+
+    def save_worker_brief(self, project_dir: Path, ticket_id: str, brief_content: str) -> None:
+        self.save_worker_file(project_dir, ticket_id, ".brief.md", brief_content)
 
     def read_worker_brief(self, project_dir: Path, ticket_id: str) -> str | None:
         try:

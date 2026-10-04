@@ -835,7 +835,7 @@ for a in args:
     if skip:
         skip = False
         continue
-    if a in ("--project", "--format", "--branch", "--profile", "--harness-config", "--template", "--model"):
+    if a in ("--project", "--format", "--branch", "--profile", "--harness-config", "--template", "--model", "--config"):
         skip = True
         continue
     if a.startswith("-"):
@@ -847,7 +847,7 @@ def load():
     return json.load(open(state_file)) if os.path.exists(state_file) else {}
 def save(d):
     json.dump(d, open(state_file, "w"))
-if mode == "fail":
+if mode == "fail" and not os.path.exists(state_file + ".runtime_up"):  # fake podman can bring it up
     print("Error: podman ps failed: exit status 125", file=sys.stderr)
     sys.exit(125)
 # FAKE_SCION_FAIL_CMDS=stop,suspend makes just those subcommands fail.
@@ -863,7 +863,9 @@ if cmd == "start":
     prompts = json.load(open(prompts_file)) if os.path.exists(prompts_file) else {}
     prompts[name] = pos[2] if len(pos) > 2 else ""
     json.dump(prompts, open(prompts_file, "w"))
-    open(state_file + ".start_args", "a").write(json.dumps({"name": name, "args": args}) + "\\n")
+    cfg_path = args[args.index("--config") + 1] if "--config" in args else ""
+    cfg_text = open(cfg_path).read() if cfg_path and os.path.exists(cfg_path) else ""
+    open(state_file + ".start_args", "a").write(json.dumps({"name": name, "args": args, "config": cfg_text}) + "\\n")
     if os.environ.get("FAKE_SCION_WORKER_REPORT"):
         # Simulate a worker in an isolated workspace that adds a note and the review tag.
         import re
@@ -879,7 +881,10 @@ if cmd == "start":
             open(os.path.join(dst, name + ".md"), "w").write(text)
     print(f"started {name}"); sys.exit(0)
 if cmd in ("list", "ls"):
-    print(json.dumps([{"name": k, "phase": v} for k, v in d.items()])); sys.exit(0)
+    # FAKE_SCION_ACTIVITY=completed reports running pods as having finished their turn.
+    act = os.environ.get("FAKE_SCION_ACTIVITY", "")
+    print(json.dumps([{"name": k, "phase": v, "activity": act if v == "running" else ""} for k, v in d.items()]))
+    sys.exit(0)
 if cmd == "suspend":
     d[name] = "suspended"; save(d); sys.exit(0)
 if cmd == "stop":
@@ -914,12 +919,25 @@ sys.exit(0)
 '''
 
 
+FAKE_PODMAN_SCRIPT = '''#!/bin/sh
+# Fake `podman`: `machine start` succeeds only with FAKE_PODMAN_MODE=ok (then the fake scion runtime is up).
+echo "$*" >> "$FAKE_SCION_STATE.podman_calls"
+if [ "$1 $2" = "machine start" ] && [ "$FAKE_PODMAN_MODE" = "ok" ]; then
+  touch "$FAKE_SCION_STATE.runtime_up"; echo "Machine started successfully"; exit 0
+fi
+echo "Error: no podman machine" >&2; exit 125
+'''
+
+
 @given(r'a fake "scion" runtime in mode "(?P<mode>ok|fail|silent)"')
 def step_fake_scion(context, mode):
-    """Install a fake scion binary on PATH that simulates the runtime."""
+    """Install a fake scion binary on PATH that simulates the runtime, plus a fake podman whose
+    `machine start` fails unless FAKE_PODMAN_MODE=ok (so tests never touch a real Podman)."""
     create_plugin(context, 'scion', FAKE_SCION_SCRIPT)
+    create_plugin(context, 'podman', FAKE_PODMAN_SCRIPT)
     os.environ['FAKE_SCION_STATE'] = str(Path(context.test_dir) / 'fake_scion_state.json')
     os.environ['FAKE_SCION_MODE'] = mode
+    os.environ['FAKE_PODMAN_MODE'] = 'fail'
 
 
 @given(r'the fake Scion Hub reports the project as "(?P<hub_state>linked|unlinked)"')
@@ -1140,6 +1158,17 @@ def step_fake_scion_start_args(context, name, text):
     calls = [json.loads(ln) for ln in (log.read_text().splitlines() if log.exists() else []) if ln.strip()]
     argv = [" ".join(c["args"]) for c in calls if c["name"] == name]
     assert argv and text in argv[-1], f"Expected {text!r} in start args for {name}, got: {argv}"
+
+
+@then(r'the fake scion launch config for "(?P<name>[^"]+)" should contain "(?P<text>[^"]+)"')
+def step_fake_scion_launch_config(context, name, text):
+    """Assert the `--config` file passed to the last `start <name>` contains ``text``
+    (``{tk}`` expands to the resolved path of the repo's `ticket` script)."""
+    log = Path(os.environ['FAKE_SCION_STATE'] + '.start_args')
+    calls = [json.loads(ln) for ln in (log.read_text().splitlines() if log.exists() else []) if ln.strip()]
+    configs = [c.get("config", "") for c in calls if c["name"] == name]
+    text = text.replace("{tk}", str((Path(context.project_dir) / 'ticket').resolve()))
+    assert configs and text in configs[-1], f"Expected {text!r} in launch config for {name}, got: {configs}"
 
 
 @then(r'every command line in the output should appear in the repo file "(?P<rel_path>[^"]+)"')
