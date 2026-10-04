@@ -63,11 +63,11 @@ Auth follows the harness:
 | :--- | :--- |
 | `.scion-taskforce/scion-taskforce.yaml` | Project config with every key commented |
 | `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/` | Worker template: `scion-agent.yaml`, `agents.md`, `system-prompt.md` |
-| `.scion/templates/tk-<role>/` | Role templates, if chosen (see [Role templates](#role-templates)) |
+| `.agents/skills/tk-scion-*/` | Agent-team role skills, if chosen (see [Role skills](#role-skills)) |
 | `.tickets/.hooks/post-write.d/scion-taskforce` | The save hook |
 | `.tickets/.hooks/.gitignore`, `.tickets/.gitignore` | Ignore the hook log, the hook and the log symlink |
 
-`init` also links the folder to the Scion Hub once (`scion hub link`). Dispatch links only a project that has a task force config and became unlinked. Re-running `init` keeps your config values and template edits. `--defaults` skips the questions and installs no role templates; `--force` starts over.
+`init` also links the folder to the Scion Hub once (`scion hub link`). Dispatch links only a project that has a task force config and became unlinked. Re-running `init` keeps your config values and template edits. `--defaults` skips the questions and installs no role skills; `--force` starts over.
 
 ## Lifecycle
 
@@ -95,7 +95,7 @@ Writes that bypass `tk` fire no hook: hand edits, `git pull` and worker edits. A
 
 To pick up reports without saving anything, keep `tk scion-taskforce watch` running in a terminal. It repeats `sync` every 60 seconds until you press Ctrl-C. Nothing runs in the background after that.
 
-## Git, privacy and role templates
+## Git, privacy and role skills
 
 ### Git is optional
 
@@ -108,20 +108,36 @@ To pick up reports without saving anything, keep `tk scion-taskforce watch` runn
 
 ### Privacy
 
-`worker.privacy` defaults to `confidential`. Workers are then told not to upload or publish project content, push, or comment on external systems. `templates install` drops skills that publish content, and `status` warns when the Scion Hub endpoint is not local. Set `standard` to lift these limits, for example to let PR reviews post a `gh pr comment`.
+`worker.privacy` defaults to `confidential`. Workers are then told not to upload or publish project content, push, or comment on external systems. `skills install` drops skills that publish content, and `status` warns when the Scion Hub endpoint is not local. Set `standard` to lift these limits, for example to let PR reviews post a `gh pr comment`.
 
-### Role templates
+### Role skills
 
-`tk scion-taskforce templates install [<role>...]` installs role templates from [scion-frontiers/agent-team](https://github.com/scion-frontiers/agent-team/tree/main/templates) into `.scion/templates/tk-<role>/`. A ticket tagged `role:<name>` runs on that template; without a role tag the default worker template is used.
+Every worker runs on the project's one worker template (how the pod runs). Role knowledge ships as skills (how to do the job). `tk scion-taskforce skills install [<role>...]` turns roles from [scion-frontiers/agent-team](https://github.com/scion-frontiers/agent-team/tree/main/templates) into skills under `.agents/skills/`:
+
+| Folder | Content |
+| :--- | :--- |
+| `tk-scion-<role>/SKILL.md` | The tk contract (wins over upstream: work alone, report in the ticket, follow the git rule, no push), the upstream persona (`system-prompt.md`), the role guidance (`agents.md`) and paths to its related skills |
+| `tk-scion-<skill>/` | Each skill a role references, with `name:` set to the prefixed folder name and its own `LICENSE` |
+| `UPSTREAM.md` (in each folder) | Source commit, licence and every installed or dropped skill; marks the folder as generated |
 
 - Default set: `developer`, `code-reviewer`, `investigator`, `doc-writer`, `test-engineer`, `security-auditor`, `researcher`, `architect`. Name others explicitly (for example `qa-tester`). Coordinator roles are left out because `tk` is the coordinator.
-- Upstream is fetched once at a pinned commit (`--ref <sha>` overrides). Every referenced skill is copied into `skills/`, so nothing is downloaded when a worker starts.
-- `agents.md` starts with the tk contract, which wins over upstream guidance: work alone, report in the ticket, follow the git rule, no push.
-- `UPSTREAM.md` in each folder lists the source commit, licences, and every vendored or dropped skill.
-- Offline or air-gapped: mirror the repos as `<dir>/<owner>/<repo>/`, then run `templates install --from <dir>`.
-- Existing role templates are kept; `--force` regenerates them. `uninit` removes them.
+- Upstream is fetched once at a pinned commit (`--ref <sha>` overrides), so nothing is downloaded when a worker starts. Per-role model and resource settings are not carried over.
+- Re-running keeps existing skills. `--force` regenerates generated skills (those with `UPSTREAM.md`) only; hand-made skills and folders without the `tk-scion-` prefix are never touched. `uninit` removes generated skills.
+- Offline or air-gapped: mirror the repos as `<dir>/<owner>/<repo>/`, then run `skills install --from <dir>`.
+- Git: tk neither commits nor ignores the skills. Commit them to share (`git add .agents/skills/tk-scion-*`) or keep them local (`echo '/.agents/skills/tk-scion-*/' >> .git/info/exclude`). If Scion gives a worker its own worktree, that worktree holds only committed files, so commit the skills to use them there.
+- The skills are plain `SKILL.md` files, so people and local agents can use them outside Scion too.
 
-A `role:` tag whose template is missing gets a note, and the worker runs on the default template.
+How the brief uses them (the brief names file paths, so this works with any harness):
+
+| Ticket | Brief |
+| :--- | :--- |
+| Tagged `role:<name>` (several allowed) | "Read and follow `.agents/skills/tk-scion-<name>/SKILL.md` before starting" (mandatory) |
+| No role tag | The installed role skills (and hand-made `tk-scion-*` skills) with descriptions; use one only if it clearly fits. Less reliable than a tag |
+| Tagged with a role whose skill is missing | No worker starts. The ticket gets a note with the install command; the queue moves on to other tickets |
+
+Custom briefs (`worker.prompt_file`) get the same section through the `{skills}` placeholder.
+
+**Migrating from role templates.** `templates install` and `templates list` still work as deprecated aliases of `skills` (removal after 2027-04-01). Old generated `.scion/templates/tk-<role>/` templates keep working for a role that has no skill yet. To switch: run `tk scion-taskforce skills install`, then delete the old `tk-<role>` folders (`uninit` also removes them).
 
 ### tk inside workers
 
@@ -129,7 +145,7 @@ Worker images do not ship `tk`. At each start the task force finds `tk` on this 
 
 If `tk` is not found, or `provider.mount_tk` is `false`, the worker edits `.tickets/<id>.md` directly. Turn the mount off when workers run on a remote Scion broker, where your local path does not exist.
 
-The brief, the seeded template and the role templates tell workers to use `tk` as their only channel:
+The brief, the seeded template and the role skills tell workers to use `tk` as their only channel:
 
 | Worker step | Command |
 | :--- | :--- |
@@ -138,7 +154,7 @@ The brief, the seeded template and the role templates tell workers to use `tk` a
 | Report | `tk add-note <id>` with a `## Task Force Worker Report` heading |
 | Hand back for review | `tk update <id> --tags <current tags>,waiting-for-review` |
 
-Workers never close, reopen or create tickets. `init` updates the old report section of an existing worker template in place; role templates update with `templates install --force`.
+Workers never close, reopen or create tickets. `init` updates the old report section of an existing worker template in place; role skills update with `skills install --force`.
 
 ## Automatic actions
 
@@ -166,11 +182,11 @@ tk scion-taskforce [--config <path>] [--dry-run] <subcommand> [args...]
 | Command | Description |
 | :--- | :--- |
 | `tk scion-taskforce init [--global] [--force] [--defaults\|--interactive]` | Run `tk init`/`scion init` if needed, then the wizard: config, template, Hub link, save hook. `--global` writes only `~/.config/tk/scion-taskforce.yaml` |
-| `tk scion-taskforce uninit [--global] [--yes]` | Stop and delete this project's workers (branches kept), then remove `.scion-taskforce/`, the worker template and the save hook. Asks first unless `--yes` |
+| `tk scion-taskforce uninit [--global] [--yes]` | Stop and delete this project's workers (branches kept), then remove `.scion-taskforce/`, the worker template, generated `tk-scion-*` skills and the save hook. Asks first unless `--yes` |
 | `tk scion-taskforce hook install\|uninstall\|status` | Manage the save hook for this project |
 | `tk scion-taskforce test [--timeout <s>] [--keep]` | Create a ticket tagged `init,taskforce`, wait (default 600 s) for its worker to report back, then close it unless `--keep` |
-| `tk scion-taskforce templates install [<role>...] [--force] [--from <dir>] [--ref <sha>]` | Install agent-team role templates (default set) with vendored skills; see [Role templates](#role-templates) |
-| `tk scion-taskforce templates list` | Installed role templates and their sources |
+| `tk scion-taskforce skills install [<role>...] [--force] [--from <dir>] [--ref <sha>]` | Install agent-team roles (default set) as `.agents/skills/tk-scion-*` skills; see [Role skills](#role-skills). `templates install` is a deprecated alias |
+| `tk scion-taskforce skills list` | Installed `tk-scion-*` skills and their sources |
 | `tk scion-taskforce on-save <id> [--event <e>]` | Handle one ticket save. The hook calls it |
 | `tk scion-taskforce sync [dir]` | Merge worker reports, pause reviewed workers and workers that stopped without a report, flag dead workers, start queued tickets |
 | `tk scion-taskforce watch [dir] [--interval <s>]` | Foreground loop: `sync` every `<s>` seconds (default 60, minimum 10) without retrying failed starts. Ctrl-C stops it |
@@ -213,7 +229,7 @@ Commonly edited keys:
 | `provider.mount_tk` | `true` | Mount this machine's `tk` into each worker; see [tk inside workers](#tk-inside-workers) |
 | `worker.git` | `off` | `off`: no git state changes; `branch`: commit on the ticket branch |
 | `worker.privacy` | `confidential` | `confidential` or `standard`; see [Privacy](#privacy) |
-| `worker.prompt_file` | blank | Custom brief template |
+| `worker.prompt_file` | blank | Custom brief template; `{skills}` inserts the skill section |
 | `telemetry.rotation.retention_days` | `30` | Days `gc` keeps rotated logs |
 
 ## Logs and state
@@ -237,8 +253,9 @@ Logs rotate daily (UTC) or at 100 MB. Set `TK_SCION_TASKFORCE_LOG_DIR` or `TK_SC
 | Note: "could not start a Scion worker … podman" | Container runtime down and `podman machine start` failed or is disabled | Start the runtime, then save the ticket again or run `sync` |
 | Note: "not linked to the Scion Hub" | Folder has no task force config, or the link failed | Run `tk scion-taskforce init` once |
 | Note: "'.scion/agents/' must be in .gitignore" | The automatic `.git/info/exclude` fix failed (for example, a read-only `.git`) | Add `/.scion/agents/` to `.git/info/exclude`, then save the ticket again |
-| Note: "role `x` has no template" | The `role:x` template is not installed | `tk scion-taskforce templates install x` |
-| `templates install` cannot download | No network or GitHub rate limit | Set `GITHUB_TOKEN`, or use `--from <mirror>` |
+| Note: "role skill `tk-scion-x` is not installed" | The ticket is tagged `role:x` but `.agents/skills/tk-scion-x/` is missing; no worker started | `tk scion-taskforce skills install x`, then save the ticket again or run `sync` |
+| `skills install` cannot download | No network or GitHub rate limit | Set `GITHUB_TOKEN`, or use `--from <mirror>` |
+| `skills install`: "exists and was not generated by tk" | A hand-made `tk-scion-<role>` folder has no `UPSTREAM.md` | Rename that folder, or install a different role |
 | Worker reported, but the ticket shows nothing | Reports land on the next save | Run `tk scion-taskforce sync`, or keep `watch` running |
 | Note: "stopped without a report" | The worker's turn ended (finished, asked a question, or hit a limit) without the review tag | Add a note to answer or redirect it; `attach <id>` shows the session |
 | Note: "worker lost" | The pod died without reporting | Inspect with `logs <id>`. `tk reopen <id>` (tag kept) relaunches; remove the tag to abandon |

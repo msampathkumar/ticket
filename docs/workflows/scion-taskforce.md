@@ -27,7 +27,7 @@ sequenceDiagram
 
 ## 1. Tag the ticket
 
-Write clear acceptance criteria, then add the opt-in tag. The save starts a worker in the project folder. Add `role:<name>` (for example `role:code-reviewer`) to run it on an installed [role template](../plugins/scion-taskforce.md#role-templates).
+Write clear acceptance criteria, then add the opt-in tag. The save starts a worker in the project folder. Add `role:<name>` (for example `role:code-reviewer`) to make the worker follow an installed [role skill](../plugins/scion-taskforce.md#role-skills).
 
 ```bash
 tk create "Add input sanitization to auth endpoints" -p 1 \

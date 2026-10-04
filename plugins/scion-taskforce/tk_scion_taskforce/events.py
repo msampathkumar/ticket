@@ -28,6 +28,7 @@ from typing import Any
 
 from tk_scion_taskforce.config import load_config
 from tk_scion_taskforce.providers.scion import ScionProvider
+from tk_scion_taskforce.roles import select_roles
 from tk_scion_taskforce.state import load_state, normalize_project_dir, save_state, state_lock
 from tk_scion_taskforce.telemetry import TelemetryManager
 from tk_scion_taskforce.tickets import (
@@ -50,6 +51,7 @@ from tk_scion_taskforce.workers import (
     is_eligible_for_dispatch,
     mark_worker_lost,
     max_workers_per_project,
+    missing_skill_message,
     pause_worker_for_ticket,
     project_lock,
     send_feedback_to_worker,
@@ -73,6 +75,7 @@ class _Ctx:
     paused: int = 0
     errors: int = 0
     error: str = ""  # detail of the last failed start, for `dispatch`
+    skill_missing: bool = False  # the last start failed only because a role skill is not installed
 
     @property
     def workers(self) -> dict[str, dict[str, Any]]:
@@ -196,6 +199,17 @@ def _has_slot(ctx: _Ctx) -> tuple[bool, int, int]:
 
 
 def _start(ctx: _Ctx, ticket: TicketInfo, ack: str) -> bool:
+    missing = select_roles(ctx.project, ticket.tags).missing
+    if missing:
+        # Not a runtime failure: only this ticket waits, so the queue keeps going (`skill_missing`).
+        ctx.errors += 1
+        ctx.skill_missing = True
+        ctx.error = missing_skill_message(missing)
+        ctx.telemetry.log_event("WARNING", f"{ticket.id}: {ctx.error}", ticket_id=ticket.id)
+        entry = ctx.workers.setdefault(_worker_key(ctx.proj_str, ticket.id), {})
+        entry.update({"ticket_id": ticket.id, "project_dir": ctx.proj_str, "state": "error", "error": ctx.error})
+        _note(ticket.path, ctx.error)
+        return False
     _note(ticket.path, ack)
     try:
         ok = dispatch_ticket(ctx.project, ticket, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state)
@@ -238,6 +252,9 @@ def _start_queued(ctx: _Ctx, retry_errors: bool = False) -> int:
         if not _has_slot(ctx)[0]:
             break
         if not _start(ctx, ticket, "a worker slot is free; starting a new Scion worker."):
+            if ctx.skill_missing:
+                ctx.skill_missing = False
+                continue
             break
         started += 1
     return started

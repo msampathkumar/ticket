@@ -84,7 +84,7 @@ Feature: SCION Task Force Plugin
     When I run "printf '\n\n\n\n\n2\ny\nn\n' | ticket scion-taskforce init --interactive"
     Then the command should succeed
     And the output should contain "7. Privacy"
-    And the output should contain "8. agent-team role templates"
+    And the output should contain "8. agent-team skills"
     And the output should contain "recommended: API-key auth"
     And the output should contain "skipped; gemini-cli authenticates with the GEMINI_API_KEY Scion secret"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "api-key"
@@ -164,53 +164,120 @@ Feature: SCION Task Force Plugin
     And the output should contain "Automatic actions (latest 5):"
     And the output should contain "auto-fix: added `/.scion/agents/`"
 
-  Scenario: templates install vendors agent-team roles with the tk contract
+  Scenario: skills install writes prefixed agent-team skills with the tk contract
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
     And a local agent-team mirror at "mirror"
+    And a file ".agents/skills/my-skill/SKILL.md" with content "hand-made skill"
     When I run "ticket scion-taskforce init"
-    And I run "ticket scion-taskforce templates install developer --from mirror"
+    And I run "ticket scion-taskforce skills install developer --from mirror"
     Then the command should succeed
-    And the output should contain "tk-developer: installed, 2 skill(s) vendored; dropped: gcs-artifact-publishing"
-    And the file ".scion/templates/tk-developer/agents.md" should contain "tk contract (wins over the role guidance below)"
-    And the file ".scion/templates/tk-developer/agents.md" should contain "Commit and push per logical phase"
-    And the file ".scion/templates/tk-developer/skills/code-review/SKILL.md" should contain "name: code-review"
-    And the file ".scion/templates/tk-developer/skills/code-simplification/LICENSE" should contain "MIT License"
-    And the file ".scion/templates/tk-developer/skills/gcs-artifact-publishing/SKILL.md" should not exist
-    And the file ".scion/templates/tk-developer/scion-agent.yaml" should not contain "uri:"
-    And the file ".scion/templates/tk-developer/UPSTREAM.md" should contain "dropped: publishes public links"
-    And the file ".scion/templates/tk-developer/LICENSE" should contain "Apache License"
-    When I run "ticket scion-taskforce templates install developer --from mirror"
-    Then the output should contain "tk-developer: kept"
-    When I run "ticket scion-taskforce templates install ghost --from mirror"
+    And the output should contain "tk-scion-developer: installed; uses tk-scion-code-review, tk-scion-code-simplification; dropped: gcs-artifact-publishing"
+    And the output should contain "tk neither commits nor ignores them"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "name: tk-scion-developer"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "tk contract (wins over the role guidance below)"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "## Persona (upstream `system-prompt.md`)"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "Commit and push per logical phase"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "`.agents/skills/tk-scion-code-review/SKILL.md`"
+    And the file ".agents/skills/tk-scion-developer/UPSTREAM.md" should contain "dropped: publishes public links"
+    And the file ".agents/skills/tk-scion-developer/LICENSE" should contain "Apache License"
+    And the file ".agents/skills/tk-scion-code-review/SKILL.md" should contain "name: tk-scion-code-review"
+    And the file ".agents/skills/tk-scion-code-simplification/LICENSE" should contain "MIT License"
+    And the file ".agents/skills/tk-scion-gcs-artifact-publishing/SKILL.md" should not exist
+    And the file ".scion/templates/tk-developer/scion-agent.yaml" should not exist
+    When I run "ticket scion-taskforce skills install developer --from mirror"
+    Then the output should contain "tk-scion-developer: kept"
+    When I run "ticket scion-taskforce skills install developer --from mirror --force"
+    Then the output should contain "tk-scion-developer: updated"
+    And the file ".agents/skills/my-skill/SKILL.md" should contain "hand-made skill"
+    When I run "ticket scion-taskforce skills install ghost --from mirror"
     Then the command should fail
     And the output should contain "unknown role(s): ghost. Available: developer"
-    When I run "ticket scion-taskforce templates list"
-    Then the output should contain "developer"
+    When I run "ticket scion-taskforce skills list"
+    Then the output should contain "tk-scion-developer"
     When I run "ticket scion-taskforce uninit --yes"
-    Then the file ".scion/templates/tk-developer/agents.md" should not exist
+    Then the file ".agents/skills/tk-scion-developer/SKILL.md" should not exist
+    And the file ".agents/skills/tk-scion-code-review/SKILL.md" should not exist
+    And the file ".agents/skills/my-skill/SKILL.md" should contain "hand-made skill"
 
-  Scenario: A role tag runs the worker on its role template
+  Scenario: skills install never overwrites a hand-made tk-scion skill
+    Given a clean tickets directory
+    And a local agent-team mirror at "mirror"
+    And a file ".agents/skills/tk-scion-developer/SKILL.md" with content "my own developer skill"
+    When I run "ticket scion-taskforce skills install developer --from mirror --force"
+    Then the command should fail
+    And the output should contain "was not generated by tk"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "my own developer skill"
+    And the file ".agents/skills/tk-scion-code-review/SKILL.md" should not exist
+
+  Scenario: templates install is a deprecated alias of skills install
+    Given a clean tickets directory
+    And a local agent-team mirror at "mirror"
+    When I run "ticket scion-taskforce templates install developer --from mirror"
+    Then the command should succeed
+    And the output should contain "`templates` is deprecated"
+    And the file ".agents/skills/tk-scion-developer/SKILL.md" should contain "name: tk-scion-developer"
+
+  Scenario: A role tag runs the worker on the worker template and the brief names the role skill
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
     And a local agent-team mirror at "mirror"
     And a ticket exists with ID "tf-0007" and title "Developer role"
     And ticket "tf-0007" has tags "taskforce, role:developer"
     When I run "ticket scion-taskforce init"
-    And I run "ticket scion-taskforce templates install developer --from mirror"
+    And I run "ticket scion-taskforce skills install developer --from mirror"
     And I run "ticket scion-taskforce dispatch tf-0007"
     Then the command should succeed
-    And the fake scion start for "tf-0007" should include "-t tk-developer"
+    And the fake scion start for "tf-0007" should not include "tk-developer"
+    And the fake scion prompt for "tf-0007" should contain "### Skills (mandatory)"
+    And the fake scion prompt for "tf-0007" should contain "- `.agents/skills/tk-scion-developer/SKILL.md`"
+    And the fake scion prompt for "tf-0007" should contain "tk add-note tf-0007"
 
-  Scenario: A role tag without an installed template falls back to the default worker with a note
+  Scenario: An untagged ticket's brief lists the installed tk-scion skills
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a local agent-team mirror at "mirror"
+    And a ticket exists with ID "tf-0008" and title "No role"
+    And ticket "tf-0008" has tags "taskforce"
+    When I run "ticket scion-taskforce init"
+    And I run "ticket scion-taskforce skills install developer --from mirror"
+    And I run "ticket scion-taskforce dispatch tf-0008"
+    Then the command should succeed
+    And the fake scion prompt for "tf-0008" should contain "### Skills (optional)"
+    And the fake scion prompt for "tf-0008" should contain "Use one only if it clearly fits this ticket"
+    And the fake scion prompt for "tf-0008" should contain "`.agents/skills/tk-scion-developer/SKILL.md`: Developer"
+    And the fake scion prompt for "tf-0008" should not contain "### Skills (mandatory)"
+
+  Scenario: A role tag naming a missing skill gets a note and no worker, and the queue moves on
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
     And a ticket exists with ID "tf-0006" and title "Ghost role"
     And ticket "tf-0006" has tags "taskforce, role:ghost"
-    When I run "ticket scion-taskforce dispatch tf-0006"
+    And a ticket exists with ID "tf-0009" and title "Plain task"
+    And ticket "tf-0009" has tags "taskforce"
+    When I run "ticket scion-taskforce init"
+    And I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And ticket "tf-0006" should contain "role `ghost` has no template in this project; using the default worker"
-    And the fake scion start for "tf-0006" should not include "tk-ghost"
+    And ticket "tf-0006" should contain "role skill `tk-scion-ghost` is not installed"
+    And ticket "tf-0006" should contain "`tk scion-taskforce skills install ghost`"
+    And ticket "tf-0006" should have field "status" with value "open"
+    And ticket "tf-0009" should have field "status" with value "in_progress"
+    And the fake scion runtime should have 1 pod(s)
+    When I run "ticket scion-taskforce dispatch tf-0006"
+    Then the command should fail
+    And the output should contain "tk scion-taskforce skills install ghost"
+
+  Scenario: A deprecated tk-<role> template still runs a role that has no skill
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0010" and title "Legacy role"
+    And ticket "tf-0010" has tags "taskforce, role:legacy"
+    And a file ".scion/templates/tk-legacy/scion-agent.yaml" with content "schema_version: '1'"
+    When I run "ticket scion-taskforce init"
+    And I run "ticket scion-taskforce dispatch tf-0010"
+    Then the command should succeed
+    And the fake scion start for "tf-0010" should include "-t tk-legacy"
+    And the fake scion prompt for "tf-0010" should not contain "### Skills"
 
   Scenario: Task force is opt-in - only tickets the user tagged taskforce are dispatched
     Given a clean tickets directory

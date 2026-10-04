@@ -113,11 +113,11 @@ worker:
                                   #   leave changes in the working tree and list them. Works in plain folders.
                                   # branch: workers commit on the ticket branch (never push). Git repos only.
   privacy: "confidential"         # confidential: the brief forbids uploads, public links, pushes and PR
-                                  #   comments; `templates install` drops publishing skills.
+                                  #   comments; `skills install` drops publishing skills.
                                   # standard: no extra restrictions.
   prompt_file: ""                 # Optional path to a custom prompt template. Placeholders:
                                   # {ticket_id} {project_dir} {branch} {ticket_details} {work_type}
-                                  # {claim_tag} {review_tag} {external_ref} {ticket_title}
+                                  # {claim_tag} {review_tag} {external_ref} {ticket_title} {skills}
   review_tags: [pr, review]       # A ticket with any of these tags gets the REVIEW brief
   review_ref_prefixes: [gh-pr-]   # ...or whose external-ref starts with one of these prefixes
 
@@ -499,5 +499,13 @@ def uninit_config(
         if tmpl_dir.is_dir():
             shutil.rmtree(tmpl_dir)
             removed_any = True
+    # Generated role skills (tk-scion-* with UPSTREAM.md); hand-made and unprefixed skills are left alone.
+    skills_dir = base_dir / ".agents" / "skills"
+    for skill_dir in [m.parent for m in skills_dir.glob("tk-scion-*/UPSTREAM.md")]:
+        shutil.rmtree(skill_dir)
+        removed_any = True
+    for empty in (skills_dir, skills_dir.parent):
+        if empty.is_dir() and not any(empty.iterdir()):
+            empty.rmdir()
     return removed_any, str(scion_dir)
 

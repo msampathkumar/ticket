@@ -185,9 +185,14 @@ tk scion-taskforce test                    # Creates an init+taskforce ticket, w
 tk scion-taskforce status                  # Save hook, provider health, workers for this project
 tk scion-taskforce sync                    # Catch up after hand edits or git pull
 tk scion-taskforce attach <id>             # Attach to an active worker session
+
+# Role skills (agent-team roles in .agents/skills/tk-scion-*/)
+tk scion-taskforce skills install          # Default role set; name roles to pick, --force to refresh
+tk scion-taskforce skills list             # Installed tk-scion-* skills
 ```
 
 > **Rules for Task Force**:
 > - Only tickets tagged `taskforce` by human operators are claimed; saving such a ticket starts its worker.
+> - Add `role:<name>` to make the worker follow `.agents/skills/tk-scion-<name>/SKILL.md`; a missing skill gets a note and no worker.
 > - Workers keep the ticket `in_progress` with the label `waiting-for-review`, record progress via `tk add-note`, and pause.
 > - When feedback is added via `tk add-note`, the save hook forwards it and wakes the worker. `tk close` stops the worker.

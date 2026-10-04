@@ -16,7 +16,14 @@ from typing import Any
 
 from tk_scion_taskforce.config import project_config_path
 from tk_scion_taskforce.providers.scion import ScionProvider
-from tk_scion_taskforce.roles import role_template_for
+from tk_scion_taskforce.roles import (
+    SKILLS_DIR,
+    install_command,
+    select_roles,
+    selectable_skills,
+    skill_name,
+    skill_rel_path,
+)
 from tk_scion_taskforce.state import get_state_dir, normalize_project_dir, save_state
 from tk_scion_taskforce.telemetry import (
     TelemetryManager,
@@ -92,6 +99,18 @@ def worker_launch_config(config: dict[str, Any]) -> dict[str, Any] | None:
 
 class DispatchError(Exception):
     """Raised when Scion cannot launch a verified worker; the ticket is left untouched."""
+
+
+class MissingSkillError(DispatchError):
+    """A ``role:<name>`` tag names a skill that is not installed; this ticket waits, others may start."""
+
+
+def missing_skill_message(roles: list[str]) -> str:
+    names = ", ".join(f"`{skill_name(r)}`" for r in roles)
+    return (
+        f"role skill {names} is not installed in `.agents/skills/`, so no worker was started. "
+        f"Install it with `{install_command(roles)}`, then save the ticket again or run `tk scion-taskforce sync`."
+    )
 
 
 def _worker_key(project_dir: str | Path, ticket_id: str) -> str:
@@ -214,6 +233,39 @@ def _reporting_protocol(ticket: TicketInfo, claim_tag: str, review_tag: str, git
     )
 
 
+SKILL_LIST_LIMIT = 20
+SKILLS_DIR_POSIX = SKILLS_DIR.as_posix()
+
+
+def skills_brief(ticket: TicketInfo) -> str:
+    """The brief's skill section. Tagged: the role skill(s) to read, by path (works for any harness).
+    Untagged: the installed role skills (and hand-made ``tk-scion-*`` skills), to use only if one clearly fits. Empty otherwise
+    (no skills installed, or the role runs on a deprecated per-role template)."""
+    sel = select_roles(ticket.project_dir, ticket.tags)
+    if sel.skills:
+        paths = "".join(f"- `{skill_rel_path(r)}`\n" for r in sel.skills)
+        return (
+            "### Skills (mandatory)\n"
+            f"Before starting, read and follow:\n{paths}"
+            "This brief and the `tk` rules below win where a skill disagrees.\n\n"
+        )
+    if sel.roles:
+        return ""
+    found = selectable_skills(ticket.project_dir)
+    if not found:
+        return ""
+    lines = "".join(
+        f"- `{SKILLS_DIR_POSIX}/{name}/SKILL.md`" + (f": {desc if len(desc) <= 200 else desc[:197] + '...'}" if desc else "") + "\n"
+        for name, desc in found[:SKILL_LIST_LIMIT]
+    )
+    more = f"- ... and {len(found) - SKILL_LIST_LIMIT} more in `{SKILLS_DIR_POSIX}/`\n" if len(found) > SKILL_LIST_LIMIT else ""
+    return (
+        "### Skills (optional)\n"
+        "This project has these skills. Use one only if it clearly fits this ticket; read its SKILL.md first:\n"
+        f"{lines}{more}\n"
+    )
+
+
 def _default_prompt(
     ticket: TicketInfo, branch: str, work_type: str, claim_tag: str, review_tag: str, config: dict[str, Any]
 ) -> str:
@@ -224,6 +276,7 @@ def _default_prompt(
         f"in project `{ticket.project_dir}` (mounted here as your workspace). You work alone: "
         "the ticket is your only channel to the human.\n\n"
         f"### Ticket Details (`tk show {ticket.id}`)\n{ticket_details.strip()}\n\n"
+        + skills_brief(ticket)
     )
     if work_type == "review":
         pr_num = _pr_number_from_ref(ticket.external_ref)
@@ -307,6 +360,7 @@ def build_worker_prompt(
                 "review_tag": review_tag,
                 "external_ref": ticket.external_ref,
                 "ticket_details": run_tk_show(ticket.project_dir, ticket.id).strip(),
+                "skills": skills_brief(ticket).strip(),
             }
             for key, value in mapping.items():
                 template = template.replace("{" + key + "}", str(value))
@@ -469,6 +523,11 @@ def dispatch_ticket(
     branch = provider.format_branch(ticket.id) if git_mode(config) == "branch" else ""
     slug = project_slug(project_dir)
 
+    # Role skills first: a ticket whose role:<name> skill is missing must not start without it.
+    selection = select_roles(Path(proj_str), ticket.tags)
+    if selection.missing:
+        raise MissingSkillError(missing_skill_message(selection.missing))
+
     # 0. Pre-flight: is the provider runtime (podman/docker/k8s) reachable at all?
     pre = provider.preflight(proj_str)
     if not pre.ok and _auto_fix_preflight(pre.reason, config, provider, proj_str, telemetry, trace_id, ticket.id):
@@ -516,13 +575,7 @@ def dispatch_ticket(
     fixed = ensure_scion_agents_ignored(Path(proj_str))
     if fixed:
         telemetry.log_event("INFO", fixed, trace_id=trace_id, ticket_id=ticket.id, project=proj_str, autofix=True)
-    role, template = role_template_for(Path(proj_str), ticket.tags)
-    if role and not template:
-        status_note(
-            ticket.path,
-            f"role `{role}` has no template in this project; using the default worker. "
-            f"Install it with `tk scion-taskforce templates install {role}`.",
-        )
+    template = selection.template  # "" = the project's worker template; set only for deprecated tk-<role> templates
     prompt = build_worker_prompt(ticket, config, branch=branch)
     telemetry.save_worker_brief(project_dir, ticket.id, prompt)
     launch = worker_launch_config(config)

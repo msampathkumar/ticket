@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- SCION Task Force: agent-team roles ship as skills in `.agents/skills/tk-scion-*/` (`tk scion-taskforce skills install|list`) instead of per-role Scion templates. Every ticket runs on the one worker template; a `role:<name>` tag (several allowed) makes the brief name `.agents/skills/tk-scion-<name>/SKILL.md`, and untagged tickets get a list of installed role skills. A tag naming a missing skill gets a ticket note with the install command instead of a worker. `templates install|list` remain as deprecated aliases; existing `tk-<role>` templates keep working until removed. `uninit` removes generated skills.
+
 ## [0.4.0] - 2026-10-03
 
 ### Added

@@ -1,7 +1,7 @@
 ---
 tags: [taskforce]
 id: tic-cpji
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-10-03T23:46:17Z
@@ -55,3 +55,11 @@ Implemented in the main checkout (worker paused: opencode had no model set, so i
 2. init runs tk init if .tickets/ is missing and scion init if .scion/ is missing.
 3. Model: now asked. Options are the harness's Scion aliases, the harness default, and Vertex Gemini IDs for opencode. Project and region are now saved (provider.gcp_project/gcp_region); before this they were lost after the wizard.
 Files: wizard.py (new), cli.py, config.py, providers/scion.py, feature tests (+3), docs.
+
+**2026-10-04T22:23:29Z**
+
+Verified: wizard menus/validation, tk/scion init pre-check and model question are in master; wizard BDD scenarios pass (make test 212/212). Closing.
+
+**2026-10-04T22:23:29Z**
+
+**Task Force:** ticket closed; could not stop worker `tic-cpji`: scion stop exited 1: Using hub: http://127.0.0.1:8080 (see `tk scion-taskforce logs tic-cpji`)

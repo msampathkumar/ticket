@@ -35,10 +35,15 @@ from tk_scion_taskforce.events import (
 from tk_scion_taskforce.providers.scion import ScionProvider
 from tk_scion_taskforce.roles import (
     DEFAULT_ROLES,
+    SKILL_PREFIX,
+    SKILLS_DIR,
     UPSTREAM_REF,
     RoleInstallError,
-    install_roles,
+    install_skills,
+    installed_role_skills,
     installed_roles,
+    installed_skills,
+    skill_name,
 )
 from tk_scion_taskforce.state import StateError, known_projects, load_state, normalize_project_dir, state_lock
 from tk_scion_taskforce.telemetry import TelemetryManager, new_trace_id, project_slug
@@ -73,20 +78,23 @@ in the background. For a ticket YOU tagged `taskforce`:
 - worker reports back (`waiting-for-review`): worker paused, next queued ticket starts
 - ticket closed: worker stopped, next queued ticket starts
 - tag removed, `no-taskforce` added or ticket file deleted: worker stopped and deleted (branch kept)
-`gc` deletes the workers of tickets closed more than 5 days ago. A `role:<name>` tag runs the
-worker on the role template `tk-<name>` (see `templates`).
+`gc` deletes the workers of tickets closed more than 5 days ago. Every worker runs on the project's
+worker template. A `role:<name>` tag (several allowed) makes the brief require
+`.agents/skills/tk-scion-<name>/SKILL.md`; if it is missing, the ticket gets a note and no worker.
 
 Setup:
   init [--global] [--force] [--defaults|--interactive]
                                    tk/scion init if needed; setup wizard: config, template, Hub link, save hook
   uninit [--global] [--yes]        Stop and delete this project's workers (branches kept), then remove
-                                   .scion-taskforce/, the worker template and the save hook; asks first unless --yes
+                                   .scion-taskforce/, the worker template, generated tk-scion-* skills
+                                   and the save hook; asks first unless --yes
   hook install|uninstall|status    Manage the tk post-write hook for this project
   test [--timeout <s>] [--keep]    Create a ticket tagged init+taskforce, wait for its worker to report back
-  templates install [<role>...] [--force] [--from <dir>] [--ref <sha>]
-                                   Install agent-team role templates (default set) into .scion/templates/,
-                                   skills vendored, pinned to a commit; --from uses a local <owner>/<repo>/ mirror
-  templates list                   Installed role templates and their sources
+  skills install [<role>...] [--force] [--from <dir>] [--ref <sha>]
+                                   Install agent-team roles (default set) as skills in .agents/skills/tk-scion-*/,
+                                   pinned to a commit; --force refreshes generated skills only; --from uses a
+                                   local <owner>/<repo>/ mirror. `templates` is a deprecated alias.
+  skills list                      Installed tk-scion-* skills and their sources
 
 Dispatch:
   on-save <id> [--event <e>]       Handle one ticket save (called by the hook)
@@ -313,7 +321,7 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
         "claim_tag": "taskforce",
         "max_concurrent": 1,
         "privacy": "confidential",
-        "roles": "none",  # non-interactive: no download; `templates install` adds roles later
+        "roles": "none",  # non-interactive: no download; `skills install` adds role skills later
     }
     if is_interactive:
         answers["gcp_project"] = _detect_default_gcp_project()
@@ -352,7 +360,7 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
         print(f"🪝 Save hook:  `{hook}` (ticket saves now trigger the task force)")
         if is_interactive and answers.get("roles", "none") != "none":
             chosen = None if answers["roles"] == "recommended" else [r.strip() for r in answers["roles"].split(",")]
-            _install_roles_report(project_dir, chosen, str(answers.get("privacy", "confidential")))
+            _install_skills_report(project_dir, chosen, str(answers.get("privacy", "confidential")))
     print(f"✅ Initialization successful! Tag a ready ticket `{answers['claim_tag']}` to hand it to the task force.")
 
     if is_interactive:
@@ -370,38 +378,50 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
 
 
 
-def _install_roles_report(
+def _install_skills_report(
     project_dir: Path, roles: list[str] | None, privacy: str, mirror: Path | None = None,
     ref: str = UPSTREAM_REF, force: bool = False,
 ) -> int:
-    print(f"🧩 Role templates: fetching {', '.join(roles or DEFAULT_ROLES)} ({'local mirror' if mirror else 'GitHub'})...")
+    print(f"🧩 Agent-team skills: fetching {', '.join(roles or DEFAULT_ROLES)} ({'local mirror' if mirror else 'GitHub'})...")
     try:
-        results = install_roles(project_dir, roles, privacy=privacy, mirror=mirror, ref=ref, force=force)
+        results = install_skills(project_dir, roles, privacy=privacy, mirror=mirror, ref=ref, force=force)
     except RoleInstallError as exc:
-        print(f"⚠️  Role templates not installed: {exc}\n   Retry with `tk scion-taskforce templates install`.")
+        print(f"⚠️  Skills not installed: {exc}\n   Retry with `tk scion-taskforce skills install`.")
         return 1
     for r in results:
         if r.action == "kept":
-            print(f"   = {r.template_dir.name}: kept (use --force to regenerate)")
+            print(f"   = {r.path.name}: kept (use --force to regenerate)")
             continue
+        uses = f"; uses {', '.join(skill_name(s) for s in r.skills)}" if r.skills else ""
         dropped = f"; dropped: {', '.join(r.dropped)}" if r.dropped else ""
-        print(f"   ✓ {r.template_dir.name}: {r.action}, {len(r.skills)} skill(s) vendored{dropped}")
-    print("   Sources and licences: UPSTREAM.md in each folder. Tag a ticket `role:<name>` to use one.")
+        print(f"   ✓ {r.path.name}: {r.action}{uses}{dropped}")
+    rel = SKILLS_DIR.as_posix()
+    print(f"   Location: {rel}/ (sources and licences in each UPSTREAM.md). Tag a ticket `role:<name>` to use one.")
+    print(
+        f"   Git: tk neither commits nor ignores them. Share: `git add {rel}/{SKILL_PREFIX}*`; "
+        f"keep local: `echo '/{rel}/{SKILL_PREFIX}*/' >> .git/info/exclude`."
+    )
     return 0
 
 
-def cmd_templates(args: list[str], project_dir: Path, explicit_config: str | None) -> int:
+def cmd_skills(args: list[str], project_dir: Path, explicit_config: str | None) -> int:
     action = args[0] if args else "list"
     if action == "list":
-        found = installed_roles(project_dir)
+        found = installed_skills(project_dir)
+        role_rows = dict(installed_role_skills(project_dir))
         if not found:
-            print("No role templates installed. Run `tk scion-taskforce templates install`.")
-        for role, source in found:
-            print(f"  {role:<18} tk-{role:<20} {source}")
+            print("No tk-scion-* skills installed. Run `tk scion-taskforce skills install`.")
+        for name, _desc in found:
+            role = name[len(SKILL_PREFIX):]
+            kind = "role" if role in role_rows else "skill"
+            print(f"  {name:<34} {kind:<6} {role_rows.get(role, '')}")
+        legacy = installed_roles(project_dir)
+        if legacy:
+            print(f"Deprecated role templates (still used until removed): {', '.join('tk-' + r for r, _ in legacy)}")
         print(f"Default set: {', '.join(DEFAULT_ROLES)}")
         return 0
     if action != "install":
-        print("Usage: tk scion-taskforce templates install [<role>...] [--force] [--from <dir>] [--ref <sha>] | list",
+        print("Usage: tk scion-taskforce skills install [<role>...] [--force] [--from <dir>] [--ref <sha>] | list",
               file=sys.stderr)
         return 1
     rest = args[1:]
@@ -409,7 +429,7 @@ def cmd_templates(args: list[str], project_dir: Path, explicit_config: str | Non
     roles = [a for i, a in enumerate(rest) if not a.startswith("-") and (i == 0 or rest[i - 1] not in value_flags)]
     mirror = _flag_value(rest, ("--from",), "")
     cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
-    return _install_roles_report(
+    return _install_skills_report(
         project_dir, roles or None, privacy_level(cfg),
         mirror=Path(mirror).expanduser().resolve() if mirror else None,
         ref=_flag_value(rest, ("--ref",), UPSTREAM_REF),
@@ -567,7 +587,10 @@ def cmd_status(project_dir: Path, explicit_config: str | None) -> int:
     proj = normalize_project_dir(project_dir)
     cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
     hook = hook_path(project_dir)
-    roles = ", ".join(r for r, _ in installed_roles(project_dir)) or "none"
+    roles = ", ".join(r for r, _ in installed_role_skills(project_dir)) or "none"
+    legacy = installed_roles(project_dir)  # deprecated per-role templates, still used until removed
+    if legacy:
+        roles += f" (deprecated templates: {', '.join('tk-' + r for r, _ in legacy)})"
     print(f"Project:   {proj}")
     print(f"Settings:  worker.git={git_mode(cfg)}, worker.privacy={privacy_level(cfg)}, roles: {roles}")
     print(f"Save hook: {'✅ installed' if hook.exists() else '❌ not installed (run `tk scion-taskforce hook install`)'}")
@@ -899,8 +922,12 @@ def _main(argv: list[str] | None = None) -> int:
     if subcmd == "uninit":
         return cmd_uninit(subargs, project_dir, explicit_config, dry_run)
 
+    if subcmd == "skills":
+        return cmd_skills(subargs, project_dir, explicit_config)
+    # deprecated: `templates` (per-role Scion templates) is an alias of `skills` since tic-82f8; remove after 2027-04-01
     if subcmd == "templates":
-        return cmd_templates(subargs, project_dir, explicit_config)
+        print("ℹ️  `templates` is deprecated: role knowledge now ships as skills. Use `tk scion-taskforce skills ...`.")
+        return cmd_skills(subargs, project_dir, explicit_config)
 
     if subcmd == "hook":
         return cmd_hook(subargs, project_dir)

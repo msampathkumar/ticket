@@ -217,8 +217,8 @@ def run_wizard(defaults: dict, installed: list[str]) -> dict:
         other=False,
     )
     roles = choose(
-        "8. agent-team role templates (github.com/scion-frontiers/agent-team; tag a ticket role:<name>)",
-        [("recommended", ", ".join(DEFAULT_ROLES)), ("none", "only the default worker")],
+        "8. agent-team skills in .agents/skills/tk-scion-* (github.com/scion-frontiers/agent-team; tag a ticket role:<name>)",
+        [("recommended", ", ".join(DEFAULT_ROLES)), ("none", "no role skills; the worker uses only its brief")],
         validate=validate_roles,
     )
 
