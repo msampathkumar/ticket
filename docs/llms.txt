@@ -122,7 +122,7 @@ Plugins can invoke core built-in commands using:
 ### Official Plugins
 - `tk webui`: FastAPI + Tailwind 4-lane Kanban, Table View, and DAG Mind Map.
 - `tk github`: Bi-directional GitHub issues and PR sync (`tk github sync`).
-- `tk scion-taskforce`: Autonomous multi-agent worker orchestration daemon with OpenTelemetry logs.
+- `tk scion-taskforce`: Event-driven SCION worker per opted-in ticket, triggered by a `tk` save hook; local OpenTelemetry logs.
 
 ---
 
@@ -135,14 +135,14 @@ For complete and in-depth details, refer to the individual Markdown guides:
 - [Quick Start](getting-started/quick-start.md): 60-second tutorial to initialize and manage tasks.
 - [Solo CLI Workflow](workflows/cli-solo.md): Terminal-first workflow for solo developers and power users.
 - [Web UI & Kanban Workflow](workflows/webui-team.md): Visual sprint planning, DAG Mind Map, and code review comments.
-- [SCION Task Force Workflow](workflows/scion-taskforce.md): Autonomous multi-agent engineering with human review gates.
+- [SCION Task Force Workflow](workflows/scion-taskforce.md): Tag a ticket for a SCION worker, review its report, send feedback and close.
 - [Command Reference](core-cli/commands.md): Complete reference table for all core `tk` commands.
 - [Dependency Intelligence](core-cli/dependencies.md): DAG task dependencies, blockers, and cycle detection.
 - [Core CLI Configuration](core-cli/configuration.md): Environment variables, directory discovery logic, and schema.
 - [Plugin Architecture](plugins/architecture.md): Writing custom Bash or Python plugins with `TICKETS_DIR` and `TK_SCRIPT`.
 - [Interactive Web UI Plugin](plugins/webui.md): 4-lane Kanban board, DAG Mind Map, daemon management, and configuration.
 - [GitHub Sync Plugin](plugins/github.md): Bi-directional GitHub issue/PR sync, prerequisites, and configuration.
-- [SCION Task Force Plugin](plugins/scion-taskforce.md): Autonomous multi-agent worker orchestration daemon and configuration.
+- [SCION Task Force Plugin](plugins/scion-taskforce.md): Save-hook worker orchestration: setup, lifecycle, commands, configuration and troubleshooting.
 - [Agent Execution Loop](agents/workflow.md): The deterministic 5-step operational loop for AI coding agents.
 - [Agent Skill](agents/agent-skill.md): Reusable agent skill definition and `npx` install instructions.
 - [LLM & Agent Context Guide](agents/llms-txt.md): Machine-readable documentation standards and endpoints.

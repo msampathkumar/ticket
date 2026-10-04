@@ -53,7 +53,8 @@ ticket/
 3. **GitHub Sync Plugin (`plugins/github`)**:
    - Syncs GitHub issues and pull requests into local `.tickets/` markdown files.
 4. **Scion Task Force Plugin (`plugins/scion-taskforce`, standalone optional plugin)**:
-   - Straightforward integration tool wrapping the native `scion` CLI. A per-project `tk` post-write hook (`.tickets/.hooks/post-write.d/scion-taskforce`) runs `tk scion-taskforce on-save <id>` on every save; tickets tagged `taskforce` get a status note and a 1:1 worker (or the update is forwarded to the existing worker). Uses project-level templates (`.scion/templates/tk-worker-gemini-cli-with-api-key-auth`), merges worker notes back on `waiting-for-review`, stops workers on `tk close`, supports Google Cloud Vertex AI ADC, and emits OpenTelemetry to local rotating logs (30-day retention). `tk scion-taskforce sync` catches up on hand edits. No daemon runs. Includes an interactive setup wizard (`tk scion-taskforce init`, which links the folder to the Hub once and installs the hook) and automated test runner (`tk scion-taskforce test`). Installable via `./install.sh --scion-taskforce` or `./plugins/scion-taskforce/install.sh`.
+   - Hands tickets tagged `taskforce` to SCION coding agents, one worker per ticket. A per-project `tk` post-write hook runs `tk scion-taskforce on-save <id>` on every save; no daemon runs.
+   - Setup: `./install.sh --scion-taskforce`, then `tk scion-taskforce init` (wizard, worker template, Hub link, save hook) and `tk scion-taskforce test`. Usage and troubleshooting: [docs/plugins/scion-taskforce.md](docs/plugins/scion-taskforce.md); design: [SCION-TASKFORCE-SPEC.md](plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md).
 
 ---
 

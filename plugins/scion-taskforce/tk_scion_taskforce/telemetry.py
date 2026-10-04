@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import shutil
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,11 @@ from typing import Any
 from tk_scion_taskforce import __version__
 
 ROTATED_DATE_RE = re.compile(r"\.(\d{4}-\d{2}-\d{2})(?:\.\d+)?(?:\.gz)?$")
+TRACES_FILE = "otel-traces.jsonl"
+METRICS_FILE = "otel-metrics.jsonl"
+LOG_FILE = "taskforce.log"
+WORKER_LOGS_DIR = "workers"
+_RESOURCE = {"service.name": "tk-scion-taskforce", "service.version": __version__}
 
 
 def project_slug(project_dir: Path) -> str:
@@ -37,7 +43,11 @@ def utc_now_iso() -> str:
 
 
 class TelemetryManager:
-    """Manages local OpenTelemetry traces, metrics, task force logs, and 30-day log rotation."""
+    """Manages local OpenTelemetry traces, metrics, task force logs, and 30-day log rotation.
+
+    Failure policy ``warn`` (coder-soul §4.3): a failed write prints one warning to stderr and is
+    dropped. Telemetry never raises into the worker lifecycle, so a full disk cannot orphan a pod.
+    """
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -51,23 +61,32 @@ class TelemetryManager:
         self.log_dir = Path(raw_log_dir).expanduser().resolve()
         self.project_log_symlink: bool = bool(tel_cfg.get("project_log_symlink", True))
 
-        self.traces_file = self.log_dir / str(tel_cfg.get("traces_file", "otel-traces.jsonl"))
-        self.metrics_file = self.log_dir / str(tel_cfg.get("metrics_file", "otel-metrics.jsonl"))
-        self.log_file = self.log_dir / str(tel_cfg.get("log_file", "taskforce.log"))
-        self.workers_dir = self.log_dir / str(tel_cfg.get("worker_logs_dir", "workers"))
+        self.traces_file = self.log_dir / TRACES_FILE
+        self.metrics_file = self.log_dir / METRICS_FILE
+        self.log_file = self.log_dir / LOG_FILE
+        self.workers_dir = self.log_dir / WORKER_LOGS_DIR
 
         rot_cfg = tel_cfg.get("rotation", {})
         self.rotation_enabled: bool = bool(rot_cfg.get("enabled", True))
-        self.rotation_when: str = str(rot_cfg.get("when", "midnight"))
         self.max_bytes: int = int(rot_cfg.get("max_bytes", 104857600))
         self.retention_days: int = int(rot_cfg.get("retention_days", 30))
         self.compress: bool = bool(rot_cfg.get("compress", True))
+        self._warned = False
 
-        self.ensure_dirs()
+    def _warn(self, exc: OSError) -> None:
+        if not self._warned:
+            print(f"tk-scion-taskforce: warning: telemetry write failed, continuing without it: {exc}", file=sys.stderr)
+            self._warned = True
 
-    def ensure_dirs(self) -> None:
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.workers_dir.mkdir(parents=True, exist_ok=True)
+    def _append(self, path: Path, text: str) -> None:
+        """Rotate if due, then append ``text`` to ``path``. Never raises (warn policy)."""
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._maybe_rotate_file(path)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(text)
+        except OSError as exc:
+            self._warn(exc)
 
     def ensure_project_symlink(self, project_dir: Path) -> None:
         if not self.project_log_symlink:
@@ -79,37 +98,31 @@ class TelemetryManager:
         if link_path.exists() or link_path.is_symlink():
             return
         try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
             link_path.symlink_to(self.log_dir)
         except OSError:
             pass
 
-    def worker_log_path(self, project_dir: Path, ticket_id: str) -> Path:
-        slug = project_slug(project_dir)
+    def _worker_file(self, project_dir: Path, ticket_id: str, suffix: str) -> Path:
         safe_id = re.sub(r"[^A-Za-z0-9._-]+", "_", ticket_id)
-        target_dir = (self.workers_dir / slug).resolve()
-        target_dir.mkdir(parents=True, exist_ok=True)
-        return target_dir / f"{safe_id}.log"
+        return (self.workers_dir / project_slug(project_dir)).resolve() / f"{safe_id}{suffix}"
 
-    def save_worker_brief(self, project_dir: Path, ticket_id: str, brief_content: str) -> Path:
-        slug = project_slug(project_dir)
-        safe_id = re.sub(r"[^A-Za-z0-9._-]+", "_", ticket_id)
-        target_dir = (self.workers_dir / slug).resolve()
-        target_dir.mkdir(parents=True, exist_ok=True)
-        b_path = target_dir / f"{safe_id}.brief.md"
-        b_path.write_text(brief_content, encoding="utf-8")
-        return b_path
+    def worker_log_path(self, project_dir: Path, ticket_id: str) -> Path:
+        return self._worker_file(project_dir, ticket_id, ".log")
+
+    def save_worker_brief(self, project_dir: Path, ticket_id: str, brief_content: str) -> None:
+        b_path = self._worker_file(project_dir, ticket_id, ".brief.md")
+        try:
+            b_path.parent.mkdir(parents=True, exist_ok=True)
+            b_path.write_text(brief_content, encoding="utf-8")
+        except OSError as exc:
+            self._warn(exc)
 
     def read_worker_brief(self, project_dir: Path, ticket_id: str) -> str | None:
-        slug = project_slug(project_dir)
-        safe_id = re.sub(r"[^A-Za-z0-9._-]+", "_", ticket_id)
-        b_path = (self.workers_dir / slug / f"{safe_id}.brief.md").resolve()
-        if b_path.exists():
-            try:
-                return b_path.read_text(encoding="utf-8")
-            except OSError:
-                return None
-        return None
-
+        try:
+            return self._worker_file(project_dir, ticket_id, ".brief.md").read_text(encoding="utf-8")
+        except OSError:
+            return None
 
     def _maybe_rotate_file(self, file_path: Path) -> None:
         if not self.rotation_enabled or not file_path.exists():
@@ -126,7 +139,7 @@ class TelemetryManager:
 
         should_rotate = False
         date_suffix = mtime_utc.strftime("%Y-%m-%d")
-        if self.rotation_when == "midnight" and mtime_utc.date() < now_utc.date():
+        if mtime_utc.date() < now_utc.date():  # daily rotation at UTC midnight
             should_rotate = True
         elif self.max_bytes > 0 and stat.st_size >= self.max_bytes:
             should_rotate = True
@@ -209,8 +222,6 @@ class TelemetryManager:
         span_id: str | None = None,
         **extra: Any,
     ) -> None:
-        self.ensure_dirs()
-        self._maybe_rotate_file(self.log_file)
         record: dict[str, Any] = {
             "timestamp": utc_now_iso(),
             "severity": level.upper(),
@@ -223,8 +234,7 @@ class TelemetryManager:
             record["span_id"] = span_id
         if extra:
             record["attributes"] = extra
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
+        self._append(self.log_file, json.dumps(record) + "\n")
 
     def log_worker(
         self,
@@ -233,17 +243,11 @@ class TelemetryManager:
         line: str,
         trace_id: str | None = None,
     ) -> None:
-        self.ensure_dirs()
-        w_path = self.worker_log_path(project_dir, ticket_id)
-        self._maybe_rotate_file(w_path)
         prefix = f"[{utc_now_iso()}]"
         if trace_id:
             prefix += f" [trace_id={trace_id}]"
-        with open(w_path, "a", encoding="utf-8") as f:
-            f.writelines(
-                f"{prefix} {subline}\n"
-                for subline in (line.rstrip("\n").splitlines() or [""])
-            )
+        lines = line.rstrip("\n").splitlines() or [""]
+        self._append(self.worker_log_path(project_dir, ticket_id), "".join(f"{prefix} {sub}\n" for sub in lines))
 
     def emit_span(
         self,
@@ -258,9 +262,6 @@ class TelemetryManager:
         actual_span_id = span_id or new_span_id()
         if not self.enabled:
             return actual_span_id
-
-        self.ensure_dirs()
-        self._maybe_rotate_file(self.traces_file)
         span_record: dict[str, Any] = {
             "timestamp": utc_now_iso(),
             "trace_id": trace_id,
@@ -269,15 +270,11 @@ class TelemetryManager:
             "name": name,
             "kind": "INTERNAL",
             "status": {"code": status_code},
-            "resource": {
-                "service.name": "tk-scion-taskforce",
-                "service.version": __version__,
-            },
+            "resource": _RESOURCE,
             "attributes": attributes or {},
             "events": events or [],
         }
-        with open(self.traces_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(span_record) + "\n")
+        self._append(self.traces_file, json.dumps(span_record) + "\n")
         return actual_span_id
 
     def emit_metric(
@@ -289,21 +286,15 @@ class TelemetryManager:
     ) -> None:
         if not self.enabled:
             return
-        self.ensure_dirs()
-        self._maybe_rotate_file(self.metrics_file)
         metric_record: dict[str, Any] = {
             "timestamp": utc_now_iso(),
             "name": name,
             "value": value,
             "unit": unit,
-            "resource": {
-                "service.name": "tk-scion-taskforce",
-                "service.version": __version__,
-            },
+            "resource": _RESOURCE,
             "attributes": attributes or {},
         }
-        with open(self.metrics_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(metric_record) + "\n")
+        self._append(self.metrics_file, json.dumps(metric_record) + "\n")
 
     @staticmethod
     def _iter_file_lines_with_archives(active_file: Path) -> list[str]:

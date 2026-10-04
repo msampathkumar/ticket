@@ -81,7 +81,7 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 
 - **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
 - **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
-- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Autonomous worker orchestrator wrapping SCION Hub (`http://127.0.0.1:8080`). Features an interactive setup wizard (`tk scion-taskforce init`), automated test runner (`tk scion-taskforce test`), project worker templates (`.scion/templates/tk-worker-gemini-cli-with-api-key-auth`), Vertex AI Model Garden integration, and OpenTelemetry logging. *(optional; requires Python 3.9+ and the `scion` CLI)*
+- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(optional; requires Python 3.9+ and the `scion` CLI)*
 
 ---
 

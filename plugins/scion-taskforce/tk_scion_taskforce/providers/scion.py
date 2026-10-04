@@ -1,4 +1,4 @@
-"""SCION CLI implementation of the WorkerProvider interface."""
+"""Thin adapter around the Scion CLI (``scion --project <dir> ...``): the only worker runtime."""
 
 from __future__ import annotations
 
@@ -8,14 +8,31 @@ import re
 import shutil
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from tk_scion_taskforce.providers import ProviderResult, WorkerProvider, WorkerStatus
 from tk_scion_taskforce.tickets import validate_ticket_id
 from tk_scion_taskforce.wizard import resolve_model_alias
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+@dataclass
+class WorkerStatus:
+    worker_id: str      # 1:1 with ticket_id (e.g. "tic-a1b2")
+    project_dir: str    # Project root path
+    state: str          # "running" | "paused" | "stopped" | "error" | "unknown"
+
+    @property
+    def is_running(self) -> bool:
+        return self.state == "running"
+
+
+@dataclass
+class ProviderResult:
+    ok: bool
+    message: str = ""
 
 
 def _hint_for(detail: str, project_dir: str) -> str:
@@ -63,10 +80,9 @@ def apply_vertex_env(prov_cfg: dict[str, Any], env: dict[str, str]) -> dict[str,
     return env
 
 
-class ScionProvider(WorkerProvider):
-    """Concrete WorkerProvider wrapping the SCION CLI ('scion --project <dir> ...')."""
-
-    provider_name: str = "scion"
+class ScionProvider:
+    """Runs Scion CLI commands for one config. ``dry_run`` (or ``TK_SCION_TASKFORCE_DRY_RUN=1``)
+    simulates every command in-process; the test suite relies on it."""
 
     def __init__(self, config: dict[str, Any], dry_run: bool = False) -> None:
         self.config = config
@@ -79,23 +95,8 @@ class ScionProvider(WorkerProvider):
         self.branch_prefix = str(prov_cfg.get("branch_prefix", "") or "")
         self.extra_start_args = [str(x) for x in (prov_cfg.get("extra_start_args") or [])]
         self.extra_resume_args = [str(x) for x in (prov_cfg.get("extra_resume_args") or [])]
-        self.auto_accept_prompts = bool(prov_cfg.get("auto_accept_prompts", True))
-        self.prompt_patterns = [
-            str(x) for x in (prov_cfg.get("auto_accept_prompt_patterns") or ["Yes, I trust this folder"])
-        ]
-        self.ready_patterns = [
-            str(x)
-            for x in (prov_cfg.get("harness_ready_patterns") or ["bypass permissions on", "esc to interrupt"])
-        ]
-        self.container_user = str(prov_cfg.get("container_user", "scion") or "scion")
-        self.tmux_session = str(prov_cfg.get("tmux_session", "scion") or "scion")
-        env_dry = os.environ.get("TK_SCION_TASKFORCE_DRY_RUN", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        env_dry = os.environ.get("TK_SCION_TASKFORCE_DRY_RUN", "").lower() in ("1", "true", "yes")
         self.dry_run = dry_run or env_dry
-        self.last_commands: list[list[str]] = []
         self.last_error = ""
         # Dry-run only: simulate pods spawned in this process so verification succeeds.
         self._dry_run_pods: dict[str, str] = {}
@@ -123,7 +124,6 @@ class ScionProvider(WorkerProvider):
         extra_env: dict[str, str] | None = None,
         timeout: int = 120,
     ) -> subprocess.CompletedProcess[str]:
-        self.last_commands.append(args)
         self.last_error = ""
         if self.dry_run:
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="[dry-run] ok\n", stderr="")
@@ -184,38 +184,7 @@ class ScionProvider(WorkerProvider):
         if res.returncode != 0:
             return ProviderResult(ok=False, message=self.last_error)
 
-        # DEPRECATED: silent Hub auto-link on every preflight. It ran `scion hub link --yes` for
-        # ANY unlinked directory dispatch touched, creating a stray Hub project per directory
-        # (e.g. BDD temp dirs `ticket_test_xxxxxxxx` -> Hub projects `ticket-test-xxxxxxxx`).
-        # Linking is now an explicit one-time step in `init`/`start` (ensure_project_registered).
-        # try:
-        #     hub_stat = self._run(
-        #         [binary, "--project", proj, "hub", "status", "--non-interactive"],
-        #         cwd=proj,
-        #         timeout=15,
-        #     )
-        #     if hub_stat.returncode == 0:
-        #         if "Linked: no" in hub_stat.stdout:
-        #             self._run(
-        #                 [binary, "--project", proj, "hub", "link", "--yes", "--non-interactive"],
-        #                 cwd=proj,
-        #                 timeout=30,
-        #             )
-        #             self._run(
-        #                 [binary, "--project", proj, "hub", "enable", "--non-interactive"],
-        #                 cwd=proj,
-        #                 timeout=15,
-        #             )
-        #         elif "Enabled: false" in hub_stat.stdout:
-        #             self._run(
-        #                 [binary, "--project", proj, "hub", "enable", "--non-interactive"],
-        #                 cwd=proj,
-        #                 timeout=15,
-        #             )
-        # except Exception:
-        #     pass
-
-        # Dispatch must never create a Hub project: refuse to run in an unlinked folder.
+        # Dispatch must never create a Hub project (that is `init`'s job): refuse an unlinked folder.
         if self._hub_unlinked(self._hub_status(binary, proj)):
             return ProviderResult(
                 ok=False,
@@ -278,7 +247,7 @@ class ScionProvider(WorkerProvider):
             if state is None:
                 return None
             return WorkerStatus(worker_id=clean_id, project_dir=proj, state=state)
-        workers = self.list_workers(proj)
+        workers = self._list_agents(proj)
         # scion normalises agent names to lower-case (``AO-08gp`` -> ``ao-08gp``),
         # so match case-insensitively to avoid false "pod never appeared" results.
         if clean_id in workers:
@@ -302,7 +271,6 @@ class ScionProvider(WorkerProvider):
         clean_id = validate_ticket_id(worker_id)
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
-        target_branch = branch or self.format_branch(clean_id)
 
         cmd: list[str] = [
             binary,
@@ -312,7 +280,7 @@ class ScionProvider(WorkerProvider):
             clean_id,
             prompt,
             "--branch",
-            target_branch,
+            branch,
             "-w",
             proj,
             "--enable-telemetry",
@@ -328,7 +296,6 @@ class ScionProvider(WorkerProvider):
             cmd.extend(["--model", resolve_model_alias(self.harness_config, self.model)])
         if self.extra_start_args:
             cmd.extend(self.extra_start_args)
-
 
         res = self._run(cmd, cwd=proj, extra_env=env)
         if res.returncode == 0 and self.dry_run:
@@ -381,8 +348,6 @@ class ScionProvider(WorkerProvider):
             self._dry_run_pods[clean_id] = "running"
         return res.returncode == 0
 
-
-
     def attach_command(self, project_dir: str, worker_id: str) -> list[str]:
         clean_id = validate_ticket_id(worker_id)
         proj = self._validate_project_dir(project_dir)
@@ -413,16 +378,22 @@ class ScionProvider(WorkerProvider):
             self._dry_run_pods.pop(clean_id, None)
         return res.returncode == 0
 
-    def list_workers(self, project_dir: str) -> dict[str, WorkerStatus]:
-        proj = self._validate_project_dir(project_dir)
-        if self.dry_run:
-            return {
-                wid: WorkerStatus(worker_id=wid, project_dir=proj, state=st)
-                for wid, st in self._dry_run_pods.items()
-            }
-        binary = self._resolve_binary()
+    def wait_until_running(
+        self, project_dir: str, worker_id: str, timeout_seconds: float = 30.0, poll_seconds: float = 2.0
+    ) -> WorkerStatus | None:
+        """Poll ``health`` until the worker reports running or error, or the timeout passes."""
+        deadline = time.monotonic() + max(0.0, float(timeout_seconds))
+        while True:
+            last = self.health(project_dir, worker_id)
+            if last is not None and last.state in ("running", "error"):
+                return last
+            if time.monotonic() >= deadline:
+                return last
+            time.sleep(max(0.1, float(poll_seconds)))
+
+    def _list_agents(self, proj: str) -> dict[str, WorkerStatus]:
         res = self._run(
-            [binary, "--non-interactive", "--project", proj, "list", "--format", "json"],
+            [self._resolve_binary(), "--non-interactive", "--project", proj, "list", "--format", "json"],
             cwd=proj,
             timeout=60,
         )
@@ -441,15 +412,8 @@ class ScionProvider(WorkerProvider):
             if not wid:
                 continue
             raw_status = str(item.get("phase") or item.get("status") or item.get("state") or "unknown")
-            workers[wid] = WorkerStatus(
-                worker_id=wid,
-                project_dir=proj,
-                state=_normalize_state(raw_status),
-                branch=item.get("branch"),
-            )
+            workers[wid] = WorkerStatus(worker_id=wid, project_dir=proj, state=_normalize_state(raw_status))
         return workers
-
-    # ---------------------------------------------------------- optional hooks
 
     def workspace_path(self, project_dir: str, worker_id: str) -> Path | None:
         """Project-local scion projects (``scion init``) give each agent a git worktree at
@@ -462,97 +426,3 @@ class ScionProvider(WorkerProvider):
             if candidate.is_dir():
                 return candidate
         return None
-
-    def _container_for(self, project_dir: str, worker_id: str) -> tuple[str, str] | None:
-        """Return (runtime, container_id) for a worker."""
-        clean_id = validate_ticket_id(worker_id).lower()
-        # Direct lookup via podman container name filter (e.g. ticket--test-worker-2780)
-        try:
-            p_res = subprocess.run(
-                ["podman", "ps", "-q", "--filter", f"name=--{clean_id}$"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if p_res.returncode == 0 and p_res.stdout.strip():
-                return "podman", p_res.stdout.strip().splitlines()[0]
-        except Exception:
-            pass
-
-        proj = self._validate_project_dir(project_dir)
-        binary = self._resolve_binary()
-        res = self._run(
-            [binary, "--non-interactive", "--project", proj, "list", "--format", "json"],
-            cwd=proj,
-            timeout=60,
-        )
-        if res.returncode != 0 or not res.stdout.strip():
-            return None
-        try:
-            items = json.loads(res.stdout)
-        except json.JSONDecodeError:
-            return None
-        wanted = clean_id
-        for item in items if isinstance(items, list) else []:
-            if not isinstance(item, dict) or str(item.get("name", "")).lower() != wanted:
-                continue
-            cid = str(item.get("containerId") or "").strip()
-            runtime = str(item.get("runtime") or "podman").strip() or "podman"
-            if cid:
-                return runtime, cid
-        return None
-
-    def _pane(self, runtime: str, cid: str) -> str:
-        res = self._run(
-            [runtime, "exec", "-u", self.container_user, cid, "tmux", "capture-pane", "-p",
-             "-t", self.tmux_session, "-S", "-40"],
-            cwd=os.getcwd(), timeout=20,
-        )
-        return res.stdout if res.returncode == 0 else ""
-
-    def post_spawn(self, project_dir: str, worker_id: str, timeout_seconds: float = 40.0) -> str:
-        """Auto-accept interactive harness start-up prompts (e.g. Claude Code's folder-trust
-        dialog, which scion fails to pre-seed for project-local workspaces) by pressing Enter
-        in the agent's tmux session. Best effort; silent no-op when anything is unavailable."""
-        if self.dry_run or not self.auto_accept_prompts:
-            return ""
-        try:
-            clean_id = validate_ticket_id(worker_id)
-            target = self._container_for(project_dir, clean_id)
-            if target is None:
-                return ""
-            runtime, cid = target
-            if not shutil.which(runtime):
-                return ""
-            deadline = time.monotonic() + max(0.0, float(timeout_seconds))
-            accepted: list[str] = []
-            while time.monotonic() < deadline:
-                pane = self._pane(runtime, cid)
-                hit = next((pat for pat in self.prompt_patterns if pat in pane), None)
-                if hit is None:
-                    if accepted or any(pat in pane for pat in self.ready_patterns):
-                        break  # prompt handled/gone, or the harness is already at its main prompt
-                    time.sleep(2.0)  # pane not up yet / no prompt (yet); keep polling
-                    continue
-                self._run(
-                    [runtime, "exec", "-u", self.container_user, cid, "tmux", "send-keys",
-                     "-t", self.tmux_session, "Enter"],
-                    cwd=os.getcwd(), timeout=20,
-                )
-                accepted.append(hit)
-                time.sleep(3.0)
-            if accepted:
-                return f"auto-accepted harness prompt(s): {', '.join(dict.fromkeys(accepted))}"
-            return ""
-        except Exception as exc:  # noqa: BLE001 - must never break dispatch
-            self.last_error = f"post_spawn: {exc}"
-            return ""
-
-    def logs(self, project_dir: str, worker_id: str) -> str:
-        clean_id = validate_ticket_id(worker_id)
-        proj = self._validate_project_dir(project_dir)
-        if self.dry_run:
-            return f"[dry-run] logs for worker {clean_id} in {proj}"
-        binary = self._resolve_binary()
-        res = self._run([binary, "--project", proj, "logs", clean_id], cwd=proj)
-        return res.stdout or res.stderr

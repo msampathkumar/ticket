@@ -585,6 +585,18 @@ def step_file_contains(context, rel_path, text):
     assert text in content, f"File {rel_path} does not contain '{text}'\nContent: {content}"
 
 
+@then(r'the file "(?P<rel_path>[^"]+)" should not contain "(?P<text>[^"]+)"')
+def step_file_not_contains(context, rel_path, text):
+    """Assert a file relative to test_dir does not contain text."""
+    content = (Path(context.test_dir) / rel_path).read_text()
+    assert text not in content, f"File {rel_path} should not contain '{text}'\nContent: {content}"
+
+
+@then(r'the exit code should be (?P<code>\d+)')
+def step_exit_code_is(context, code):
+    assert context.returncode == int(code), f"Expected exit code {code}, got {context.returncode}"
+
+
 @then(r'the file "(?P<rel_path>[^"]+)" should not exist')
 def step_file_not_exists(context, rel_path):
     """Assert a file relative to test_dir does not exist."""
@@ -991,8 +1003,8 @@ def step_fake_scion_pod_state_is(context, pod, pod_state):
 
 @given(r'the scion-taskforce setting "(?P<key>[^"]+)" is "(?P<value>[^"]+)"')
 def step_taskforce_setting(context, key, value):
-    """Write a dotted key (e.g. watcher.max_concurrent_per_project) into .tickets/scion-taskforce.yaml."""
-    cfg_path = Path(context.test_dir) / '.tickets' / 'scion-taskforce.yaml'
+    """Write a dotted key (e.g. watcher.max_concurrent_per_project) into the project config."""
+    cfg_path = Path(context.test_dir) / '.scion-taskforce' / 'scion-taskforce.yaml'
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
     settings = getattr(context, 'taskforce_settings', {})
     settings[key] = value
@@ -1122,3 +1134,22 @@ def step_fake_scion_start_args(context, name, text):
     calls = [json.loads(ln) for ln in (log.read_text().splitlines() if log.exists() else []) if ln.strip()]
     argv = [" ".join(c["args"]) for c in calls if c["name"] == name]
     assert argv and text in argv[-1], f"Expected {text!r} in start args for {name}, got: {argv}"
+
+
+@then(r'every command line in the output should appear in the repo file "(?P<rel_path>[^"]+)"')
+def step_help_commands_in_doc(context, rel_path):
+    """Keep a reference doc in step with a help text: each two-space-indented command line of the
+    output (syntax only, before the description column) must appear in the doc, prefixed by the
+    plugin name taken from the first output line (``tk-scion-taskforce - ...``). Table cells escape
+    pipes as ``\\|``, so the doc is compared with those unescaped."""
+    doc = (Path(context.project_dir) / rel_path).read_text().replace("\\|", "|")
+    syntax = [
+        re.split(r"\s{2,}", line.strip())[0]
+        for line in context.stdout.splitlines()
+        if re.match(r"^  \S", line)
+    ]
+    assert syntax, f"No command lines found in output:\n{context.stdout}"
+    # Subcommands must appear as `<plugin> <syntax>`, so a bare word like "status" cannot match by chance.
+    prefix = context.stdout.split(" - ", 1)[0].removeprefix("tk-") + " "
+    missing = [s for s in syntax if (s if s.startswith("tk ") else prefix + s) not in doc]
+    assert not missing, f"{rel_path} is missing these help lines: {missing}"

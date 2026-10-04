@@ -12,14 +12,25 @@ from typing import Any
 from tk_scion_taskforce import __version__
 from tk_scion_taskforce.config import (
     WORKER_TEMPLATE,
+    ConfigError,
     init_config,
     load_config,
+    project_config_path,
     resolve_config_path,
     uninit_config,
 )
-from tk_scion_taskforce.events import collect_reports, hook_path, install_hook, on_save, sync_project, uninstall_hook
-from tk_scion_taskforce.providers import get_provider
-from tk_scion_taskforce.providers.scion import apply_vertex_env
+from tk_scion_taskforce.events import (
+    collect_reports,
+    dispatch_now,
+    hook_path,
+    install_hook,
+    on_save,
+    project_agents,
+    remove_project_workers,
+    sync_project,
+    uninstall_hook,
+)
+from tk_scion_taskforce.providers.scion import ScionProvider
 from tk_scion_taskforce.state import StateError, known_projects, load_state, normalize_project_dir, state_lock
 from tk_scion_taskforce.telemetry import TelemetryManager, new_trace_id, project_slug
 from tk_scion_taskforce.tickets import find_tk_binary, parse_ticket_file, resolve_ticket_path
@@ -31,13 +42,12 @@ from tk_scion_taskforce.wizard import (
     run_wizard,
 )
 from tk_scion_taskforce.workers import (
-    DispatchError,
-    dispatch_ticket,
-    is_eligible_for_dispatch,
+    _worker_key,
     pause_worker_for_ticket,
     project_lock,
     run_gc,
     send_feedback_to_worker,
+    tags,
 )
 
 HELP_TEXT = """tk-scion-taskforce - Autonomous SCION task force orchestrator plugin for tk
@@ -46,23 +56,27 @@ Usage:
   tk scion-taskforce [--config <path>] [--dry-run] <subcommand> [args...]
 
 `init` installs a tk post-write hook. Every ticket save (CLI or Web UI) runs `on-save <id>`
-in the background: a READY ticket YOU tagged `taskforce` gets a status note and a Scion worker;
-a note added to a ticket with an active worker is forwarded to it; a worker that reports back
-(`waiting-for-review`) is paused; closing a ticket stops its worker and starts the next queued one.
+in the background. For a ticket YOU tagged `taskforce`:
+- ready (open, deps closed): status note, then a Scion worker starts (or the ticket queues)
+- note added while its worker is active: forwarded to the worker
+- worker reports back (`waiting-for-review`): worker paused, next queued ticket starts
+- ticket closed: worker stopped, next queued ticket starts
+- tag removed, `no-taskforce` added or ticket file deleted: worker stopped and deleted (branch kept)
+`gc` deletes the workers of tickets closed more than 5 days ago.
 
 Setup:
   init [--global] [--force] [--defaults|--interactive]
                                    tk/scion init if needed; setup wizard: config, template, Hub link, save hook
-  uninit [--global]                Remove .scion-taskforce/ and the save hook
+  uninit [--global] [--yes]        Stop and delete this project's workers (branches kept), then remove
+                                   .scion-taskforce/, the worker template and the save hook; asks first unless --yes
   hook install|uninstall|status    Manage the tk post-write hook for this project
   test [--timeout <s>] [--keep]    Create a ticket tagged init+taskforce, wait for its worker to report back
-  test --raw [--prompt "<text>"]   Launch a worker directly (no ticket, no hook)
 
 Dispatch:
   on-save <id> [--event <e>]       Handle one ticket save (called by the hook)
   sync [dir]                       Catch up on saves the hook missed (hand edits, git pull,
                                    worker reports), flag dead workers, start queued tickets
-  dispatch <id>                    Start a verified worker for one opted-in ticket now
+  dispatch <id>                    Start a worker for one ready, opted-in ticket now (ignores the worker limit)
 
 Workers:
   status                           Save hook, provider health and workers for this project
@@ -82,6 +96,7 @@ never adds that tag itself. A ticket moves to in_progress only after its worker 
 
 
 _HOOK_HINT = "Ticket saves now start workers; run `tk scion-taskforce hook install` once, then `sync` to catch up."
+# deprecated: daemon-era commands, kept only to print a migration hint; remove after 2027-01-01
 REMOVED_COMMANDS = {
     "start": _HOOK_HINT,
     "restart": _HOOK_HINT,
@@ -165,7 +180,7 @@ def _ensure_runtime_project(project_dir: Path, explicit_config: str | None = Non
     """
     try:
         cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
-        res = get_provider(cfg, dry_run=dry_run).ensure_project_registered(str(project_dir))
+        res = ScionProvider(cfg, dry_run=dry_run).ensure_project_registered(str(project_dir))
     except Exception as exc:  # noqa: BLE001 - registration must not break init
         print(f"⚠️  Scion Hub: could not check project link: {exc}")
         return
@@ -185,9 +200,10 @@ def _flag_value(args: list[str], names: tuple[str, ...], default: str) -> str:
 
 
 def cmd_test(args: list[str], project_dir: Path) -> int:
-    """Verify the task force. Default: through a real tk ticket; `--raw`: launch a worker directly."""
     if "--raw" in args:
-        return _test_raw(args, project_dir)
+        # deprecated: `test --raw` launched a worker outside the real dispatch path; remove after 2027-01-01
+        print("`--raw` was removed; `tk scion-taskforce test` verifies end to end through a ticket.", file=sys.stderr)
+        return 2
     return _test_via_ticket(args, project_dir)
 
 
@@ -197,9 +213,7 @@ def _test_via_ticket(args: list[str], project_dir: Path) -> int:
     Exercises the whole pipeline: tk save hook -> on-save -> dispatch -> worker (project template)
     -> report merged back as a note + the review tag. Closes the ticket afterwards unless --keep.
     """
-    cfg = load_config(project_dir=project_dir)
-    claim_tag = str(cfg.get("tags", {}).get("claim", "taskforce"))
-    review_tag = str(cfg.get("tags", {}).get("review", "waiting-for-review"))
+    claim_tag, _, review_tag = tags(load_config(project_dir=project_dir))
     timeout = int(_flag_value(args, ("--timeout",), "600"))
     if not hook_path(project_dir).exists():
         print("❌ Save hook not installed; run `tk scion-taskforce init` (or `hook install`) first.", file=sys.stderr)
@@ -257,138 +271,6 @@ def _test_via_ticket(args: list[str], project_dir: Path) -> int:
     return 0
 
 
-def _test_raw(args: list[str], project_dir: Path) -> int:
-    """Run an end-to-end test worker to verify SCION Hub & worker execution."""
-    cfg = load_config(project_dir=project_dir)
-    provider_cfg = cfg.get("provider", {})
-    harness = str(provider_cfg.get("harness_config", "claude") or "claude")
-    model = str(provider_cfg.get("model", "") or "").strip()
-    binary = str(provider_cfg.get("binary", "scion") or "scion")
-
-    prompt = next((args[i + 1] for i, a in enumerate(args) if a in ("--prompt", "-p") and i + 1 < len(args)), None)
-    if not prompt:
-        prompt = (
-            "Write a short markdown file called poem.md with a 4-line poem about the latest "
-            "Google Gemini model. Save poem.md directly in the current repository workspace directory "
-            "and complete your job."
-        )
-
-    test_id = f"test-worker-{int(time.time()) % 10000:04d}"
-    target_file = project_dir / "poem.md"
-
-    print("=" * 60)
-    print("🧪 Running SCION Task Force Test Worker")
-    print("=" * 60)
-    print(f"• Worker ID:   `{test_id}`")
-    print(f"• Project Dir: `{project_dir}`")
-    print(f"• Harness:     `{harness}` (Model: `{model}`)")
-    print(f"• Target File: `{target_file.name}`")
-    print("-" * 60)
-
-    if target_file.is_file():
-        target_file.unlink()
-
-    provider = get_provider(cfg, dry_run=False)
-    pre = provider.preflight(str(project_dir))
-    if not pre.ok:
-        print(f"❌ Provider preflight failed: {pre.message}", file=sys.stderr)
-        return 1
-
-    print("🚀 Launching test worker via SCION Hub...")
-    cmd = [
-        binary,
-        "--project",
-        str(project_dir),
-        "start",
-        test_id,
-        prompt,
-        "-w",
-        str(project_dir),
-        "--enable-telemetry",
-        "--non-interactive",
-    ]
-    template = str(provider_cfg.get("template", "") or "")
-    if template and (project_dir / ".scion" / "templates" / template).is_dir():
-        cmd.extend(["-t", template])
-    if harness:
-        cmd.extend(["--harness-config", harness])
-    if model and model.lower() not in ("default", ""):
-        cmd.extend(["--model", model])
-    for extra in provider_cfg.get("extra_start_args", []):
-        cmd.append(str(extra))
-
-    env = apply_vertex_env(provider_cfg, os.environ.copy())
-
-    launch_res = subprocess.run(cmd, cwd=str(project_dir), env=env, capture_output=True, text=True)
-    if launch_res.returncode != 0:
-        print(f"❌ Failed to launch test worker:\n{launch_res.stderr or launch_res.stdout}", file=sys.stderr)
-        return 1
-
-    print(f"✅ Test worker '{test_id}' started on SCION Hub!")
-    provider.post_spawn(str(project_dir), test_id, timeout_seconds=15)
-    print("⏳ Waiting for worker to write poem.md (polling up to 90s)...")
-
-    start_t = time.time()
-    found = False
-    while time.time() - start_t < 90:
-        if target_file.is_file() and target_file.stat().st_size > 0:
-            found = True
-            break
-        candidate_paths = [
-            project_dir / ".scion" / "agents" / test_id / "workspace" / "poem.md",
-        ]
-        hub_configs = Path.home() / ".scion" / "project-configs"
-        if hub_configs.is_dir():
-            candidate_paths.extend(hub_configs.glob(f"*/.scion/agents/{test_id}/workspace/poem.md"))
-
-        for candidate in candidate_paths:
-            if candidate.is_file() and candidate.stat().st_size > 0:
-                import shutil
-                shutil.copy2(candidate, target_file)
-                found = True
-                break
-        if found:
-            break
-        print(".", end="", flush=True)
-        time.sleep(2.0)
-    print()
-
-    if not found:
-        print("⚠️ Test worker did not produce poem.md within 90s.")
-        print("   Capturing agent terminal output...")
-        look_proc = subprocess.run(
-            [binary, "--non-interactive", "--project", str(project_dir), "look", test_id],
-            capture_output=True,
-            text=True,
-        )
-        if look_proc.stdout:
-            print(look_proc.stdout[:800])
-        subprocess.run(
-            [binary, "--non-interactive", "--project", str(project_dir), "delete", test_id, "-y"],
-            capture_output=True,
-        )
-        return 1
-
-    content = target_file.read_text(encoding="utf-8").strip()
-    print("🎉 Test worker completed successfully!")
-    print("📄 Verified poem.md in local project workspace:")
-    print("-" * 60)
-    print(content)
-    print("-" * 60)
-
-    # Clean up test poem so project working directory remains clean
-    if target_file.is_file():
-        target_file.unlink()
-
-    print(f"🧹 Cleaning up test worker '{test_id}'...")
-    subprocess.run(
-        [binary, "--non-interactive", "--project", str(project_dir), "delete", test_id, "-y"],
-        capture_output=True,
-    )
-    print("✅ Test run verified! Your SCION Task Force is fully operational.")
-    return 0
-
-
 def cmd_init(args: list[str], project_dir: Path) -> int:
     global_scope = "--global" in args or "-g" in args
     force = "--force" in args or "-f" in args
@@ -424,27 +306,26 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
         print("\n🔎 Checking project setup...")
         ensure_project_initialized(project_dir, binary)
 
-    harness, model = answers["harness"], answers["model"]
     scope_desc = "global scope" if global_scope else f"project scope at `{project_dir}`"
     print(f"\n🚀 Initializing SCION Task Force ({scope_desc})...")
-    target, archived_count = init_config(
+    # Re-running init keeps an existing config: only the wizard (or --force) changes its values.
+    write_answers = not global_scope and (is_interactive or force or not project_config_path(project_dir).exists())
+    target, action = init_config(
         project_dir=project_dir,
         global_scope=global_scope,
         force=force,
-        harness=harness,
-        model=model,
-        gcp_project=answers["gcp_project"],
-        gcp_region=answers["gcp_region"],
-        claim_tag=answers["claim_tag"],
-        max_concurrent=answers["max_concurrent"],
+        answers=answers if write_answers else None,
     )
-    if archived_count > 0:
-        print(f"📦 Archived {archived_count} existing configuration/prompt file(s) with timestamped .old suffixes.")
-    print("📁 Created/Updated configuration directory & templates:")
-    print(f"   • Config:   `{target}`")
-    print(f"   • Template: `{project_dir / '.scion' / 'templates' / WORKER_TEMPLATE}` (harness={harness}, model={model or 'harness default'})")
-    print(f"   • Brief:    `{target.parent / 'prompt.md'}`")
+    note = {
+        "created": "created",
+        "updated": "updated the wizard's settings, kept your other values",
+        "kept": "kept your existing values; `--force` starts over",
+    }[action]
+    print(f"📁 Config:   `{target}` ({note})")
     if not global_scope:
+        prov = load_config(project_dir=project_dir)["provider"]
+        harness, model = prov.get("harness_config") or "default", prov.get("model") or "harness default"
+        print(f"   Template: `{project_dir / '.scion' / 'templates' / WORKER_TEMPLATE}` (harness={harness}, model={model})")
         _ensure_runtime_project(project_dir)
         hook = install_hook(project_dir)
         print(f"🪝 Save hook:  `{hook}` (ticket saves now trigger the task force)")
@@ -465,10 +346,24 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
 
 
 
-def cmd_uninit(args: list[str], project_dir: Path) -> int:
+def cmd_uninit(args: list[str], project_dir: Path, explicit_config: str | None, dry_run: bool) -> int:
     global_scope = "--global" in args or "-g" in args
     scope_desc = "global config" if global_scope else f"project directory `{project_dir}`"
+    agents = [] if global_scope else project_agents(project_dir)
+    if agents:
+        print(f"This stops and deletes {len(agents)} Scion worker(s) of this project (branches are kept): {', '.join(agents)}")
+        if "--yes" not in args and "-y" not in args:
+            try:
+                answer = input("Continue? [y/N]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                answer = ""
+            if answer not in ("y", "yes"):
+                print("Aborted; nothing was changed. Re-run with --yes to skip this question.")
+                return 1
     print(f"🗑️ Uninitializing SCION Task Force for {scope_desc}...")
+    if agents:
+        removed = remove_project_workers(project_dir, explicit_config=explicit_config, dry_run=dry_run)
+        print(f"ℹ️ Stopped and deleted {removed} worker(s).")
     success, path = uninit_config(project_dir=project_dir, global_scope=global_scope)
     if not global_scope and uninstall_hook(project_dir):
         print(f"ℹ️ Removed save hook `{hook_path(project_dir)}`.")
@@ -529,25 +424,16 @@ def cmd_dispatch(
     if not ticket_arg:
         print("Usage: tk scion-taskforce dispatch <id>   (use `sync` to start all queued tickets)", file=sys.stderr)
         return 1
-    cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
     proj, t_path = _find_ticket_across_projects(ticket_arg, project_dir)
-    ticket = parse_ticket_file(t_path, project_dir=proj)
-    eligible, reason = is_eligible_for_dispatch(ticket, cfg)
-    if not eligible:
-        claim_tag = str(cfg.get("tags", {}).get("claim", "taskforce"))
-        print(f"⏭️  Not dispatching {ticket.id}: {reason}.")
-        print(f"   Opt a ticket in with: tk update {ticket.id} --tags <existing>,{claim_tag}")
-        return 1
-    try:
-        ok = dispatch_ticket(proj, ticket, cfg, TelemetryManager(cfg), get_provider(cfg, dry_run=dry_run), load_state())
-    except DispatchError as exc:
-        print(f"❌ Could not launch a verified worker for '{ticket.id}': {exc}", file=sys.stderr)
-        print("   Ticket left untouched. Check the provider runtime (e.g. `podman machine start`).", file=sys.stderr)
-        return 1
+    tid = parse_ticket_file(t_path, project_dir=proj).id
+    ok, reason = dispatch_now(proj, t_path, explicit_config=explicit_config, dry_run=dry_run)
     if ok:
-        print(f"🚀 Dispatched & verified task force worker '{ticket.id}' in {proj}")
+        print(f"🚀 Dispatched & verified task force worker '{tid}' in {proj}")
         return 0
-    print(f"❌ Did not dispatch worker for ticket '{ticket.id}' (see `tk scion-taskforce logs`)", file=sys.stderr)
+    print(f"❌ Not dispatching {tid}: {reason}", file=sys.stderr)
+    if "opt-in tag" in reason:
+        claim_tag = tags(load_config(project_dir=proj, explicit_config=explicit_config))[0]
+        print(f"   Opt a ticket in with: tk update {tid} --tags <existing>,{claim_tag}", file=sys.stderr)
     return 1
 
 
@@ -558,17 +444,16 @@ def cmd_list(project_dir: Path, explicit_config: str | None) -> int:
         print("No task force workers tracked yet.")
         return 0
 
-    print(f"{'WORKER ID':<14} {'STATE':<10} {'PROVIDER':<10} {'CYCLES':<7} {'PROJECT':<30} {'TRACE ID'}")
-    print("-" * 105)
+    print(f"{'WORKER ID':<14} {'STATE':<10} {'CYCLES':<7} {'PROJECT':<30} {'TRACE ID'}")
+    print("-" * 94)
     # states: running | paused | stopped (ticket closed) | error (never verified or pod lost) | deleted
     for w in sorted(workers.values(), key=lambda x: (str(x.get("project_dir", "")), str(x.get("ticket_id", "")))):
         wid = str(w.get("ticket_id", ""))
         st = str(w.get("state", "unknown"))
-        prov = str(w.get("provider", "scion"))
         cycles = int(w.get("feedback_cycles", 0))
         proj = str(w.get("project_dir", str(project_dir)))
         trace_id = str(w.get("trace_id", ""))
-        print(f"{wid:<14} {st:<10} {prov:<10} {cycles:<7} {proj:<30} {trace_id}")
+        print(f"{wid:<14} {st:<10} {cycles:<7} {proj:<30} {trace_id}")
     return 0
 
 
@@ -604,14 +489,12 @@ def cmd_feedback(
     proj, t_path = _find_ticket_across_projects(ticket_id, project_dir)
     ticket = parse_ticket_file(t_path, project_dir=proj)
     cfg = load_config(project_dir=proj, explicit_config=explicit_config)
-    telemetry = TelemetryManager(cfg)
-    provider = get_provider(cfg, dry_run=dry_run)
     state = load_state()
 
     if ticket.status == "closed":
         print(f"❌ Ticket {ticket.id} is closed; reopen it before sending feedback.", file=sys.stderr)
         return 1
-    w_state = state.get("workers", {}).get(f"{normalize_project_dir(proj)}::{ticket.id}", {}).get("state")
+    w_state = state.get("workers", {}).get(_worker_key(proj, ticket.id), {}).get("state")
     if w_state not in ("running", "paused"):
         print(
             f"❌ Ticket {ticket.id} has no active worker (state: {w_state or 'none'}); nothing to wake.\n"
@@ -626,8 +509,8 @@ def cmd_feedback(
         ticket_id=ticket.id,
         feedback_message=feedback_msg,
         config=cfg,
-        telemetry=telemetry,
-        provider=provider,
+        telemetry=TelemetryManager(cfg),
+        provider=ScionProvider(cfg, dry_run=dry_run),
         state=state,
         append_note_to_ticket=True,
     )
@@ -655,17 +538,12 @@ def cmd_pause(
     proj, t_path = _find_ticket_across_projects(ticket_id, project_dir)
     ticket = parse_ticket_file(t_path, project_dir=proj)
     cfg = load_config(project_dir=proj, explicit_config=explicit_config)
-    telemetry = TelemetryManager(cfg)
-    provider = get_provider(cfg, dry_run=dry_run)
-    state = load_state()
-
     ok = pause_worker_for_ticket(
         project_dir=proj,
         ticket=ticket,
-        config=cfg,
-        telemetry=telemetry,
-        provider=provider,
-        state=state,
+        telemetry=TelemetryManager(cfg),
+        provider=ScionProvider(cfg, dry_run=dry_run),
+        state=load_state(),
         reason="manual-pause",
     )
     if ok:
@@ -690,10 +568,8 @@ def cmd_attach(
     ticket = parse_ticket_file(t_path, project_dir=proj)
     cfg = load_config(project_dir=proj, explicit_config=explicit_config)
     telemetry = TelemetryManager(cfg)
-    provider = get_provider(cfg, dry_run=dry_run)
-    state = load_state()
-    wkey = f"{normalize_project_dir(proj)}::{ticket.id}"
-    w_entry = state.get("workers", {}).get(wkey, {})
+    provider = ScionProvider(cfg, dry_run=dry_run)
+    w_entry = load_state().get("workers", {}).get(_worker_key(proj, ticket.id), {})
     trace_id = str(w_entry.get("trace_id") or new_trace_id())
 
     cmd = provider.attach_command(str(proj), ticket.id)
@@ -706,12 +582,11 @@ def cmd_attach(
             "project.path": str(proj),
             "project.name": project_slug(proj),
             "worker.id": ticket.id,
-            "worker.provider": provider.provider_name,
         },
     )
     telemetry.log_worker(proj, ticket.id, f"Interactive attach requested: {' '.join(cmd)}", trace_id=trace_id)
 
-    if dry_run or os.environ.get("TK_SCION_TASKFORCE_DRY_RUN", "").lower() in ("1", "true", "yes"):
+    if provider.dry_run:
         print(f"🔗 [dry-run] Attach command: {' '.join(cmd)}")
         return 0
 
@@ -825,7 +700,7 @@ def cmd_gc(
     force = "--force" in args or "-f" in args
     cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
     telemetry = TelemetryManager(cfg)
-    provider = get_provider(cfg, dry_run=dry_run)
+    provider = ScionProvider(cfg, dry_run=dry_run)
     state = load_state()
     projects = known_projects(state)
     norm_default = normalize_project_dir(project_dir)
@@ -852,7 +727,7 @@ def cmd_gc(
 def main(argv: list[str] | None = None) -> int:
     try:
         return _main(argv)
-    except StateError as exc:
+    except (StateError, ConfigError) as exc:
         print(f"❌ {exc}", file=sys.stderr)
         return 1
 
@@ -883,7 +758,7 @@ def _main(argv: list[str] | None = None) -> int:
         return cmd_test(subargs, project_dir)
 
     if subcmd == "uninit":
-        return cmd_uninit(subargs, project_dir)
+        return cmd_uninit(subargs, project_dir, explicit_config, dry_run)
 
     if subcmd == "hook":
         return cmd_hook(subargs, project_dir)
@@ -897,9 +772,12 @@ def _main(argv: list[str] | None = None) -> int:
     if subcmd == "status":
         return cmd_status(project_dir, explicit_config)
 
+    if subcmd == "dispatch":  # takes the ticket's project lock itself
+        return cmd_dispatch(subargs, project_dir, explicit_config, dry_run)
+
     # Commands that write worker state share the per-project lock with the background hook, plus the
     # global state-file lock (the state file is shared by all projects).
-    writers = {"dispatch": cmd_dispatch, "feedback": cmd_feedback, "pause": cmd_pause, "gc": cmd_gc}
+    writers = {"feedback": cmd_feedback, "pause": cmd_pause, "gc": cmd_gc}
     if subcmd in writers:
         with project_lock(Path(normalize_project_dir(project_dir))), state_lock():
             return writers[subcmd](subargs, project_dir, explicit_config, dry_run)

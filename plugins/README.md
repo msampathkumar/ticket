@@ -12,7 +12,7 @@ All plugins follow the [Plugin Specification (PLUGIN_SPEC.md)](../docs/PLUGIN_SP
 | :--- | :--- | :--- | :--- |
 | [`webui/`](../tk_webui) | `tk webui` | [WEBUI-SPEC.md](../tk_webui/WEBUI-SPEC.md) | Full-featured Kanban, Table, Mind Map DAG, and Timeline dashboard |
 | [`github/`](github/) | `tk github` | [GITHUB-SPEC.md](github/GITHUB-SPEC.md) | Sync GitHub issues & pull requests into local tickets |
-| [`scion-taskforce/`](scion-taskforce/) | `tk scion-taskforce` | [SCION-TASKFORCE-SPEC.md](scion-taskforce/SCION-TASKFORCE-SPEC.md) | Opt-in (`taskforce` tag) SCION worker orchestration triggered on ticket save (post-write hook, no daemon) with verified launches, liveness sweep, PR-review or implementation briefs, 1 worker/project by default (shared checkout; `scion init` worktrees are isolated and merged back), trust-prompt auto-accept, & OpenTelemetry (optional install) |
+| [`scion-taskforce/`](scion-taskforce/) | `tk scion-taskforce` | [SCION-TASKFORCE-SPEC.md](scion-taskforce/SCION-TASKFORCE-SPEC.md) | Opt-in SCION worker per ticket, triggered by a `tk` save hook (optional install; [user guide](../docs/plugins/scion-taskforce.md)) |
 
 > [!NOTE]
 > Utility commands like `ls`, `list`, `edit`, `query`, and `find` are natively built into core `tk`.

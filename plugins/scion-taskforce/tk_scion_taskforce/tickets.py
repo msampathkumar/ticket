@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 import shutil
@@ -29,13 +28,6 @@ class TicketInfo:
     external_ref: str = ""  # e.g. gh-pr-123 / gh-123 / JIRA-1 (from tk --external-ref)
     body: str = ""
     notes: list[tuple[str, str]] = field(default_factory=list)  # (timestamp, note_text)
-
-    @property
-    def last_note_hash(self) -> str:
-        if not self.notes:
-            return ""
-        ts, text = self.notes[-1]
-        return hashlib.sha256(f"{ts}:{text}".encode()).hexdigest()[:16]
 
 
 def validate_ticket_id(ticket_id: str) -> str:
@@ -245,10 +237,11 @@ def remove_ticket_tag(ticket_path: Path, tag: str) -> list[str]:
     return tags
 
 
-def append_ticket_note(ticket_path: Path, note_text: str) -> str:
-    """Append a timestamped note to the ticket's ## Notes section (matches 'tk add-note')."""
+def append_ticket_note(ticket_path: Path, note_text: str, timestamp: str | None = None) -> str:
+    """Append a note to the ticket's ## Notes section (matches 'tk add-note'). ``timestamp`` keeps a
+    worker note's original time when mirroring it; default is now."""
     resolved_path = ticket_path.expanduser().resolve()
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     content = resolved_path.read_text(encoding="utf-8")
 
     if "## Notes" not in content:
@@ -261,20 +254,6 @@ def append_ticket_note(ticket_path: Path, note_text: str) -> str:
     content += f"\n**{timestamp}**\n\n{note_text.strip()}\n"
     resolved_path.write_text(content, encoding="utf-8")
     return timestamp
-
-
-def append_raw_note(ticket_path: Path, timestamp: str, note_text: str) -> None:
-    """Append a note block with a caller-supplied timestamp (used when mirroring worker notes)."""
-    resolved_path = ticket_path.expanduser().resolve()
-    content = resolved_path.read_text(encoding="utf-8")
-    if "## Notes" not in content:
-        if not content.endswith("\n"):
-            content += "\n"
-        content += "\n## Notes\n"
-    if not content.endswith("\n"):
-        content += "\n"
-    content += f"\n**{timestamp}**\n\n{note_text.strip()}\n"
-    resolved_path.write_text(content, encoding="utf-8")
 
 
 def merge_worker_ticket_copy(main_path: Path, worker_copy: Path, review_tag: str) -> dict[str, int]:
@@ -292,7 +271,7 @@ def merge_worker_ticket_copy(main_path: Path, worker_copy: Path, review_tag: str
     have = {(ts, txt) for ts, txt in main.notes}
     for ts, txt in copy.notes:
         if (ts, txt) not in have:
-            append_raw_note(main_path, ts, txt)
+            append_ticket_note(main_path, txt, timestamp=ts)
             result["notes"] += 1
     if review_tag in copy.tags and review_tag not in main.tags:
         add_ticket_tag(main_path, review_tag)

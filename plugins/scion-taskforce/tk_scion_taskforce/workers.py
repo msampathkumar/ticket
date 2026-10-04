@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from tk_scion_taskforce.providers import WorkerProvider
+from tk_scion_taskforce.providers.scion import ScionProvider
 from tk_scion_taskforce.state import get_state_dir, normalize_project_dir, save_state
 from tk_scion_taskforce.telemetry import (
     TelemetryManager,
@@ -55,19 +55,27 @@ def failure_hint(detail: str, ticket_id: str) -> str:
 
 
 class DispatchError(Exception):
-    """Raised when the provider runtime cannot launch a verified worker.
-
-    Carries ``abort_project=True`` when the failure is environmental (runtime down,
-    binary missing) and further spawns in the same project should be skipped this pass.
-    """
-
-    def __init__(self, message: str, abort_project: bool = True) -> None:
-        super().__init__(message)
-        self.abort_project = abort_project
+    """Raised when Scion cannot launch a verified worker; the ticket is left untouched."""
 
 
 def _worker_key(project_dir: str | Path, ticket_id: str) -> str:
     return f"{normalize_project_dir(project_dir)}::{ticket_id}"
+
+
+def tags(config: dict[str, Any]) -> tuple[str, str, str]:
+    """The ``(claim, ignore, review)`` tag names from ``config``."""
+    cfg = config.get("tags") or {}
+    return (
+        str(cfg.get("claim", "taskforce")),
+        str(cfg.get("ignore", "no-taskforce")),
+        str(cfg.get("review", "waiting-for-review")),
+    )
+
+
+def has_agent(entry: dict[str, Any]) -> bool:
+    """Whether Scion may hold an agent for this worker entry. ``False`` when the start failed before
+    Scion accepted a spawn (nothing to stop or delete). Entries from older versions lack the flag."""
+    return bool(entry.get("agent", entry.get("state") != "error"))
 
 
 def classify_work_type(ticket: TicketInfo, config: dict[str, Any]) -> str:
@@ -158,9 +166,7 @@ def build_worker_prompt(
     config: dict[str, Any],
     branch: str,
 ) -> str:
-    tags_cfg = config.get("tags", {})
-    claim_tag = str(tags_cfg.get("claim", "taskforce"))
-    review_tag = str(tags_cfg.get("review", "waiting-for-review"))
+    claim_tag, _, review_tag = tags(config)
     work_type = classify_work_type(ticket, config)
 
     # Optional user template (worker.prompt_file) with simple {placeholder} substitution.
@@ -207,11 +213,7 @@ def is_eligible_for_dispatch(ticket: TicketInfo, config: dict[str, Any]) -> tupl
 
     Returns (eligible, reason).
     """
-    tags_cfg = config.get("tags", {})
-    claim_tag = str(tags_cfg.get("claim", "taskforce"))
-    ignore_tag = str(tags_cfg.get("ignore", "no-taskforce"))
-    review_tag = str(tags_cfg.get("review", "waiting-for-review"))
-
+    claim_tag, ignore_tag, review_tag = tags(config)
     if ticket.status != "open":
         return False, f"status is {ticket.status!r}, not 'open'"
     if ignore_tag in ticket.tags:
@@ -253,25 +255,61 @@ def _record_project_health(
     save_state(state)
 
 
+def _record(
+    telemetry: TelemetryManager,
+    project_dir: Path,
+    ticket_id: str,
+    span: str,
+    ok: bool,
+    message: str,
+    *,
+    trace_id: str,
+    parent_span_id: str | None = None,
+    attrs: dict[str, Any] | None = None,
+    event: tuple[str, dict[str, Any]] | None = None,
+    worker_line: str | None = None,
+    metric: str | None = None,
+    metric_attrs: dict[str, Any] | None = None,
+) -> str:
+    """Write one worker lifecycle step to every sink: a span, ``taskforce.log``, the worker log and,
+    when ``metric`` is set, a counter. Returns the span ID."""
+    slug = project_slug(project_dir)
+    span_id = telemetry.emit_span(
+        name=span,
+        trace_id=trace_id,
+        parent_span_id=parent_span_id,
+        status_code="OK" if ok else "ERROR",
+        attributes={
+            "ticket.id": ticket_id,
+            "project.path": normalize_project_dir(project_dir),
+            "project.name": slug,
+            "worker.id": ticket_id,
+            **(attrs or {}),
+        },
+        events=[{"name": event[0], "timestamp": utc_now_iso(), "attributes": event[1]}] if event else None,
+    )
+    telemetry.log_event("INFO" if ok else "ERROR", message, trace_id=trace_id, span_id=span_id, ticket_id=ticket_id)
+    telemetry.log_worker(project_dir, ticket_id, worker_line or message, trace_id=trace_id)
+    if metric:
+        telemetry.emit_metric(metric, 1, attributes={"project.name": slug, **(metric_attrs or {})})
+    return span_id
+
+
 def dispatch_ticket(
     project_dir: Path,
     ticket: TicketInfo,
     config: dict[str, Any],
     telemetry: TelemetryManager,
-    provider: WorkerProvider,
+    provider: ScionProvider,
     state: dict[str, Any],
-    skip_preflight: bool = False,
 ) -> bool:
     """Launch a worker for ``ticket`` and claim it ONLY after the pod is verified running.
 
-    Raises ``DispatchError`` when the provider runtime is unavailable so callers can stop
-    iterating over the remaining tickets in the same project for this pass.
+    Raises ``DispatchError`` when Scion cannot launch a verified worker. Returns ``False`` when a
+    pod with this ID already exists and is left alone.
     """
-    tags_cfg = config.get("tags", {})
-    claim_tag = str(tags_cfg.get("claim", "taskforce"))
     watcher_cfg = config.get("watcher", {})
     verify_timeout = float(watcher_cfg.get("spawn_verify_timeout_seconds", 30))
-    prompt_timeout = float(watcher_cfg.get("spawn_prompt_unblock_seconds", 40))
     verify_poll = float(watcher_cfg.get("spawn_verify_poll_seconds", 2))
 
     proj_str = normalize_project_dir(project_dir)
@@ -280,25 +318,15 @@ def dispatch_ticket(
 
     trace_id = new_trace_id()
     lifecycle_span_id = new_span_id()
-    branch_prefix = str(config.get("provider", {}).get("branch_prefix", "") or "")
-    branch = f"{branch_prefix.rstrip('/')}/{ticket.id}" if branch_prefix else ticket.id
+    branch = provider.format_branch(ticket.id)
     slug = project_slug(project_dir)
-    base_attrs = {
-        "ticket.id": ticket.id,
-        "project.path": proj_str,
-        "project.name": slug,
-        "worker.id": ticket.id,
-        "worker.provider": provider.provider_name,
-        "worker.branch": branch,
-    }
 
     # 0. Pre-flight: is the provider runtime (podman/docker/k8s) reachable at all?
-    if not skip_preflight:
-        pre = provider.preflight(proj_str)
-        _record_project_health(state, telemetry, proj_str, pre.ok, pre.message)
-        if not pre.ok:
-            telemetry.log_worker(project_dir, ticket.id, f"Provider preflight failed: {pre.message}", trace_id=trace_id)
-            raise DispatchError(f"provider preflight failed: {pre.message}", abort_project=True)
+    pre = provider.preflight(proj_str)
+    _record_project_health(state, telemetry, proj_str, pre.ok, pre.message)
+    if not pre.ok:
+        telemetry.log_worker(project_dir, ticket.id, f"Provider preflight failed: {pre.message}", trace_id=trace_id)
+        raise DispatchError(f"provider preflight failed: {pre.message}")
 
     # 1. Idempotency: adopt an already-running pod with this ID instead of double-spawning.
     existing = provider.health(proj_str, ticket.id)
@@ -312,7 +340,7 @@ def dispatch_ticket(
     elif existing is not None:
         # A dead pod left behind by a previous attempt (worker state 'error'/'deleted', or the
         # ticket was explicitly reopened by a human) is replaced; anything else is left alone.
-        prev = state.get("workers", {}).get(wkey, {})
+        prev = workers.get(wkey, {})
         retry_ok = prev.get("state") in ("error", "deleted", "stopped") or not prev
         if retry_ok and provider.delete(proj_str, ticket.id, preserve_branch=True):
             telemetry.log_event(
@@ -345,88 +373,60 @@ def dispatch_ticket(
         "TRACEPARENT": f"00-{trace_id}-{lifecycle_span_id}-01",
     }
 
-    # 2. Spawn (request accepted by provider?)
-    if existing is None:
-        ok = provider.spawn(
-            project_dir=proj_str,
-            worker_id=ticket.id,
-            prompt=prompt,
-            branch=branch,
-            env=worker_env,
+    def record_spawn(ok: bool, message: str, worker_line: str, metric: str, attrs: dict[str, Any]) -> None:
+        _record(
+            telemetry, project_dir, ticket.id, "taskforce.worker.spawn", ok, message,
+            trace_id=trace_id, parent_span_id=lifecycle_span_id,
+            attrs={"worker.branch": branch, **attrs}, worker_line=worker_line, metric=metric,
         )
-        if not ok:
-            err = provider.last_error or "provider.spawn returned False"
-            telemetry.emit_span(
-                name="taskforce.worker.spawn",
-                trace_id=trace_id,
-                parent_span_id=lifecycle_span_id,
-                status_code="ERROR",
-                attributes={**base_attrs, "worker.state": "error", "error.message": err},
-            )
-            telemetry.log_event(
-                "ERROR",
-                f"Spawn FAILED for {ticket.id} in {proj_str}; ticket left untouched: {err}",
-                trace_id=trace_id,
-                ticket_id=ticket.id,
-                project=proj_str,
-            )
-            telemetry.log_worker(project_dir, ticket.id, f"Spawn failed: {err}", trace_id=trace_id)
-            telemetry.emit_metric("taskforce.workers.spawn_failed", 1, attributes={"project.name": slug})
-            _record_project_health(state, telemetry, proj_str, False, err)
-            raise DispatchError(err, abort_project=True)
+
+    # 2. Spawn (request accepted by provider?)
+    if existing is None and not provider.spawn(
+        project_dir=proj_str, worker_id=ticket.id, prompt=prompt, branch=branch, env=worker_env
+    ):
+        err = provider.last_error or "provider.spawn returned False"
+        record_spawn(
+            False, f"Spawn FAILED for {ticket.id} in {proj_str}; ticket left untouched: {err}",
+            f"Spawn failed: {err}", "taskforce.workers.spawn_failed",
+            {"worker.state": "error", "error.message": err},
+        )
+        _record_project_health(state, telemetry, proj_str, False, err)
+        raise DispatchError(err)
 
     # 3. Verify the pod actually exists and is running (NOT fire-and-forget).
     status = provider.wait_until_running(
         proj_str, ticket.id, timeout_seconds=verify_timeout, poll_seconds=verify_poll
     )
+    entry = {
+        "ticket_id": ticket.id,
+        "project_dir": proj_str,
+        "agent": True,  # Scion accepted the spawn (or the pod already existed)
+        "branch": branch,
+        "trace_id": trace_id,
+        "lifecycle_span_id": lifecycle_span_id,
+    }
     if status is None or not status.is_running:
         observed = status.state if status else "not_found"
         err = (
             f"worker {ticket.id} did not reach 'running' within {verify_timeout:.0f}s "
             f"(observed: {observed}). {provider.last_error}".strip()
         )
-        telemetry.emit_span(
-            name="taskforce.worker.spawn",
-            trace_id=trace_id,
-            parent_span_id=lifecycle_span_id,
-            status_code="ERROR",
-            attributes={**base_attrs, "worker.state": observed, "error.message": err},
+        record_spawn(
+            False, f"Spawn verification FAILED for {ticket.id} in {proj_str}; ticket left untouched: {err}",
+            f"Spawn verification failed: {err}", "taskforce.workers.spawn_unverified",
+            {"worker.state": observed, "error.message": err},
         )
-        telemetry.log_event(
-            "ERROR",
-            f"Spawn verification FAILED for {ticket.id} in {proj_str}; ticket left untouched: {err}",
-            trace_id=trace_id,
-            ticket_id=ticket.id,
-            project=proj_str,
-        )
-        telemetry.log_worker(project_dir, ticket.id, f"Spawn verification failed: {err}", trace_id=trace_id)
-        telemetry.emit_metric("taskforce.workers.spawn_unverified", 1, attributes={"project.name": slug})
         # Remember the orphaned pod so we don't re-spawn it blindly on the next pass.
-        workers[wkey] = {
-            "ticket_id": ticket.id,
-            "project_dir": proj_str,
-            "provider": provider.provider_name,
-            "state": "error",
-            "branch": branch,
-            "trace_id": trace_id,
-            "lifecycle_span_id": lifecycle_span_id,
-            "spawned_at": utc_now_iso(),
-            "error": err,
-        }
+        workers[wkey] = {**entry, "state": "error", "error": err}
         save_state(state)
-        raise DispatchError(err, abort_project=True)
+        raise DispatchError(err)
 
     # 4. Verified running -> claim the ticket (status only; the opt-in tag is user-owned).
     update_ticket_frontmatter(ticket.path, status="in_progress")
     refreshed = parse_ticket_file(ticket.path, project_dir=project_dir)
 
-    # 5. Post-spawn housekeeping (best effort, never fatal):
-    #    a) dismiss interactive harness start-up prompts (e.g. Claude's folder-trust dialog);
-    #    b) if the runtime gave the worker an isolated workspace, make sure the ticket file is
-    #       there too (``.tickets/`` may be untracked and therefore absent from a worktree).
-    unblock_note = provider.post_spawn(proj_str, ticket.id, timeout_seconds=prompt_timeout)
-    if unblock_note:
-        telemetry.log_event("INFO", f"{ticket.id}: {unblock_note}", trace_id=trace_id, ticket_id=ticket.id)
+    # 5. If the runtime gave the worker an isolated workspace, make sure the ticket file is there
+    #    too (``.tickets/`` may be untracked and therefore absent from a worktree).
     workspace = provider.workspace_path(proj_str, ticket.id)
     if workspace is not None:
         ws_ticket = workspace / ".tickets" / ticket.path.name
@@ -445,7 +445,11 @@ def dispatch_ticket(
         trace_id=trace_id,
         span_id=lifecycle_span_id,
         attributes={
-            **base_attrs,
+            "ticket.id": ticket.id,
+            "project.path": proj_str,
+            "project.name": slug,
+            "worker.id": ticket.id,
+            "worker.branch": branch,
             "ticket.title": ticket.title,
             "ticket.status": "in_progress",
             "ticket.priority": ticket.priority,
@@ -455,50 +459,16 @@ def dispatch_ticket(
             {
                 "name": "ticket.claimed",
                 "timestamp": utc_now_iso(),
-                "attributes": {"opt_in_tag": claim_tag, "status": "in_progress"},
+                "attributes": {"opt_in_tag": tags(config)[0], "status": "in_progress"},
             }
         ],
     )
-    spawn_span_id = telemetry.emit_span(
-        name="taskforce.worker.spawn",
-        trace_id=trace_id,
-        parent_span_id=lifecycle_span_id,
-        status_code="OK",
-        attributes={**base_attrs, "worker.state": "running", "worker.verified": True},
+    record_spawn(
+        True, f"Spawned & verified worker {ticket.id} in {proj_str} (branch={branch})",
+        f"Worker {ticket.id} spawned on branch '{branch}' and verified running", "taskforce.workers.spawned",
+        {"worker.state": "running", "worker.verified": True},
     )
-    telemetry.log_event(
-        "INFO",
-        f"Spawned & verified worker {ticket.id} in {proj_str} (branch={branch})",
-        trace_id=trace_id,
-        span_id=spawn_span_id,
-        ticket_id=ticket.id,
-        project=proj_str,
-    )
-    telemetry.log_worker(
-        project_dir,
-        ticket.id,
-        f"Worker {ticket.id} spawned by provider '{provider.provider_name}' on branch '{branch}' and verified running",
-        trace_id=trace_id,
-    )
-    telemetry.emit_metric(
-        "taskforce.workers.spawned",
-        1,
-        attributes={"project.name": slug, "worker.provider": provider.provider_name},
-    )
-    workers[wkey] = {
-        "ticket_id": ticket.id,
-        "project_dir": proj_str,
-        "provider": provider.provider_name,
-        "state": "running",
-        "branch": branch,
-        "trace_id": trace_id,
-        "lifecycle_span_id": lifecycle_span_id,
-        "spawned_at": utc_now_iso(),
-        "verified_at": utc_now_iso(),
-        "paused_at": None,
-        "last_note_hash": refreshed.last_note_hash,
-        "feedback_cycles": 0,
-    }
+    workers[wkey] = {**entry, "state": "running", "feedback_cycles": 0}
     save_state(state)
     return True
 
@@ -506,9 +476,8 @@ def dispatch_ticket(
 def pause_worker_for_ticket(
     project_dir: Path,
     ticket: TicketInfo,
-    config: dict[str, Any],
     telemetry: TelemetryManager,
-    provider: WorkerProvider,
+    provider: ScionProvider,
     state: dict[str, Any],
     reason: str = "waiting-for-review",
 ) -> bool:
@@ -517,66 +486,24 @@ def pause_worker_for_ticket(
     workers: dict[str, dict[str, Any]] = state.setdefault("workers", {})
     w_entry = workers.get(wkey, {})
     trace_id = str(w_entry.get("trace_id") or new_trace_id())
-    parent_span_id = w_entry.get("lifecycle_span_id")
 
     ok = provider.pause(proj_str, ticket.id)
-    span_id = telemetry.emit_span(
-        name="taskforce.worker.pause",
+    _record(
+        telemetry, project_dir, ticket.id, "taskforce.worker.pause", ok,
+        f"Paused worker {ticket.id} in {proj_str} ({reason})" + ("" if ok else f" FAILED: {provider.last_error}"),
         trace_id=trace_id,
-        parent_span_id=parent_span_id,
-        status_code="OK" if ok else "ERROR",
-        attributes={
-            "ticket.id": ticket.id,
-            "project.path": proj_str,
-            "project.name": project_slug(project_dir),
-            "worker.id": ticket.id,
-            "worker.provider": provider.provider_name,
-            "worker.state": "paused",
-            "pause.reason": reason,
-        },
-        events=[
-            {
-                "name": "worker.paused_for_review",
-                "timestamp": utc_now_iso(),
-                "attributes": {"reason": reason},
-            }
-        ],
-    )
-    telemetry.log_event(
-        "INFO" if ok else "ERROR",
-        f"Paused worker {ticket.id} in {proj_str} ({reason})"
-        + ("" if ok else f" FAILED: {provider.last_error}"),
-        trace_id=trace_id,
-        span_id=span_id,
-        ticket_id=ticket.id,
-    )
-    telemetry.log_worker(
-        project_dir,
-        ticket.id,
-        f"Worker {ticket.id} paused ({reason})" if ok else f"Pausing worker {ticket.id} FAILED: {provider.last_error}",
-        trace_id=trace_id,
+        parent_span_id=w_entry.get("lifecycle_span_id"),
+        attrs={"worker.state": "paused", "pause.reason": reason},
+        event=("worker.paused_for_review", {"reason": reason}),
+        worker_line=f"Worker {ticket.id} paused ({reason})" if ok else f"Pausing worker {ticket.id} FAILED: {provider.last_error}",
+        metric="taskforce.workers.paused_for_review" if ok else None,
     )
     if not ok:
         # The pod may still be running in the shared checkout: keep it `running` so its slot stays taken.
         status_note(ticket.path, f"could not pause worker `{ticket.id}`: {failure_hint(provider.last_error, ticket.id)}")
         return False
-    telemetry.emit_metric(
-        "taskforce.workers.paused_for_review",
-        1,
-        attributes={"project.name": project_slug(project_dir)},
-    )
 
-    w_entry.update(
-        {
-            "ticket_id": ticket.id,
-            "project_dir": proj_str,
-            "provider": provider.provider_name,
-            "state": "paused",
-            "trace_id": trace_id,
-            "paused_at": utc_now_iso(),
-            "last_note_hash": ticket.last_note_hash,
-        }
-    )
+    w_entry.update({"ticket_id": ticket.id, "project_dir": proj_str, "state": "paused", "trace_id": trace_id})
     workers[wkey] = w_entry
     save_state(state)
     return True
@@ -586,7 +513,6 @@ def mark_worker_lost(
     project_dir: Path,
     ticket: TicketInfo,
     telemetry: TelemetryManager,
-    provider: WorkerProvider,
     state: dict[str, Any],
     observed_state: str,
 ) -> None:
@@ -603,31 +529,16 @@ def mark_worker_lost(
     trace_id = str(w_entry.get("trace_id") or new_trace_id())
     reason = f"worker pod is {observed_state} and never reported back"
 
-    span_id = telemetry.emit_span(
-        name="taskforce.worker.lost",
-        trace_id=trace_id,
-        parent_span_id=w_entry.get("lifecycle_span_id"),
-        status_code="ERROR",
-        attributes={
-            "ticket.id": ticket.id,
-            "project.path": proj_str,
-            "project.name": project_slug(project_dir),
-            "worker.id": ticket.id,
-            "worker.provider": provider.provider_name,
-            "worker.state": "error",
-            "worker.observed_state": observed_state,
-        },
-        events=[{"name": "worker.lost", "timestamp": utc_now_iso(), "attributes": {"reason": reason}}],
-    )
-    telemetry.log_event(
-        "ERROR",
+    _record(
+        telemetry, project_dir, ticket.id, "taskforce.worker.lost", False,
         f"Worker {ticket.id} in {proj_str} lost: {reason}",
         trace_id=trace_id,
-        span_id=span_id,
-        ticket_id=ticket.id,
+        parent_span_id=w_entry.get("lifecycle_span_id"),
+        attrs={"worker.state": "error", "worker.observed_state": observed_state},
+        event=("worker.lost", {"reason": reason}),
+        worker_line=f"Worker {ticket.id} lost ({reason})",
+        metric="taskforce.workers.lost",
     )
-    telemetry.log_worker(project_dir, ticket.id, f"Worker {ticket.id} lost ({reason})", trace_id=trace_id)
-    telemetry.emit_metric("taskforce.workers.lost", 1, attributes={"project.name": project_slug(project_dir)})
 
     append_ticket_note(
         ticket.path,
@@ -641,15 +552,7 @@ def mark_worker_lost(
     )
 
     w_entry.update(
-        {
-            "ticket_id": ticket.id,
-            "project_dir": proj_str,
-            "provider": provider.provider_name,
-            "state": "error",
-            "error": reason,
-            "trace_id": trace_id,
-            "ended_at": utc_now_iso(),
-        }
+        {"ticket_id": ticket.id, "project_dir": proj_str, "state": "error", "agent": True, "error": reason, "trace_id": trace_id}
     )
     workers[wkey] = w_entry
     save_state(state)
@@ -661,7 +564,7 @@ def send_feedback_to_worker(
     feedback_message: str | None,
     config: dict[str, Any],
     telemetry: TelemetryManager,
-    provider: WorkerProvider,
+    provider: ScionProvider,
     state: dict[str, Any],
     append_note_to_ticket: bool = True,
 ) -> bool:
@@ -670,7 +573,7 @@ def send_feedback_to_worker(
         raise ValueError(f"Ticket {ticket_id!r} not found in {project_dir}")
 
     ticket = parse_ticket_file(t_path, project_dir=project_dir)
-    review_tag = str(config.get("tags", {}).get("review", "waiting-for-review"))
+    review_tag = tags(config)[2]
 
     note_ts = utc_now_iso()
     if not (append_note_to_ticket and feedback_message) and ticket.notes:
@@ -683,7 +586,6 @@ def send_feedback_to_worker(
     workers: dict[str, dict[str, Any]] = state.setdefault("workers", {})
     w_entry = workers.get(wkey, {})
     trace_id = str(w_entry.get("trace_id") or new_trace_id())
-    parent_span_id = w_entry.get("lifecycle_span_id")
 
     prompt_msg = (
         f"New review feedback was added to ticket `{ticket.id}` at {note_ts}:\n\n"
@@ -707,64 +609,31 @@ def send_feedback_to_worker(
             worker_ticket = workspace / ".tickets" / t_path.name
             if worker_ticket.is_file():
                 remove_ticket_tag(worker_ticket, review_tag)
-        ticket = parse_ticket_file(t_path, project_dir=project_dir)
     cycles = int(w_entry.get("feedback_cycles", 0)) + (1 if ok else 0)
 
-    span_id = telemetry.emit_span(
-        name="taskforce.worker.feedback_wake",
-        trace_id=trace_id,
-        parent_span_id=parent_span_id,
-        status_code="OK" if ok else "ERROR",
-        attributes={
-            "ticket.id": ticket.id,
-            "project.path": proj_str,
-            "project.name": project_slug(project_dir),
-            "worker.id": ticket.id,
-            "worker.provider": provider.provider_name,
-            "worker.state": "running",
-            "feedback.note_timestamp": note_ts,
-            "feedback.cycle": cycles,
-        },
-        events=[
-            {
-                "name": "worker.resumed_with_feedback",
-                "timestamp": utc_now_iso(),
-                "attributes": {"feedback.note_timestamp": note_ts},
-            }
-        ],
-    )
-    telemetry.log_event(
-        "INFO" if ok else "ERROR",
+    _record(
+        telemetry, project_dir, ticket.id, "taskforce.worker.feedback_wake", ok,
         f"Woke worker {ticket.id} in {proj_str} with review feedback (cycle={cycles})"
         + ("" if ok else f" FAILED: {provider.last_error}"),
         trace_id=trace_id,
-        span_id=span_id,
-        ticket_id=ticket.id,
+        parent_span_id=w_entry.get("lifecycle_span_id"),
+        attrs={"worker.state": "running", "feedback.note_timestamp": note_ts, "feedback.cycle": cycles},
+        event=("worker.resumed_with_feedback", {"feedback.note_timestamp": note_ts}),
+        worker_line=(
+            f"Worker {ticket.id} resumed with feedback (cycle #{cycles}): {feedback_message}"
+            if ok
+            else f"Waking worker {ticket.id} with feedback FAILED: {provider.last_error}"
+        ),
+        metric="taskforce.workers.feedback_cycles" if ok else None,
+        metric_attrs={"ticket.id": ticket.id},
     )
-    telemetry.log_worker(
-        project_dir,
-        ticket.id,
-        f"Worker {ticket.id} resumed with feedback (cycle #{cycles}): {feedback_message}"
-        if ok
-        else f"Waking worker {ticket.id} with feedback FAILED: {provider.last_error}",
-        trace_id=trace_id,
-    )
-    if ok:
-        telemetry.emit_metric(
-            "taskforce.workers.feedback_cycles",
-            1,
-            attributes={"project.name": project_slug(project_dir), "ticket.id": ticket.id},
-        )
 
     w_entry.update(
         {
             "ticket_id": ticket.id,
             "project_dir": proj_str,
-            "provider": provider.provider_name,
             "state": "running" if ok else w_entry.get("state", "paused"),
             "trace_id": trace_id,
-            "paused_at": None if ok else w_entry.get("paused_at"),
-            "last_note_hash": ticket.last_note_hash,
             "feedback_cycles": cycles,
         }
     )
@@ -777,11 +646,15 @@ def run_gc(
     projects: list[str],
     config: dict[str, Any],
     telemetry: TelemetryManager,
-    provider: WorkerProvider,
+    provider: ScionProvider,
     state: dict[str, Any],
     force: bool = False,
 ) -> tuple[int, int]:
-    """Run 5-day closed ticket pod GC and 30-day rotated log retention cleanup."""
+    """Delete the Scion agents of tickets closed for ``gc_retention_days``; purge rotated logs.
+
+    Workers of closed tickets were already stopped by the save hook (or `sync`). A failed delete
+    keeps the entry, so the next `gc` retries it.
+    """
     gc_days = int(config.get("watcher", {}).get("gc_retention_days", 5))
     cutoff_seconds = gc_days * 86400
     now_ts = time.time()
@@ -794,20 +667,12 @@ def run_gc(
         tickets_map = load_all_tickets(proj_path)
 
         for w_entry in list(workers.values()):
-            if w_entry.get("project_dir") != proj_str:
+            if w_entry.get("project_dir") != proj_str or w_entry.get("state") == "deleted":
                 continue
-            if w_entry.get("state") == "deleted":
-                continue
-
             tid = str(w_entry.get("ticket_id", ""))
             t_info = tickets_map.get(tid)
             if t_info is None or t_info.status != "closed":
                 continue
-
-            if w_entry.get("state") == "running":
-                pause_worker_for_ticket(
-                    proj_path, t_info, config, telemetry, provider, state, reason="ticket-closed"
-                )
 
             closed_ts = _parse_iso_ts(t_info.closed)
             if closed_ts is None:
@@ -815,56 +680,32 @@ def run_gc(
                     closed_ts = t_info.path.stat().st_mtime
                 except OSError:
                     closed_ts = now_ts
-
             age_seconds = max(0.0, now_ts - closed_ts)
             age_days = round(age_seconds / 86400.0, 2)
+            if not (force or age_seconds >= cutoff_seconds):
+                continue
+            if not has_agent(w_entry):
+                w_entry["state"] = "deleted"  # the start failed before Scion created anything
+                continue
 
-            if force or age_seconds >= cutoff_seconds:
-                trace_id = str(w_entry.get("trace_id") or new_trace_id())
-                parent_span_id = w_entry.get("lifecycle_span_id")
-                ok = provider.delete(proj_str, tid, preserve_branch=True)
-                telemetry.emit_span(
-                    name="taskforce.worker.gc_delete",
-                    trace_id=trace_id,
-                    parent_span_id=parent_span_id,
-                    status_code="OK" if ok else "ERROR",
-                    attributes={
-                        "ticket.id": tid,
-                        "project.path": proj_str,
-                        "project.name": project_slug(proj_path),
-                        "worker.id": tid,
-                        "worker.provider": provider.provider_name,
-                        "worker.state": "deleted",
-                        "gc.retention_days": gc_days,
-                        "gc.ticket_closed_age_days": age_days,
-                    },
-                    events=[
-                        {
-                            "name": "worker.gc_deleted",
-                            "timestamp": utc_now_iso(),
-                            "attributes": {"age_days": age_days, "force": force},
-                        }
-                    ],
-                )
-                telemetry.log_event(
-                    "INFO",
-                    f"GC deleted worker pod {tid} in {proj_str} (closed_age_days={age_days})",
-                    trace_id=trace_id,
-                    ticket_id=tid,
-                )
-                telemetry.log_worker(
-                    proj_path,
-                    tid,
-                    f"Worker pod {tid} deleted by 5-day GC (closed_age_days={age_days})",
-                    trace_id=trace_id,
-                )
-                telemetry.emit_metric(
-                    "taskforce.workers.gc_deleted",
-                    1,
-                    attributes={"project.name": project_slug(proj_path)},
-                )
-                w_entry["state"] = "deleted"
-                w_entry["deleted_at"] = utc_now_iso()
+            ok = provider.delete(proj_str, tid, preserve_branch=True)
+            _record(
+                telemetry, proj_path, tid, "taskforce.worker.gc_delete", ok,
+                f"GC deleted worker pod {tid} in {proj_str} (closed_age_days={age_days})"
+                if ok
+                else f"GC could not delete worker pod {tid} in {proj_str}; kept for the next gc: {provider.last_error}",
+                trace_id=str(w_entry.get("trace_id") or new_trace_id()),
+                parent_span_id=w_entry.get("lifecycle_span_id"),
+                attrs={
+                    "worker.state": "deleted" if ok else str(w_entry.get("state")),
+                    "gc.retention_days": gc_days,
+                    "gc.ticket_closed_age_days": age_days,
+                },
+                event=("worker.gc_deleted", {"age_days": age_days, "force": force}) if ok else None,
+                metric="taskforce.workers.gc_deleted" if ok else None,
+            )
+            if ok:
+                w_entry.update({"state": "deleted", "agent": False})
                 deleted_pods += 1
 
     save_state(state)

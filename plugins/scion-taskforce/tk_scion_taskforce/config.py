@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import copy
 import os
+import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -14,10 +16,17 @@ except ImportError:
 
 # Seeded per project by `init`; modelled on a known-good Scion agent (gemini-cli + API-key auth).
 WORKER_TEMPLATE = "tk-worker-gemini-cli-with-api-key-auth"
-LEGACY_TEMPLATES = ("taskforce-worker",)  # removed by `uninit`; no longer seeded
+# deprecated: template name used before 2026-10, only removed by `uninit`; remove after 2027-01-01
+LEGACY_TEMPLATES = ("taskforce-worker",)
 
+
+class ConfigError(ValueError):
+    """A config file cannot be read reliably."""
+
+
+# shortcut: the `watcher:` section is named after the removed polling daemon; rename it (reading the
+# old name as a fallback) when the config schema next changes.
 DEFAULT_CONFIG: dict[str, Any] = {
-    "version": 1,
     "tags": {
         "claim": "taskforce",
         "ignore": "no-taskforce",
@@ -28,7 +37,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "max_concurrent_per_project": 1,
         "spawn_verify_timeout_seconds": 30,
         "spawn_verify_poll_seconds": 2,
-        "spawn_prompt_unblock_seconds": 40,
         "gc_retention_days": 5,
     },
     "worker": {
@@ -37,7 +45,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "review_ref_prefixes": ["gh-pr-"],
     },
     "provider": {
-        "driver": "scion",
         "binary": "scion",
         "profile": "",
         "template": WORKER_TEMPLATE,
@@ -48,24 +55,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "branch_prefix": "",
         "extra_start_args": [],
         "extra_resume_args": [],
-        "auto_accept_prompts": True,
-        "auto_accept_prompt_patterns": ["Yes, I trust this folder"],
-        "harness_ready_patterns": ["bypass permissions on", "esc to interrupt"],
-        "container_user": "scion",
-        "tmux_session": "scion",
     },
     "telemetry": {
         "enabled": True,
         "log_dir": "~/.local/state/tk/scion-taskforce/logs",
         "project_log_symlink": True,
-        "traces_file": "otel-traces.jsonl",
-        "metrics_file": "otel-metrics.jsonl",
-        "log_file": "taskforce.log",
-        "worker_logs_dir": "workers",
-        "otlp_endpoint": "",
         "rotation": {
             "enabled": True,
-            "when": "midnight",
             "max_bytes": 104857600,
             "retention_days": 30,
             "compress": True,
@@ -73,12 +69,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
 }
 
-STARTER_YAML_TEMPLATE = """# scion-taskforce.yaml — Configuration for tk-scion-taskforce
-# Place in:
-#   - .tickets/scion-taskforce.yaml          (project-level overrides)
-#   - ~/.config/tk/scion-taskforce.yaml      (global defaults)
-
-version: 1
+STARTER_YAML_TEMPLATE = """# scion-taskforce.yaml — Configuration for tk-scion-taskforce (the full key reference)
+# Precedence, low to high (later files are deep-merged over earlier ones):
+#   built-in defaults
+#   < ~/.config/tk/scion-taskforce.yaml                 (global; `init --global`; honours $XDG_CONFIG_HOME)
+#   < <project>/.scion-taskforce/scion-taskforce.yaml   (project; `init`)
+#   < $TK_SCION_TASKFORCE_CONFIG                        (file path)
+#   < --config <path>
 
 # 1. Ticket Tags (customizable)
 #    The task force is OPT-IN: it only picks up ready (unblocked, open) tickets that
@@ -88,19 +85,16 @@ tags:
   ignore: no-taskforce            # Tickets with this tag are never picked up (safety override)
   review: waiting-for-review      # Added by the worker when it finishes and pauses for review
 
-# 2. Concurrency & Launch Settings
+# 2. Concurrency & Launch Settings (section name kept from the removed daemon)
 watcher:
   max_concurrent: 10              # Maximum total running workers across all projects
-  max_concurrent_per_project: 1   # Max working tasks per project; next one starts when one finishes.
-                                  # SAFETY: SCION mounts the project checkout directly into each pod
-                                  # (no per-worker worktree), so concurrent workers in ONE project share
-                                  # a working tree and will fight over branches/stashes. Raise above 1
-                                  # only if your runtime isolates workspaces.
+  max_concurrent_per_project: 1   # Max running workers per project; the next queued ticket starts when one
+                                  # pauses or closes. SAFETY: each worker mounts the project checkout
+                                  # (`scion start -w <project>`), so workers in ONE project share a working
+                                  # tree and can fight over branches. Raise above 1 only if you accept that.
   spawn_verify_timeout_seconds: 30 # Wait up to N s for a spawned pod to report 'running' before claiming
   spawn_verify_poll_seconds: 2    # Poll interval while verifying a freshly spawned pod
-  spawn_prompt_unblock_seconds: 40 # After launch, watch the pod up to N s for interactive harness
-                                  # prompts (e.g. Claude's "trust this folder?") and auto-accept them
-  gc_retention_days: 5            # Days to retain paused pods after ticket status == closed
+  gc_retention_days: 5            # Days after a ticket closes before `gc` deletes its stopped worker
 
 # 3. Worker Prompt Settings
 #    Workers get an auto-generated brief: "implement" for normal tickets, "review" for
@@ -113,40 +107,30 @@ worker:
   review_tags: [pr, review]       # A ticket with any of these tags gets the REVIEW brief
   review_ref_prefixes: [gh-pr-]   # ...or whose external-ref starts with one of these prefixes
 
-# 4. Worker Provider Settings (pluggable runtime)
+# 4. Scion Worker Settings
 provider:
-  driver: scion                   # Orchestrator backend ('scion' today; extensible)
   binary: scion                   # Path or command name for the provider CLI
   profile: ""                     # Optional SCION runtime profile (--profile)
   template: "tk-worker-gemini-cli-with-api-key-auth"  # Project-level SCION template (.scion/templates/<name>)
   harness_config: "gemini-cli"    # Scion harness-config (see `scion harness-config list`)
-  model: ""                       # Model ID or Scion alias (small|medium|large); blank = harness default
+  model: ""                       # Model ID or Scion alias (small|medium|large); aliases are resolved to a
+                                  # model ID at start so resumed workers keep a valid model; blank = harness default
   gcp_project: ""                 # Vertex AI project (GOOGLE_CLOUD_PROJECT); blank = inherit from env
   gcp_region: ""                  # Vertex AI location, e.g. europe-west3 or global; blank = env or fallback
   branch_prefix: ""               # Optional git branch prefix (default: <ticket-id>)
   extra_start_args: ["--harness-auth", "api-key"] # gemini-cli: GEMINI_API_KEY (Scion secret); other harnesses: vertex-ai
   extra_resume_args: []           # Additional flags passed to 'scion resume'
-  auto_accept_prompts: true       # Press Enter on known harness start-up prompts inside the pod
-  auto_accept_prompt_patterns: ["Yes, I trust this folder"]
-  harness_ready_patterns: ["bypass permissions on", "esc to interrupt"]  # Stop watching once seen
-  container_user: scion           # User owning the tmux session inside the pod
-  tmux_session: scion             # tmux session name used by the scion image
 
 # 5. OpenTelemetry & Local Log Rotation Settings
 telemetry:
-  enabled: true
+  enabled: true                   # Write spans and metrics; taskforce.log and worker logs are always written
   log_dir: ~/.local/state/tk/scion-taskforce/logs
   project_log_symlink: true       # Symlink <project>/.tickets/.scion-taskforce-logs -> global log dir
-  traces_file: otel-traces.jsonl
-  metrics_file: otel-metrics.jsonl
-  log_file: taskforce.log
-  worker_logs_dir: workers
-  otlp_endpoint: ""               # Optional OTLP HTTP/gRPC collector endpoint
+                                  # Files: otel-traces.jsonl, otel-metrics.jsonl, taskforce.log, workers/
   rotation:
-    enabled: true
-    when: midnight                # Rotate logs daily at midnight
+    enabled: true                 # Rotate logs daily at UTC midnight
     max_bytes: 104857600          # Also rotate if active log exceeds 100 MB
-    retention_days: 30            # Keep 30 days of rotated logs before automatic deletion
+    retention_days: 30            # `gc` deletes rotated logs older than N days
     compress: true                # Gzip rotated log files (.gz)
 """
 
@@ -156,6 +140,11 @@ def global_config_path() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME", "").strip()
     root = Path(base).expanduser() if base else Path.home() / ".config"
     return root / "tk" / "scion-taskforce.yaml"
+
+
+def project_config_path(project_dir: Path | str) -> Path:
+    """``<project>/.scion-taskforce/scion-taskforce.yaml``, written by `init`."""
+    return Path(project_dir).expanduser().resolve() / ".scion-taskforce" / "scion-taskforce.yaml"
 
 
 def _parse_scalar(val: str) -> Any:
@@ -190,12 +179,13 @@ def _parse_scalar(val: str) -> Any:
     return val
 
 
-def _fallback_parse_yaml(text: str) -> dict[str, Any]:
-    """Minimal indentation-aware YAML parser for 2-3 level nested mappings."""
+def _fallback_parse_yaml(text: str, source: str = "config") -> dict[str, Any]:
+    """Parser for the subset of YAML that `init` writes: nested ``key: value`` mappings and inline
+    ``[a, b]`` lists. Raises ``ConfigError`` on anything else instead of mis-reading it."""
     root: dict[str, Any] = {}
     stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
 
-    for raw_line in text.splitlines():
+    for line_no, raw_line in enumerate(text.splitlines(), start=1):
         line_no_comment = raw_line
         in_single = False
         in_double = False
@@ -214,18 +204,30 @@ def _fallback_parse_yaml(text: str) -> dict[str, Any]:
                 break
 
         stripped = line_no_comment.strip()
-        if not stripped or ":" not in stripped:
+        if not stripped or stripped == "---":
             continue
+        key, colon, rest = stripped.partition(":")
+        rest = rest.strip()
+        unsupported = (
+            "a block list item ('- ...')" if stripped.startswith("-")
+            else "a line without 'key: value'" if not colon
+            else "a multi-line string" if rest[:1] in ("|", ">")
+            else "an inline mapping" if rest.startswith("{") and rest.replace(" ", "") != "{}"
+            else "an anchor or alias" if rest[:1] in ("&", "*")
+            else ""
+        )
+        if unsupported:
+            raise ConfigError(
+                f"{source}:{line_no}: {unsupported} needs PyYAML. Install it (`pip install pyyaml`) or "
+                "run `tk scion-taskforce` from the repo's .venv, or rewrite the value inline."
+            )
 
         indent = len(line_no_comment) - len(line_no_comment.lstrip(" "))
         while len(stack) > 1 and indent <= stack[-1][0]:
             stack.pop()
 
         current_dict = stack[-1][1]
-        key, _, rest = stripped.partition(":")
         key = key.strip()
-        rest = rest.strip()
-
         if not rest:
             new_section: dict[str, Any] = {}
             current_dict[key] = new_section
@@ -253,7 +255,7 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     if yaml is not None:
         loaded = yaml.safe_load(text)
         return loaded if isinstance(loaded, dict) else {}
-    return _fallback_parse_yaml(text)
+    return _fallback_parse_yaml(text, source=str(path))
 
 
 def resolve_config_path(
@@ -271,10 +273,7 @@ def resolve_config_path(
             return candidate
     if project_dir is not None:
         p = Path(project_dir).expanduser().resolve()
-        scion_proj_cfg = p / ".scion-taskforce" / "scion-taskforce.yaml"
-        if scion_proj_cfg.exists():
-            return scion_proj_cfg
-        proj_cfg = p / ".tickets" / "scion-taskforce.yaml"
+        proj_cfg = project_config_path(p)
         if proj_cfg.exists():
             return proj_cfg
     global_cfg = global_config_path()
@@ -295,13 +294,9 @@ def load_config(
         cfg = _deep_merge(cfg, load_yaml_file(global_cfg))
 
     if project_dir is not None:
-        p = Path(project_dir).expanduser().resolve()
-        proj_cfg = p / ".tickets" / "scion-taskforce.yaml"
+        proj_cfg = project_config_path(project_dir)
         if proj_cfg.exists():
             cfg = _deep_merge(cfg, load_yaml_file(proj_cfg))
-        scion_proj_cfg = p / ".scion-taskforce" / "scion-taskforce.yaml"
-        if scion_proj_cfg.exists():
-            cfg = _deep_merge(cfg, load_yaml_file(scion_proj_cfg))
 
     env_cfg = os.environ.get("TK_SCION_TASKFORCE_CONFIG")
     if env_cfg:
@@ -352,84 +347,79 @@ changes over broad rewrites, state assumptions explicitly, and report honestly w
 }
 
 
-def seed_project_scion_template(project_dir: Path) -> Path:
-    """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/ (overwrites the three template files)."""
+def seed_project_scion_template(project_dir: Path, force: bool = False) -> Path:
+    """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/. Existing files are kept unless ``force``."""
     tmpl_dir = project_dir / ".scion" / "templates" / WORKER_TEMPLATE
     tmpl_dir.mkdir(parents=True, exist_ok=True)
     for name, content in WORKER_TEMPLATE_FILES.items():
-        (tmpl_dir / name).write_text(content, encoding="utf-8")
+        target = tmpl_dir / name
+        if force or not target.exists():
+            target.write_text(content, encoding="utf-8")
     return tmpl_dir
+
+
+def set_yaml_value(text: str, section: str, key: str, value: str) -> str:
+    """Set top-level ``section``'s ``key`` to the YAML literal ``value``, keeping comments and layout.
+    Adds the key (and section) when missing."""
+    lines = text.splitlines(keepends=True)
+    header = None
+    for i, line in enumerate(lines):
+        if line[:1] not in ("", " ", "#", "\n") and line.split(":", 1)[0].strip() == section:
+            header = i
+            continue
+        if header is None:
+            continue
+        if line[:1] not in (" ", "#", "\n"):
+            break  # next top-level key: the section has no such key
+        m = re.match(rf"^(\s+{re.escape(key)}:\s*)(.*?)(\s+#.*)?$", line.rstrip("\n"))
+        if m:
+            lines[i] = f"{m.group(1)}{value}{m.group(3) or ''}\n"
+            return "".join(lines)
+    if header is None:
+        return text + ("" if text.endswith("\n") else "\n") + f"\n{section}:\n  {key}: {value}\n"
+    lines.insert(header + 1, f"  {key}: {value}\n")
+    return "".join(lines)
+
+
+def _answer_values(answers: dict[str, Any]) -> dict[tuple[str, str], str]:
+    """Config keys set by the `init` wizard, as YAML literals."""
+    auth = "api-key" if answers["harness"] == "gemini-cli" else "vertex-ai"
+    return {
+        ("tags", "claim"): str(answers["claim_tag"]),
+        ("watcher", "max_concurrent_per_project"): str(answers["max_concurrent"]),
+        ("provider", "harness_config"): f'"{answers["harness"]}"',
+        ("provider", "model"): f'"{answers["model"]}"',
+        ("provider", "gcp_project"): f'"{answers["gcp_project"]}"',
+        ("provider", "gcp_region"): f'"{answers["gcp_region"]}"',
+        ("provider", "extra_start_args"): f'["--harness-auth", "{auth}"]',
+    }
 
 
 def init_config(
     project_dir: Path | None = None,
     global_scope: bool = False,
     force: bool = False,
-    harness: str = "gemini-cli",
-    model: str = "",
-    gcp_project: str = "",
-    gcp_region: str = "",
-    claim_tag: str = "taskforce",
-    review_tag: str = "waiting-for-review",
-    max_concurrent: int = 1,
-) -> tuple[Path, int]:
-    """Initialize .scion-taskforce/ directory in project or global config."""
-    archived_count = 0
-    if global_scope:
-        target = global_config_path()
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists() and not force:
-            return target, 0
-        target.write_text(STARTER_YAML_TEMPLATE, encoding="utf-8")
-        return target, 0
+    answers: dict[str, Any] | None = None,
+) -> tuple[Path, str]:
+    """Write the global or project config and, for a project, seed the worker template.
 
-    import time
+    A new file starts from ``STARTER_YAML_TEMPLATE``; an existing one keeps the user's values
+    (``force`` starts over). ``answers`` (wizard keys) are written into either.
+    Returns ``(path, "created" | "updated" | "kept")``.
+    """
     base_dir = Path(project_dir or Path.cwd()).expanduser().resolve()
-    scion_dir = base_dir / ".scion-taskforce"
-    scion_dir.mkdir(parents=True, exist_ok=True)
-
-    yaml_target = scion_dir / "scion-taskforce.yaml"
-    prompt_target = scion_dir / "prompt.md"
-
-    timestamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
-
-    for existing_file in [yaml_target, prompt_target]:
-        if existing_file.exists():
-            if force:
-                existing_file.unlink()
-            else:
-                old_backup = existing_file.with_name(f"{existing_file.name}.{timestamp}.old")
-                existing_file.rename(old_backup)
-                archived_count += 1
-
-    auth = "api-key" if harness == "gemini-cli" else "vertex-ai"
-    yaml_content = (
-        STARTER_YAML_TEMPLATE
-        .replace('harness_config: "gemini-cli"', f'harness_config: "{harness}"')
-        .replace('["--harness-auth", "api-key"]', f'["--harness-auth", "{auth}"]')
-        .replace('model: ""', f'model: "{model}"')
-        .replace('gcp_project: ""', f'gcp_project: "{gcp_project}"')
-        .replace('gcp_region: ""', f'gcp_region: "{gcp_region}"')
-        .replace("claim: taskforce", f"claim: {claim_tag}")
-        .replace("review: waiting-for-review", f"review: {review_tag}")
-        .replace("max_concurrent_per_project: 1", f"max_concurrent_per_project: {max_concurrent}")
-    )
-
-    yaml_target.write_text(yaml_content, encoding="utf-8")
-
-    default_prompt_content = (
-        "# Default Scion Task Force Prompt Template\n"
-        "# Placeholders: {ticket_id}, {ticket_title}, {project_dir}, {branch}, {work_type}, {ticket_details}\n\n"
-        "You are an autonomous task force worker assigned to ticket {ticket_id} ({ticket_title}).\n"
-        "Working directory: {project_dir} (branch: {branch}).\n\n"
-        "### Ticket Details\n{ticket_details}\n"
-    )
-    prompt_target.write_text(default_prompt_content, encoding="utf-8")
-
-    # Seed the project-scoped SCION template
-    seed_project_scion_template(base_dir)
-
-    return yaml_target, archived_count
+    target = global_config_path() if global_scope else project_config_path(base_dir)
+    existed = target.exists() and not force
+    text = target.read_text(encoding="utf-8") if existed else STARTER_YAML_TEMPLATE
+    for (section, key), value in (_answer_values(answers) if answers else {}).items():
+        text = set_yaml_value(text, section, key, value)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    if not global_scope:
+        seed_project_scion_template(base_dir, force=force)
+    if not existed:
+        return target, "created"
+    return target, "updated" if answers else "kept"
 
 
 def uninit_config(
@@ -448,13 +438,11 @@ def uninit_config(
     scion_dir = base_dir / ".scion-taskforce"
     removed_any = False
     if scion_dir.is_dir():
-        import shutil
         shutil.rmtree(scion_dir)
         removed_any = True
     for name in (WORKER_TEMPLATE, *LEGACY_TEMPLATES):
         tmpl_dir = base_dir / ".scion" / "templates" / name
         if tmpl_dir.is_dir():
-            import shutil
             shutil.rmtree(tmpl_dir)
             removed_any = True
     return removed_any, str(scion_dir)

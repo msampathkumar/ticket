@@ -25,9 +25,9 @@ from pathlib import Path
 from typing import Any
 
 from tk_scion_taskforce.config import load_config
-from tk_scion_taskforce.providers import WorkerProvider, get_provider
+from tk_scion_taskforce.providers.scion import ScionProvider
 from tk_scion_taskforce.state import load_state, normalize_project_dir, save_state, state_lock
-from tk_scion_taskforce.telemetry import TelemetryManager, utc_now_iso
+from tk_scion_taskforce.telemetry import TelemetryManager
 from tk_scion_taskforce.tickets import (
     TicketInfo,
     get_ready_tickets,
@@ -44,6 +44,7 @@ from tk_scion_taskforce.workers import (
     _worker_key,
     dispatch_ticket,
     failure_hint,
+    has_agent,
     is_eligible_for_dispatch,
     mark_worker_lost,
     max_workers_per_project,
@@ -51,6 +52,7 @@ from tk_scion_taskforce.workers import (
     project_lock,
     send_feedback_to_worker,
     status_note,
+    tags,
 )
 
 ACTIVE_STATES = ("running", "paused")
@@ -64,17 +66,15 @@ class _Ctx:
     proj_str: str
     cfg: dict[str, Any]
     telemetry: TelemetryManager
-    provider: WorkerProvider
+    provider: ScionProvider
     state: dict[str, Any]
     paused: int = 0
     errors: int = 0
+    error: str = ""  # detail of the last failed start, for `dispatch`
 
     @property
     def workers(self) -> dict[str, dict[str, Any]]:
         return self.state.setdefault("workers", {})
-
-    def tag(self, name: str, default: str) -> str:
-        return str(self.cfg.get("tags", {}).get(name, default))
 
 
 def _context(project_dir: str | Path, explicit_config: str | None, dry_run: bool) -> _Ctx:
@@ -85,7 +85,7 @@ def _context(project_dir: str | Path, explicit_config: str | None, dry_run: bool
         proj_str=str(project),
         cfg=cfg,
         telemetry=TelemetryManager(cfg),
-        provider=get_provider(cfg, dry_run=dry_run),
+        provider=ScionProvider(cfg, dry_run=dry_run),
         state={},  # loaded by each caller under project_lock + state_lock
     )
 
@@ -106,7 +106,7 @@ def _project_workers(ctx: _Ctx, states: tuple[str, ...] = ACTIVE_STATES) -> list
 
 def _stop_worker(ctx: _Ctx, ticket: TicketInfo, entry: dict[str, Any]) -> None:
     if ctx.provider.stop(ctx.proj_str, ticket.id):
-        entry.update({"state": "stopped", "ended_at": utc_now_iso()})
+        entry["state"] = "stopped"
         _note(ticket.path, f"ticket closed; stopped worker `{ticket.id}`.")
         ctx.telemetry.log_event("INFO", f"{ticket.id}: ticket closed, worker stopped", ticket_id=ticket.id)
         return
@@ -118,11 +118,16 @@ def _stop_worker(ctx: _Ctx, ticket: TicketInfo, entry: dict[str, Any]) -> None:
 
 def _remove_worker(ctx: _Ctx, tid: str, entry: dict[str, Any], reason: str, ticket: TicketInfo | None) -> None:
     """Stop and delete the ticket's Scion agent, keeping its branch. Notes the ticket if it still exists."""
+    if not has_agent(entry):
+        # The start failed before Scion created an agent: nothing to stop, delete or note.
+        entry["state"] = "deleted"
+        ctx.telemetry.log_event("INFO", f"{tid}: {reason}; no Scion agent to remove", ticket_id=tid)
+        return
     if entry.get("state") in ACTIVE_STATES:
         ctx.provider.stop(ctx.proj_str, tid)  # best effort; delete removes a stopped agent either way
     ok = ctx.provider.delete(ctx.proj_str, tid, preserve_branch=True)
     # Marked deleted even on failure so a missing agent is not retried (and re-noted) on every save.
-    entry.update({"state": "deleted", "ended_at": utc_now_iso()})
+    entry.update({"state": "deleted", "agent": False})
     branch = entry.get("branch") or tid
     if ticket is not None:
         if ok:
@@ -141,9 +146,7 @@ def _refresh(ctx: _Ctx) -> None:
     # shortcut: worker reports are picked up on the next save or `sync`, not when written; subscribe to
     # Scion notifications (`scion notifications subscribe --triggers COMPLETED,WAITING_FOR_INPUT`) when
     # review latency matters.
-    review_tag = ctx.tag("review", "waiting-for-review")
-    claim_tag = ctx.tag("claim", "taskforce")
-    ignore_tag = ctx.tag("ignore", "no-taskforce")
+    claim_tag, ignore_tag, review_tag = tags(ctx.cfg)
     tickets = load_all_tickets(ctx.project)
     for entry in _project_workers(ctx, LIVE_STATES):
         tid = str(entry.get("ticket_id", ""))
@@ -172,7 +175,7 @@ def _refresh(ctx: _Ctx) -> None:
         elif ticket.status == "closed":
             _stop_worker(ctx, ticket, entry)
         elif review_tag in ticket.tags and entry.get("state") == "running":
-            if pause_worker_for_ticket(ctx.project, ticket, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state, reason=review_tag):
+            if pause_worker_for_ticket(ctx.project, ticket, ctx.telemetry, ctx.provider, ctx.state, reason=review_tag):
                 ctx.paused += 1
     save_state(ctx.state)
 
@@ -190,20 +193,12 @@ def _start(ctx: _Ctx, ticket: TicketInfo, ack: str) -> bool:
         ok = dispatch_ticket(ctx.project, ticket, ctx.cfg, ctx.telemetry, ctx.provider, ctx.state)
     except DispatchError as exc:
         ctx.errors += 1
+        ctx.error = str(exc)
         ctx.telemetry.log_event("ERROR", f"{ticket.id}: could not start a Scion worker: {exc}", ticket_id=ticket.id)
         # Record the failure so the queue does not retry it on every save of another ticket;
-        # a save of this ticket or `sync` retries it.
+        # a save of this ticket or `sync` retries it. Keeps the entry's `agent` flag.
         entry = ctx.workers.setdefault(_worker_key(ctx.proj_str, ticket.id), {})
-        entry.update(
-            {
-                "ticket_id": ticket.id,
-                "project_dir": ctx.proj_str,
-                "provider": ctx.provider.provider_name,
-                "state": "error",
-                "error": str(exc),
-                "ended_at": utc_now_iso(),
-            }
-        )
+        entry.update({"ticket_id": ticket.id, "project_dir": ctx.proj_str, "state": "error", "error": str(exc)})
         _note(
             ticket.path,
             f"could not start a Scion worker: {failure_hint(str(exc), ticket.id)}\n"
@@ -214,7 +209,8 @@ def _start(ctx: _Ctx, ticket: TicketInfo, ack: str) -> bool:
         branch = ctx.workers.get(_worker_key(ctx.proj_str, ticket.id), {}).get("branch", ticket.id)
         _note(ticket.path, f"started Scion worker `{ticket.id}` on branch `{branch}`.")
     else:
-        _note(ticket.path, f"a worker named `{ticket.id}` already exists in Scion; not starting another.")
+        ctx.error = f"a worker named `{ticket.id}` already exists in Scion; not starting another"
+        _note(ticket.path, f"{ctx.error}.")
     return ok
 
 
@@ -268,8 +264,16 @@ def on_save(
     return summary + (f"; started {started} queued" if started else "")
 
 
+def _waiting_on(ctx: _Ctx, ticket: TicketInfo) -> list[str]:
+    """Dependencies of ``ticket`` that are not closed yet (empty when it is ready)."""
+    if ticket.id in {t.id for t in get_ready_tickets(ctx.project)}:
+        return []
+    tickets = load_all_tickets(ctx.project)
+    return [d for d in ticket.deps if d not in tickets or tickets[d].status != "closed"]
+
+
 def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
-    claim_tag = ctx.tag("claim", "taskforce")
+    claim_tag = tags(ctx.cfg)[0]
     entry = ctx.workers.get(_worker_key(ctx.proj_str, ticket.id))
     active = bool(entry) and entry.get("state") in ACTIVE_STATES
 
@@ -296,9 +300,8 @@ def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
     eligible, reason = is_eligible_for_dispatch(ticket, ctx.cfg)
     if not eligible:
         return f"{ticket.id}: {reason}"
-    if ticket.id not in {t.id for t in get_ready_tickets(ctx.project)}:
-        tickets = load_all_tickets(ctx.project)
-        waiting = [d for d in ticket.deps if d not in tickets or tickets[d].status != "closed"]
+    waiting = _waiting_on(ctx, ticket)
+    if waiting:
         _note(ticket.path, f"request noted; waiting on dependencies: {', '.join(waiting)}.")
         return f"{ticket.id}: waiting on deps"
     has_slot, busy, limit = _has_slot(ctx)
@@ -307,6 +310,32 @@ def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
         return f"{ticket.id}: queued"
     ok = _start(ctx, ticket, "request noted; no existing worker found, starting a new Scion worker.")
     return f"{ticket.id}: started={ok}"
+
+
+def dispatch_now(
+    project_dir: str | Path,
+    ticket_path: Path,
+    explicit_config: str | None = None,
+    dry_run: bool = False,
+) -> tuple[bool, str]:
+    """`dispatch <id>`: the on-save checks (opt-in tag, status, dependencies) without the worker limit.
+    Returns ``(started, reason)``."""
+    ctx = _context(project_dir, explicit_config, dry_run)
+    with project_lock(ctx.project), state_lock():
+        ctx.state = load_state()
+        ticket = parse_ticket_file(ticket_path, project_dir=ctx.project)
+        entry = ctx.workers.get(_worker_key(ctx.proj_str, ticket.id), {})
+        if entry.get("state") in ACTIVE_STATES:
+            return False, f"its worker is already {entry['state']}"
+        eligible, reason = is_eligible_for_dispatch(ticket, ctx.cfg)
+        if not eligible:
+            return False, reason
+        waiting = _waiting_on(ctx, ticket)
+        if waiting:
+            return False, f"waiting on dependencies: {', '.join(waiting)}"
+        ok = _start(ctx, ticket, "dispatched by hand; starting a new Scion worker (worker limit ignored).")
+        save_state(ctx.state)
+    return ok, ctx.error
 
 
 def collect_reports(project_dir: str | Path, explicit_config: str | None = None) -> None:
@@ -339,14 +368,36 @@ def sync_project(
                     continue
                 live = ctx.provider.health(ctx.proj_str, ticket.id)
                 if live is None or not live.is_running:
-                    mark_worker_lost(
-                        ctx.project, ticket, ctx.telemetry, ctx.provider, ctx.state, live.state if live else "missing"
-                    )
+                    mark_worker_lost(ctx.project, ticket, ctx.telemetry, ctx.state, live.state if live else "missing")
                     stats["lost"] += 1
         stats["started"] = _start_queued(ctx, retry_errors=True)
         stats["paused"], stats["errors"] = ctx.paused, ctx.errors + stats["lost"]
         save_state(ctx.state)
     return stats
+
+
+def project_agents(project_dir: str | Path) -> list[str]:
+    """Ticket IDs of this project's workers that may still hold a Scion agent."""
+    proj_str = normalize_project_dir(project_dir)
+    workers = load_state().get("workers", {}).values()
+    return sorted(
+        str(w.get("ticket_id")) for w in workers
+        if w.get("project_dir") == proj_str and w.get("state") in LIVE_STATES and has_agent(w)
+    )
+
+
+def remove_project_workers(project_dir: str | Path, explicit_config: str | None = None, dry_run: bool = False) -> int:
+    """Stop and delete every Scion agent of this project (branches kept), for `uninit`."""
+    ctx = _context(project_dir, explicit_config, dry_run)
+    with project_lock(ctx.project), state_lock():
+        ctx.state = load_state()
+        tickets = load_all_tickets(ctx.project)
+        entries = [e for e in _project_workers(ctx, LIVE_STATES) if has_agent(e)]
+        for entry in entries:
+            tid = str(entry.get("ticket_id", ""))
+            _remove_worker(ctx, tid, entry, "task force removed from this project", tickets.get(tid))
+        save_state(ctx.state)
+    return len(entries)
 
 
 # --------------------------------------------------------------------------- hook install

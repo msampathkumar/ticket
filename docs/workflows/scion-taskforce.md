@@ -1,131 +1,68 @@
 ---
 title: SCION Task Force Workflow
-description: Autonomous multi-agent engineering workflows with 1:1 ticket workers, SCION Hub execution, and human review checkpoints.
+description: Delegate a ticket to a SCION coding agent, review its report, send feedback and close.
 ---
 
-The **SCION Task Force Workflow** allows teams to delegate actionable engineering tasks directly to autonomous coding agents while maintaining oversight through human review checkpoints.
-
----
-
-## Lifecycle Overview
+This workflow hands well-scoped tickets to AI coding agents while you keep the review and the merge. Set up the plugin first with the [SCION Task Force guide](../plugins/scion-taskforce.md); it also holds the command reference and troubleshooting.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Developer as Human Developer
-    participant TK as ticket (.tickets/)
-    participant TF as Task Force Orchestrator
-    participant Hub as SCION Hub (:8080)
-    participant Worker as Autonomous AI Worker
+    actor Dev as Developer
+    participant TK as tk (.tickets/)
+    participant TF as on-save hook
+    participant W as Scion worker
 
-    Developer->>TF: tk scion-taskforce init (installs post-write hook)
-    Developer->>TF: tk scion-taskforce test (Verify setup)
-    Developer->>TK: Creates or updates ticket tagged 'taskforce'
-    TK->>TF: post-write hook runs `on-save <id>`
-    TF->>TK: Note: request noted
-    TF->>Hub: Starts 1:1 worker (or forwards update to existing worker)
-    Worker->>Worker: Writes code & executes tests
-    Worker->>TK: Adds notes & tag `waiting-for-review`
-    TF->>Worker: Next save or `sync` merges notes, pauses worker
-    Developer->>TK: Reviews notes & diffs in Web UI
-    alt Additional Changes Needed
-        Developer->>TK: tk add-note <id> "..." (forwarded by hook)
-        TF->>Worker: Delivers feedback
-    else Approved
-        Developer->>TK: tk close <id>
-        TF->>Hub: Stops worker
-    end
+    Dev->>TK: tk create ... --tags taskforce
+    TK->>TF: post-write hook (background)
+    TF->>W: scion start (verified), ticket in_progress
+    W->>TK: report note + waiting-for-review
+    TF->>W: next save or sync: pause
+    Dev->>TK: tk add-note (feedback)
+    TK->>TF: post-write hook
+    TF->>W: forward note, wake worker
+    Dev->>TK: tk close
+    TF->>W: stop worker, start next queued ticket
 ```
 
----
+## 1. Tag the ticket
 
-## Step-by-Step Walkthrough
-
-### 1. Initialize Task Force for Your Project
-
-Run the setup wizard to configure orchestrator defaults and seed the project worker template:
+Write clear acceptance criteria, then add the opt-in tag. The save starts a worker on a branch named after the ticket ID.
 
 ```bash
-# Guided interactive setup
-tk scion-taskforce init
-
-# Or 1-step non-interactive initialization
-tk scion-taskforce init --defaults
-```
-
-This creates:
-- `.scion-taskforce/scion-taskforce.yaml`: Project orchestrator configuration.
-- `.scion/templates/tk-worker-gemini-cli-with-api-key-auth/`: Worker template with custom instructions.
-- `.tickets/.hooks/post-write.d/scion-taskforce`: Hook that dispatches on each ticket save.
-- A one-time Scion Hub link for the project folder.
-
-### 2. Verify the Pipeline End to End
-
-`init` offers this check at the end. Run it any time with:
-
-```bash
-tk scion-taskforce test            # --timeout 600, --keep to leave the ticket open
-```
-
-It creates a ticket tagged `init,taskforce` and waits for the real path to complete: save hook, `on-save`, worker start, worker note plus `waiting-for-review` merged back. The ticket is closed on success. A failure usually means the Hub or runtime is down, or the worker lacks credentials (`GEMINI_API_KEY` as a Hub secret for gemini-cli; ADC for Vertex AI).
-
-If another worker holds the only slot, the check queues until it frees. Use `tk scion-taskforce test --raw` to launch a worker directly without a ticket.
-
-### 3. Tag Actionable Work for Autonomous Execution
-
-Delegate actionable tickets to autonomous workers by adding the `taskforce` tag:
-
-```bash
-tk create "Add input sanitization to auth endpoints" \
-  -p 1 \
+tk create "Add input sanitization to auth endpoints" -p 1 \
   --tags backend,taskforce \
-  --acceptance "Run make test and ensure all pass"
+  --acceptance "make test passes; invalid input returns 400"
 ```
 
-### 4. Save-Triggered Dispatch
+If the ticket has open dependencies, it waits for them. If all worker slots are busy, it queues. Either way, a `**Task Force:**` note on the ticket says why.
 
-`init` installs `.tickets/.hooks/post-write.d/scion-taskforce`, which `tk` runs in the background after every successful write (CLI or Web UI). For a ticket tagged `taskforce`, the hook appends a `**Task Force:**` note and then:
+## 2. Review the report
 
-| Ticket state | Action |
-|--------------|--------|
-| Open, dependencies closed, slot free | Starts a Scion worker named after the ticket ID |
-| Dependencies still open | Notes "waiting on dependencies" |
-| No free slot | Notes "queued"; starts when a slot frees |
-| Worker already active, human note added | Forwards the note to the worker |
-| Closed | Stops the worker, starts the next queued ticket |
+The worker commits on its branch, adds a report note and tags the ticket `waiting-for-review`. The next save in the project, or `tk scion-taskforce sync`, merges the report and pauses the worker.
 
 ```bash
-# Catch up on changes the hook cannot see (hand edits, git pull, worker edits)
 tk scion-taskforce sync
-
-# Check workers
-tk scion-taskforce list
+tk show <id>
+git diff main...<id>
 ```
 
-### 5. Review Checkpoint & Feedback
+## 3. Send feedback
 
-When the worker finishes writing code and passing local tests, it adds verification notes and the `waiting-for-review` tag. The next save or `sync` merges those notes into the project ticket, pauses the worker, and frees its slot.
-
-Inspect the work in the Web UI (`http://localhost:8475`) or CLI:
+Add a note. The hook forwards it to the worker, wakes it and removes `waiting-for-review`.
 
 ```bash
-tk show <ticket-id>
+tk add-note <id> "Also reject empty usernames"
 ```
 
-If modifications are needed, add a note. The hook forwards it to the worker:
+`tk scion-taskforce feedback <id> "..."` does the same in one command. For a live conversation, run `tk scion-taskforce attach <id>`.
+
+## 4. Close the ticket
+
+Merge the branch the usual way, then close the ticket. Closing stops the worker, unblocks dependent tickets and starts the next queued one.
 
 ```bash
-tk add-note <ticket-id> "Fix the edge case in auth validation"
+tk close <id>
 ```
 
-`tk scion-taskforce feedback <ticket-id> "..."` does the same and also resumes a paused worker.
-
-### 6. Human Approval & Ticket Closure
-
-Once satisfied with the changes and test results, close the ticket:
-
-```bash
-tk close <ticket-id>
-```
-
-Closing the ticket unblocks downstream tasks in your dependency DAG and stops its worker immediately.
+`tk scion-taskforce gc` deletes the stopped worker 5 days later. The branch is kept.

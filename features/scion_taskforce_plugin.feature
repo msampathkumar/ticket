@@ -10,6 +10,11 @@ Feature: SCION Task Force Plugin
     And the output should contain "scion-taskforce"
     And the output should contain "Autonomous SCION task force orchestrator"
 
+  Scenario: The user guide lists every command from the help text
+    When I run "ticket scion-taskforce help"
+    Then the command should succeed
+    And every command line in the output should appear in the repo file "docs/plugins/scion-taskforce.md"
+
   Scenario: Initialize project scion-taskforce.yaml config
     Given a clean tickets directory
     When I run "ticket scion-taskforce init"
@@ -20,7 +25,30 @@ Feature: SCION Task Force Plugin
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "review: waiting-for-review"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "max_concurrent_per_project: 1"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "retention_days: 30"
-    And the file ".scion-taskforce/prompt.md" should contain "Default Scion Task Force Prompt Template"
+    And the file ".scion-taskforce/prompt.md" should not exist
+
+  Scenario: Re-running init keeps edited config values and template files
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    And I run "sed -i.bak 's/gc_retention_days: 5/gc_retention_days: 9/' .scion-taskforce/scion-taskforce.yaml"
+    And I run "echo '# my edit' >> .scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md"
+    And I run "ticket scion-taskforce init"
+    Then the command should succeed
+    And the output should contain "kept your existing values"
+    And the file ".scion-taskforce/scion-taskforce.yaml" should contain "gc_retention_days: 9"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "# my edit"
+    When I run "ls .scion-taskforce"
+    Then the output should not contain ".old"
+    When I run "ticket scion-taskforce init --force"
+    Then the file ".scion-taskforce/scion-taskforce.yaml" should contain "gc_retention_days: 5"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should not contain "# my edit"
+
+  Scenario: test --raw was removed and points to the ticket-based test
+    Given a clean tickets directory
+    When I run "ticket scion-taskforce test --raw"
+    Then the exit code should be 2
+    And the output should contain "`--raw` was removed; `tk scion-taskforce test` verifies end to end through a ticket"
 
   Scenario: Init wizard offers menus, validates input and saves Vertex AI project and region
     Given a clean tickets directory
@@ -227,6 +255,27 @@ Feature: SCION Task Force Plugin
     And the output should contain "deleted_closed_pods=1 (retention=5d)"
     And the output should contain "retention=30d"
 
+  Scenario: gc keeps the worker entry when scion delete fails
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And a ticket exists with ID "tf-0022" and title "Delete fails"
+    And ticket "tf-0022" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0022"
+    Then the command should succeed
+    Given ticket "tf-0022" has status "closed"
+    And the environment variable "FAKE_SCION_FAIL_CMDS" is "delete"
+    When I run "ticket scion-taskforce gc --force"
+    Then the command should succeed
+    And the output should contain "deleted_closed_pods=0"
+    When I run "ticket scion-taskforce list"
+    Then the output should contain "running"
+    When I run "ticket scion-taskforce logs"
+    Then the output should contain "GC could not delete worker pod tf-0022"
+    Given the environment variable "FAKE_SCION_FAIL_CMDS" is ""
+    When I run "ticket scion-taskforce gc --force"
+    Then the output should contain "deleted_closed_pods=1"
+    And the fake scion runtime should have 0 pod(s)
+
   Scenario: A pull-request ticket gets a review brief, a normal ticket gets an implementation brief
     Given a clean tickets directory
     And a fake "scion" runtime in mode "ok"
@@ -407,6 +456,25 @@ Feature: SCION Task Force Plugin
     When I run "ticket scion-taskforce hook status"
     Then the output should contain "not installed"
 
+  Scenario: uninit asks before stopping workers and --yes deletes them first
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    And I run "ticket create 'Busy' --tags taskforce"
+    And I run "ticket scion-taskforce sync"
+    Then the fake scion runtime should have 1 pod(s)
+    When I run "printf 'n\n' | ticket scion-taskforce uninit"
+    Then the command should fail
+    And the output should contain "stops and deletes 1 Scion worker(s)"
+    And the output should contain "Aborted; nothing was changed"
+    And the fake scion runtime should have 1 pod(s)
+    And the file ".tickets/.hooks/post-write.d/scion-taskforce" should contain "on-save"
+    When I run "ticket scion-taskforce uninit --yes"
+    Then the command should succeed
+    And the output should contain "Stopped and deleted 1 worker(s)"
+    And the output should contain "Removed save hook"
+    And the fake scion runtime should have 0 pod(s)
+
   Scenario: Removed daemon commands fail with a migration hint
     Given a clean tickets directory
     When I run "ticket scion-taskforce start"
@@ -576,6 +644,18 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0261" should contain "request noted" 1 time(s)
     When I run "ticket update tf-0261 --priority 1"
     Then ticket "tf-0261" should contain "could not start a Scion worker" 2 time(s)
+
+  Scenario: Untagging a ticket whose worker never started writes no removal note
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "fail"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0263" and title "Never started"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0263 --tags taskforce"
+    Then ticket "tf-0263" should contain "could not start a Scion worker" 1 time(s)
+    When I run "ticket update tf-0263 --tags docs"
+    Then ticket "tf-0263" should not contain "could not remove worker"
+    And ticket "tf-0263" should not contain "stopped and removed worker"
 
   Scenario: A failed stop keeps the worker's slot and notes only a short reason
     Given a clean tickets directory
