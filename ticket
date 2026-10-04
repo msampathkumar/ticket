@@ -367,6 +367,7 @@ cmd_create() {
         fi
     } > "$file"
 
+    _TK_HOOK_ID="$id"
     echo "$id"
 }
 
@@ -2090,6 +2091,36 @@ EOF
     esac
 }
 
+# Post-write hooks: after a successful write, run every executable in
+# $TICKETS_DIR/.hooks/post-write.d/ (opt-in per project; no folder = no-op).
+# Hooks run in the background so saves never wait; TK_HOOKS_SYNC=1 runs them inline.
+# Hooks inherit TK_HOOK_DEPTH=1, and nested tk calls skip hooks (no event loops).
+HOOK_EVENTS="create start close reopen status update add-note dep undep link unlink edit"
+
+run_hooks() {
+    local event="$1" id="$2"
+    [[ -n "${TK_HOOK_DEPTH:-}" || -n "${TK_NO_HOOKS:-}" || -z "$id" ]] && return 0
+    local hook_dir="$TICKETS_DIR/.hooks/post-write.d"
+    [[ -d "$hook_dir" ]] || return 0
+    local file abs_dir hook
+    file=$(ticket_path "$id" 2>/dev/null) || return 0
+    abs_dir=$(cd "$TICKETS_DIR" && pwd)
+    file="$abs_dir/$(basename "$file")"
+    for hook in "$hook_dir"/*; do
+        [[ -f "$hook" && -x "$hook" ]] || continue
+        if [[ -n "${TK_HOOKS_SYNC:-}" ]]; then
+            TK_HOOK_DEPTH=1 TK_EVENT="$event" TK_TICKET_ID="$(basename "$file" .md)" \
+                TK_TICKET_FILE="$file" TICKETS_DIR="$abs_dir" TK_SCRIPT="$TK_SCRIPT" \
+                "$hook" </dev/null >>"$abs_dir/.hooks/hooks.log" 2>&1 || true
+        else
+            TK_HOOK_DEPTH=1 TK_EVENT="$event" TK_TICKET_ID="$(basename "$file" .md)" \
+                TK_TICKET_FILE="$file" TICKETS_DIR="$abs_dir" TK_SCRIPT="$TK_SCRIPT" \
+                nohup "$hook" </dev/null >>"$abs_dir/.hooks/hooks.log" 2>&1 &
+        fi
+    done
+    return 0
+}
+
 # Main dispatch
 
 # Handle 'super' to bypass plugins
@@ -2133,6 +2164,10 @@ case "${1:-help}" in
 esac
 
 # Built-in commands
+_tk_cmd="${1:-help}"
+_tk_arg1="${2:-}"
+_TK_HOOK_ID=""
+TK_SCRIPT="${TK_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/$(basename "$0")}"
 case "${1:-help}" in
     init)   shift; cmd_init "$@" ;;
     uninit) shift; cmd_uninit "$@" ;;
@@ -2168,3 +2203,12 @@ case "${1:-help}" in
         exit 1
         ;;
 esac
+
+# Reached only when the command succeeded (set -e exits on failure).
+if [[ " $HOOK_EVENTS " == *" $_tk_cmd "* ]]; then
+    case "$_tk_cmd:$_tk_arg1" in
+        dep:tree|dep:cycle) ;;
+        create:*) run_hooks "$_tk_cmd" "$_TK_HOOK_ID" ;;
+        *) run_hooks "$_tk_cmd" "$_tk_arg1" ;;
+    esac
+fi

@@ -16,6 +16,8 @@ description: Environment variables, directory discovery, and default settings fo
 | `AGENTS_SKILLS_DIR` | Target installation directory when running `tk agent-skill --install`. | `$HOME/.agents/skills/tk` |
 | `TK_SCRIPT` | Path to the root `tk` executable. Automatically exported to plugins. | Auto-detected path to `tk` |
 | `NO_COLOR` | Disables ANSI color output when set to any non-empty value. | Unset (colors enabled) |
+| `TK_NO_HOOKS` | Skips post-write hooks (`.tickets/.hooks/post-write.d/`) for the command. See [SPEC §5.1](../SPEC.md). | Unset (hooks run) |
+| `TK_HOOKS_SYNC` | Runs post-write hooks inline instead of in the background. | Unset (background) |
 
 ---
 

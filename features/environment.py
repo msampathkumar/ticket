@@ -16,6 +16,21 @@ def before_all(context):
     if plugins_dir.exists():
         os.environ['PATH'] = str(plugins_dir) + ':' + os.environ.get('PATH', '')
 
+    # Never let the suite reach the developer's real `scion`/Hub: a real `scion hub link` on a
+    # temp dir creates a stray Hub project (`ticket-test-xxxxxxxx`). Scenarios that need a runtime
+    # install the fake `scion` in context.plugin_dir, which is prepended later and wins.
+    context.scion_guard_dir = tempfile.mkdtemp(prefix='tk_scion_guard_')
+    guard = Path(context.scion_guard_dir) / 'scion'
+    guard.write_text('#!/bin/sh\necho "real scion is blocked in tests" >&2\nexit 97\n')
+    guard.chmod(0o755)
+    os.environ['PATH'] = context.scion_guard_dir + ':' + os.environ['PATH']
+
+
+def after_all(context):
+    """Remove the scion guard directory."""
+    if getattr(context, 'scion_guard_dir', None) and os.path.exists(context.scion_guard_dir):
+        shutil.rmtree(context.scion_guard_dir)
+
 
 def before_scenario(context, scenario):
     """Create a fresh temporary directory for each scenario."""
@@ -40,7 +55,8 @@ def after_scenario(context, scenario):
         shutil.rmtree(context.test_dir)
     if hasattr(context, 'plugin_dir') and os.path.exists(context.plugin_dir):
         shutil.rmtree(context.plugin_dir)
-    for var in ('FAKE_SCION_STATE', 'FAKE_SCION_MODE', 'XDG_CONFIG_HOME'):
+    for var in ('FAKE_SCION_STATE', 'FAKE_SCION_MODE', 'FAKE_SCION_HUB', 'XDG_CONFIG_HOME',
+                'TK_HOOKS_SYNC', 'TK_HOOK_DEPTH', 'TK_NO_HOOKS'):
         os.environ.pop(var, None)
 
 

@@ -127,3 +127,13 @@ Following the frontmatter, the Markdown body contains:
    - Optionality: Except for `tk-webui`, all plugins are optional.
    - Metadata discovery: `# tk-plugin: <description>` comment in header or `--tk-describe` flag for `tk help` discovery.
    - Version contract: `--version` flag for standardized version reporting.
+
+### 5.1 Post-Write Hooks
+
+After a successful write, `tk` runs every executable file in `$TICKETS_DIR/.hooks/post-write.d/` (lexical order). Plugins use this to react to saves without polling; `tk scion-taskforce init` installs one.
+
+- **Events** (`TK_EVENT`): `create`, `start`, `close`, `reopen`, `status`, `update`, `add-note`, `dep`, `undep`, `link`, `unlink`, `edit`. Read-only commands, `dep tree`, `dep cycle`, and failed writes fire nothing.
+- **Environment**: `TK_EVENT`, `TK_TICKET_ID` (full ID), `TK_TICKET_FILE`, `TICKETS_DIR` (absolute), `TK_SCRIPT`, `TK_HOOK_DEPTH=1`.
+- **Execution**: background (`nohup`) by default; inline when `TK_HOOKS_SYNC=1`. Output is appended to `.tickets/.hooks/hooks.log`. Hook exit codes never change the `tk` exit code.
+- **Recursion guard**: hooks are skipped when `TK_HOOK_DEPTH` is set, so a hook calling `tk` does not re-trigger itself. Set `TK_NO_HOOKS=1` to disable hooks for one command.
+- The Web UI writes through the `tk` CLI, so its saves fire the same hooks. Hand edits and `git pull` do not.

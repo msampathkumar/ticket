@@ -851,6 +851,19 @@ if cmd == "delete":
     d.pop(name, None); save(d); sys.exit(0)
 if cmd == "logs":
     print(f"logs {name}"); sys.exit(0)
+if cmd == "hub":
+    # FAKE_SCION_HUB=linked|unlinked simulates a reachable Hub; unset = no Hub output.
+    hub_file = state_file + ".hub"
+    hub = json.load(open(hub_file)) if os.path.exists(hub_file) else {
+        "linked": os.environ.get("FAKE_SCION_HUB") == "linked", "calls": []}
+    hub["calls"].append(name)
+    if name == "link":
+        hub["linked"] = True
+    json.dump(hub, open(hub_file, "w"))
+    if name == "status" and os.environ.get("FAKE_SCION_HUB"):
+        print("Connection: ok")
+        print("Linked: " + ("yes" if hub["linked"] else "no"))
+    sys.exit(0)
 sys.exit(0)
 '''
 
@@ -861,6 +874,85 @@ def step_fake_scion(context, mode):
     create_plugin(context, 'scion', FAKE_SCION_SCRIPT)
     os.environ['FAKE_SCION_STATE'] = str(Path(context.test_dir) / 'fake_scion_state.json')
     os.environ['FAKE_SCION_MODE'] = mode
+
+
+@given(r'the fake Scion Hub reports the project as "(?P<hub_state>linked|unlinked)"')
+def step_fake_scion_hub(context, hub_state):
+    """Simulate a reachable Scion Hub with the project linked or not."""
+    os.environ['FAKE_SCION_HUB'] = hub_state
+
+
+def _fake_hub_calls():
+    hub_file = Path(os.environ['FAKE_SCION_STATE'] + '.hub')
+    return json.loads(hub_file.read_text()).get('calls', []) if hub_file.exists() else []
+
+
+@then(r'the fake Scion Hub should have received "(?P<call>[^"]+)" (?P<times>\d+) time\(s\)')
+def step_fake_scion_hub_calls(context, call, times):
+    """Assert how often a `scion hub <call>` subcommand ran."""
+    calls = _fake_hub_calls()
+    assert calls.count(call) == int(times), f"Expected hub {call!r} x{times}, got calls: {calls}"
+
+
+# ============================================================================
+# Post-write hook steps (core) and event-driven task force
+# ============================================================================
+
+RECORD_HOOK = '''#!/bin/sh
+echo "$TK_EVENT $TK_TICKET_ID depth=$TK_HOOK_DEPTH file=$(basename "$TK_TICKET_FILE")" >> "$TICKETS_DIR/../hook-calls.log"
+'''
+
+
+@given(r'a post-write hook that records events')
+def step_recording_hook(context):
+    """Install a hook that appends '<event> <id> ...' to hook-calls.log; run hooks inline."""
+    hook = Path(context.test_dir) / '.tickets' / '.hooks' / 'post-write.d' / 'record'
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(RECORD_HOOK)
+    hook.chmod(0o755)
+    os.environ['TK_HOOKS_SYNC'] = '1'
+
+
+@given(r'the environment variable "(?P<name>[A-Z_]+)" is "(?P<value>[^"]*)"')
+def step_set_env(context, name, value):
+    os.environ[name] = value
+
+
+def _hook_log(context):
+    log = Path(context.test_dir) / 'hook-calls.log'
+    return log.read_text() if log.exists() else ''
+
+
+@then(r'the hook log should contain "(?P<text>[^"]+)"')
+def step_hook_log_contains(context, text):
+    log = _hook_log(context)
+    assert text in log, f"Expected hook log to contain {text!r}\nLog:\n{log}"
+
+
+@then(r'the hook log should not contain "(?P<text>[^"]+)"')
+def step_hook_log_not_contains(context, text):
+    log = _hook_log(context)
+    assert text not in log, f"Expected hook log NOT to contain {text!r}\nLog:\n{log}"
+
+
+@then(r'the hook log should be empty')
+def step_hook_log_empty(context):
+    log = _hook_log(context)
+    assert log == '', f"Expected no hook calls, got:\n{log}"
+
+
+@then(r'ticket "(?P<ticket_id>[^"]+)" should contain "(?P<text>[^"]+)" (?P<times>\d+) time\(s\)')
+def step_ticket_contains_times(context, ticket_id, text, times):
+    content = (Path(context.test_dir) / '.tickets' / f'{ticket_id}.md').read_text()
+    assert content.count(text) == int(times), (
+        f"Expected {text!r} x{times} in {ticket_id}, found {content.count(text)}\n{content}")
+
+
+@then(r'the fake scion pod "(?P<pod>[^"]+)" should be in state "(?P<pod_state>[^"]+)"')
+def step_fake_scion_pod_state_is(context, pod, pod_state):
+    state_file = Path(os.environ['FAKE_SCION_STATE'])
+    pods = json.loads(state_file.read_text()) if state_file.exists() else {}
+    assert pods.get(pod) == pod_state, f"Expected pod {pod} in {pod_state!r}, fake runtime has: {pods}"
 
 
 @given(r'the scion-taskforce setting "(?P<key>[^"]+)" is "(?P<value>[^"]+)"')
