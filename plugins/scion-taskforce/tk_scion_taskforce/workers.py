@@ -1,17 +1,18 @@
-"""Multi-project reconciler loop, dispatcher, feedback relay, and GC for tk-scion-taskforce."""
+"""Worker lifecycle for tk-scion-taskforce: verified launch, pause, feedback relay, liveness, GC, locks."""
 
 from __future__ import annotations
 
-import signal
+import fcntl
+import hashlib
 import time
-import traceback
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from tk_scion_taskforce.config import load_config
-from tk_scion_taskforce.providers import WorkerProvider, get_provider
-from tk_scion_taskforce.server import load_state, normalize_project_dir, save_state
+from tk_scion_taskforce.providers import WorkerProvider
+from tk_scion_taskforce.state import get_state_dir, normalize_project_dir, save_state
 from tk_scion_taskforce.telemetry import (
     TelemetryManager,
     new_span_id,
@@ -23,9 +24,7 @@ from tk_scion_taskforce.tickets import (
     TicketInfo,
     add_ticket_tag,
     append_ticket_note,
-    get_ready_tickets,
     load_all_tickets,
-    merge_worker_ticket_copy,
     parse_ticket_file,
     remove_ticket_tag,
     resolve_ticket_path,
@@ -216,7 +215,7 @@ def _record_project_health(
     changed = prev.get("ok") is not ok
     health[proj_str] = {"ok": ok, "message": message, "checked_at": utc_now_iso()}
     if changed:
-        telemetry.log_daemon(
+        telemetry.log_event(
             "INFO" if ok else "ERROR",
             (
                 f"Provider runtime healthy for {proj_str}"
@@ -282,7 +281,7 @@ def dispatch_ticket(
     # 1. Idempotency: adopt an already-running pod with this ID instead of double-spawning.
     existing = provider.health(proj_str, ticket.id)
     if existing is not None and existing.is_running:
-        telemetry.log_daemon(
+        telemetry.log_event(
             "WARNING",
             f"Adopting pre-existing running worker {ticket.id} in {proj_str}",
             trace_id=trace_id,
@@ -292,9 +291,9 @@ def dispatch_ticket(
         # A dead pod left behind by a previous attempt (worker state 'error'/'deleted', or the
         # ticket was explicitly reopened by a human) is replaced; anything else is left alone.
         prev = state.get("workers", {}).get(wkey, {})
-        retry_ok = prev.get("state") in ("error", "deleted") or not prev
+        retry_ok = prev.get("state") in ("error", "deleted", "stopped") or not prev
         if retry_ok and provider.delete(proj_str, ticket.id, preserve_branch=True):
-            telemetry.log_daemon(
+            telemetry.log_event(
                 "WARNING",
                 f"Replaced stale {existing.state!r} pod for {ticket.id} in {proj_str} before relaunch",
                 trace_id=trace_id,
@@ -302,7 +301,7 @@ def dispatch_ticket(
             )
             existing = None  # the slot is free now; fall through to a fresh spawn
         else:
-            telemetry.log_daemon(
+            telemetry.log_event(
                 "WARNING",
                 f"Worker {ticket.id} already exists in state {existing.state!r}; "
                 f"not spawning (use 'tk scion-taskforce attach {ticket.id}' or delete the pod)",
@@ -342,7 +341,7 @@ def dispatch_ticket(
                 status_code="ERROR",
                 attributes={**base_attrs, "worker.state": "error", "error.message": err},
             )
-            telemetry.log_daemon(
+            telemetry.log_event(
                 "ERROR",
                 f"Spawn FAILED for {ticket.id} in {proj_str}; ticket left untouched: {err}",
                 trace_id=trace_id,
@@ -371,7 +370,7 @@ def dispatch_ticket(
             status_code="ERROR",
             attributes={**base_attrs, "worker.state": observed, "error.message": err},
         )
-        telemetry.log_daemon(
+        telemetry.log_event(
             "ERROR",
             f"Spawn verification FAILED for {ticket.id} in {proj_str}; ticket left untouched: {err}",
             trace_id=trace_id,
@@ -405,14 +404,14 @@ def dispatch_ticket(
     #       there too (``.tickets/`` may be untracked and therefore absent from a worktree).
     unblock_note = provider.post_spawn(proj_str, ticket.id, timeout_seconds=prompt_timeout)
     if unblock_note:
-        telemetry.log_daemon("INFO", f"{ticket.id}: {unblock_note}", trace_id=trace_id, ticket_id=ticket.id)
+        telemetry.log_event("INFO", f"{ticket.id}: {unblock_note}", trace_id=trace_id, ticket_id=ticket.id)
     workspace = provider.workspace_path(proj_str, ticket.id)
     if workspace is not None:
         ws_ticket = workspace / ".tickets" / ticket.path.name
         if not ws_ticket.exists():
             ws_ticket.parent.mkdir(parents=True, exist_ok=True)
             ws_ticket.write_text(ticket.path.read_text(encoding="utf-8"), encoding="utf-8")
-        telemetry.log_daemon(
+        telemetry.log_event(
             "INFO",
             f"{ticket.id}: isolated workspace {workspace}; ticket edits will be merged back",
             trace_id=trace_id,
@@ -445,7 +444,7 @@ def dispatch_ticket(
         status_code="OK",
         attributes={**base_attrs, "worker.state": "running", "worker.verified": True},
     )
-    telemetry.log_daemon(
+    telemetry.log_event(
         "INFO",
         f"Spawned & verified worker {ticket.id} in {proj_str} (branch={branch})",
         trace_id=trace_id,
@@ -521,7 +520,7 @@ def pause_worker_for_ticket(
             }
         ],
     )
-    telemetry.log_daemon(
+    telemetry.log_event(
         "INFO" if ok else "ERROR",
         f"Paused worker {ticket.id} in {proj_str} ({reason})"
         + ("" if ok else f" FAILED: {provider.last_error}"),
@@ -594,7 +593,7 @@ def mark_worker_lost(
         },
         events=[{"name": "worker.lost", "timestamp": utc_now_iso(), "attributes": {"reason": reason}}],
     )
-    telemetry.log_daemon(
+    telemetry.log_event(
         "ERROR",
         f"Worker {ticket.id} in {proj_str} lost: {reason}",
         trace_id=trace_id,
@@ -610,8 +609,8 @@ def mark_worker_lost(
         f"The SCION worker pod for `{ticket.id}` is `{observed_state}` and did not report back "
         "(no `waiting-for-review` tag). The ticket is left `in_progress` for triage.\n"
         f"- Inspect: `tk scion-taskforce logs {ticket.id}` / `scion --project {proj_str} logs {ticket.id}`\n"
-        f"- Retry: `tk reopen {ticket.id}` (keep the `taskforce` tag) — the daemon replaces the dead pod "
-        "and relaunches on the next pass.\n"
+        f"- Retry: `tk reopen {ticket.id}` (keep the `taskforce` tag) — the save hook replaces the dead pod "
+        "and relaunches it.\n"
         f"- Abandon: `tk reopen {ticket.id}` and remove the `taskforce` tag.",
     )
 
@@ -663,7 +662,7 @@ def send_feedback_to_worker(
     update_ticket_frontmatter(t_path, status="in_progress")
     ticket = parse_ticket_file(t_path, project_dir=project_dir)
 
-    # Also strip review_tag from the isolated workspace copy so reconcile doesn't re-merge and immediately re-pause
+    # Also strip review_tag from the isolated workspace copy so the next sync doesn't re-merge and immediately re-pause
     workspace = provider.workspace_path(project_dir, ticket.id)
     if workspace:
         worker_ticket = workspace / ".tickets" / t_path.name
@@ -710,7 +709,7 @@ def send_feedback_to_worker(
             }
         ],
     )
-    telemetry.log_daemon(
+    telemetry.log_event(
         "INFO" if ok else "ERROR",
         f"Woke worker {ticket.id} in {proj_str} with review feedback (cycle={cycles})"
         + ("" if ok else f" FAILED: {provider.last_error}"),
@@ -820,7 +819,7 @@ def run_gc(
                         }
                     ],
                 )
-                telemetry.log_daemon(
+                telemetry.log_event(
                     "INFO",
                     f"GC deleted worker pod {tid} in {proj_str} (closed_age_days={age_days})",
                     trace_id=trace_id,
@@ -854,226 +853,19 @@ def _count_running(workers: dict[str, dict[str, Any]], proj_str: str | None = No
     )
 
 
-def reconcile_once(
-    projects: list[str],
-    explicit_config: str | None = None,
-    dry_run: bool = False,
-    max_concurrent_override: int | None = None,
-) -> dict[str, int]:
-    """Execute one full multi-project reconciliation pass."""
-    state = load_state()
-    workers: dict[str, dict[str, Any]] = state.setdefault("workers", {})
-    stats = {
-        "spawned": 0, "paused": 0, "woken": 0, "lost": 0, "gc_deleted": 0, "logs_purged": 0, "errors": 0,
-    }
-
-    global_cfg = load_config(explicit_config=explicit_config)
-    watcher_cfg = global_cfg.get("watcher", {})
-    max_total = (
-        max_concurrent_override
-        if max_concurrent_override is not None
-        else int(watcher_cfg.get("max_concurrent", 10))
-    )
-
-    for raw_proj in projects:
-        proj_path = Path(normalize_project_dir(raw_proj))
-        proj_str = str(proj_path)
-        if not (proj_path / ".tickets").exists():
-            continue
-
-        proj_cfg = load_config(project_dir=proj_path, explicit_config=explicit_config)
-        proj_watcher = proj_cfg.get("watcher", {})
-        has_worktree = (proj_path / ".scion").is_dir()
-        configured_max = proj_watcher.get("max_concurrent_per_project", 1)
-        max_per_proj = 5 if (configured_max == 1 and has_worktree) else int(configured_max)
-        auto_pause = bool(proj_watcher.get("auto_pause_on_review", True))
-        auto_wake = bool(proj_watcher.get("auto_wake_on_feedback", True))
-        review_tag = str(proj_cfg.get("tags", {}).get("review", "waiting-for-review"))
-
-        telemetry = TelemetryManager(proj_cfg)
-        provider = get_provider(proj_cfg, dry_run=dry_run)
-        all_tickets = load_all_tickets(proj_path)
-
-        # 0. Workers with an isolated workspace edit *their* copy of the ticket; merge the
-        #    additive signals (notes, review tag) back into the project's .tickets/ first.
-        merged_any = False
-        for w_entry in list(workers.values()):
-            if w_entry.get("project_dir") != proj_str or w_entry.get("state") not in ("running", "paused"):
-                continue
-            tid = str(w_entry.get("ticket_id", ""))
-            t_info = all_tickets.get(tid)
-            if t_info is None:
-                continue
-            workspace = provider.workspace_path(proj_str, tid)
-            if workspace is None:
-                continue
-            merged = merge_worker_ticket_copy(t_info.path, workspace / ".tickets" / t_info.path.name, review_tag)
-            if merged["notes"] or merged["review_tag"]:
-                merged_any = True
-                telemetry.log_daemon(
-                    "INFO",
-                    f"{tid}: merged {merged['notes']} note(s)"
-                    + (f" and the '{review_tag}' tag" if merged["review_tag"] else "")
-                    + " from the worker workspace",
-                    ticket_id=tid,
-                )
-        if merged_any:
-            all_tickets = load_all_tickets(proj_path)
-
-        # 1. Existing tracked workers: review-pause or feedback-wake
-        for w_entry in list(workers.values()):
-            if w_entry.get("project_dir") != proj_str:
-                continue
-            tid = str(w_entry.get("ticket_id", ""))
-            t_info = all_tickets.get(tid)
-            if t_info is None:
-                continue
-
-            w_state = w_entry.get("state")
-            if auto_pause and w_state == "running" and review_tag in t_info.tags:
-                pause_worker_for_ticket(
-                    proj_path, t_info, proj_cfg, telemetry, provider, state, reason=review_tag
-                )
-                stats["paused"] += 1
-            elif (
-                auto_wake
-                and w_state == "paused"
-                and t_info.status == "in_progress"
-                and review_tag in t_info.tags
-                and t_info.last_note_hash
-                and t_info.last_note_hash != w_entry.get("last_note_hash", "")
-            ):
-                send_feedback_to_worker(
-                    proj_path,
-                    tid,
-                    feedback_message=None,
-                    config=proj_cfg,
-                    telemetry=telemetry,
-                    provider=provider,
-                    state=state,
-                    append_note_to_ticket=False,
-                )
-                stats["woken"] += 1
-
-        # 1b. Liveness: a tracked "running" worker whose pod is gone/stopped/crashed and that
-        #     never reported back (no review tag) is a ghost. Flag it so it stops occupying a
-        #     concurrency slot and the human sees why the ticket is still in_progress.
-        for w_entry in list(workers.values()):
-            if w_entry.get("project_dir") != proj_str or w_entry.get("state") != "running":
-                continue
-            tid = str(w_entry.get("ticket_id", ""))
-            t_info = all_tickets.get(tid)
-            if t_info is None or review_tag in t_info.tags:
-                continue
-            live = provider.health(proj_str, tid)
-            if live is not None and live.is_running:
-                continue
-            mark_worker_lost(proj_path, t_info, telemetry, provider, state, live.state if live else "missing")
-            stats["lost"] += 1
-            stats["errors"] += 1
-
-        # 2. Dispatch opted-in ready tickets up to the concurrency limits.
-        #    One preflight per project per pass; the first hard failure aborts this project.
-        candidates = [
-            t for t in get_ready_tickets(proj_path) if is_eligible_for_dispatch(t, proj_cfg)[0]
-        ]
-        if candidates:
-            pre = provider.preflight(proj_str)
-            _record_project_health(state, telemetry, proj_str, pre.ok, pre.message)
-            if not pre.ok:
-                stats["errors"] += 1
-                candidates = []
-
-        for candidate in candidates:
-            if _count_running(workers) >= max_total or _count_running(workers, proj_str) >= max_per_proj:
-                break
-            existing_w = workers.get(_worker_key(proj_path, candidate.id))
-            if existing_w and existing_w.get("state") in ("running", "paused"):
-                continue
-            try:
-                if dispatch_ticket(
-                    proj_path, candidate, proj_cfg, telemetry, provider, state, skip_preflight=True
-                ):
-                    stats["spawned"] += 1
-            except DispatchError as exc:
-                stats["errors"] += 1
-                if exc.abort_project:
-                    telemetry.log_daemon(
-                        "WARNING",
-                        f"Skipping remaining dispatches in {proj_str} this pass: {exc}",
-                        project=proj_str,
-                    )
-                    break
-
-        # 3. 5-day closed pod GC & 30-day log purge
-        deleted, purged = run_gc([proj_str], proj_cfg, telemetry, provider, state, force=False)
-        stats["gc_deleted"] += deleted
-        stats["logs_purged"] += purged
-
-    return stats
+def max_workers_per_project(proj_cfg: dict[str, Any], proj_path: Path) -> int:
+    """Per-project worker limit (project-local `.scion/` worktrees allow 5 when left at the default 1)."""
+    configured = proj_cfg.get("watcher", {}).get("max_concurrent_per_project", 1)
+    has_worktree = (proj_path / ".scion").is_dir()
+    return 5 if (configured == 1 and has_worktree) else int(configured)
 
 
-def run_daemon(
-    initial_projects: list[str] | None = None,
-    explicit_config: str | None = None,
-    poll_interval_override: int | None = None,
-    max_concurrent_override: int | None = None,
-    dry_run: bool = False,
-) -> int:
-    """Continuous background daemon reconciliation loop across all registered projects."""
-    running = True
-
-    def _handle_sig(_signum: int, _frame: Any) -> None:
-        nonlocal running
-        running = False
-
-    signal.signal(signal.SIGTERM, _handle_sig)
-    signal.signal(signal.SIGINT, _handle_sig)
-
-    state = load_state()
-    if initial_projects:
-        for p in initial_projects:
-            norm = normalize_project_dir(p)
-            if norm not in state["projects"]:
-                state["projects"].append(norm)
-        save_state(state)
-
-    cfg = load_config(explicit_config=explicit_config)
-    interval = (
-        poll_interval_override
-        if poll_interval_override is not None
-        else int(cfg.get("watcher", {}).get("poll_interval_seconds", 15))
-    )
-    telemetry = TelemetryManager(cfg)
-    telemetry.log_daemon(
-        "INFO",
-        f"tk-scion-taskforce daemon loop started (poll_interval={interval}s)",
-        projects=state.get("projects", []),
-    )
-
-    while running:
-        try:
-            current_state = load_state()
-            projects = list(current_state.get("projects", []))
-            if projects:
-                reconcile_once(
-                    projects=projects,
-                    explicit_config=explicit_config,
-                    dry_run=dry_run,
-                    max_concurrent_override=max_concurrent_override,
-                )
-        except Exception as exc:  # noqa: BLE001 - a bad pass must never kill the singleton daemon
-            telemetry.log_daemon(
-                "ERROR",
-                f"Reconcile pass crashed: {exc!r}",
-                traceback=traceback.format_exc(),
-            )
-            print(f"[tk-scion-taskforce] reconcile pass crashed: {exc!r}", flush=True)
-            traceback.print_exc()
-        for _ in range(max(1, interval * 2)):
-            if not running:
-                break
-            time.sleep(0.5)
-
-    telemetry.log_daemon("INFO", "tk-scion-taskforce daemon loop stopped cleanly")
-    return 0
+@contextmanager
+def project_lock(proj_path: Path) -> Iterator[None]:
+    """Hold the per-project lock so background hooks and manual commands never overwrite each other's state."""
+    lock_dir = get_state_dir() / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha1(str(proj_path).encode()).hexdigest()[:12]
+    with open(lock_dir / f"{project_slug(proj_path)}-{digest}.lock", "w", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        yield  # closing the file releases the flock

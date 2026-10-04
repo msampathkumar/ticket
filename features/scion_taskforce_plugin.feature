@@ -1,7 +1,7 @@
 Feature: SCION Task Force Plugin
   As a developer or autonomous orchestrator
-  I want to manage a global SCION task force across projects
-  So that tickets I opt in are claimed only after a verified worker launch, paused for review,
+  I want ticket saves to hand opted-in tickets to SCION workers
+  So that tickets are claimed only after a verified worker launch, paused for review,
   woken on feedback, and traced with OpenTelemetry
 
   Scenario: Help command discovers scion-taskforce plugin
@@ -22,29 +22,6 @@ Feature: SCION Task Force Plugin
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "retention_days: 30"
     And the file ".scion-taskforce/prompt.md" should contain "Default Scion Task Force Prompt Template"
 
-  Scenario: Multi-project registration and listing
-    Given a clean tickets directory
-    When I run "ticket scion-taskforce project add ."
-    Then the command should succeed
-    And the output should contain "Registered project with scion-taskforce"
-    When I run "ticket scion-taskforce project list"
-    Then the command should succeed
-    And the output should contain "Registered projects (1):"
-    When I run "ticket scion-taskforce project remove ."
-    Then the command should succeed
-    And the output should contain "Task force stopped for project"
-
-  Scenario: Per-project stop unregisters the project and stops the daemon when none remain
-    Given a clean tickets directory
-    When I run "ticket scion-taskforce project add ."
-    Then the command should succeed
-    When I run "ticket scion-taskforce stop ."
-    Then the command should succeed
-    And the output should contain "Task force stopped for project"
-    And the output should contain "No watched projects remain"
-    When I run "ticket scion-taskforce project list"
-    Then the output should contain "No projects registered"
-
   Scenario: Task force is opt-in - only tickets the user tagged taskforce are dispatched
     Given a clean tickets directory
     And a ticket exists with ID "tf-0001" and title "Opted-in task"
@@ -52,9 +29,9 @@ Feature: SCION Task Force Plugin
     And a ticket exists with ID "tf-0002" and title "Untagged task"
     And a ticket exists with ID "tf-0003" and title "Opted out task"
     And ticket "tf-0003" has tags "taskforce, no-taskforce"
-    When I run "ticket scion-taskforce dispatch --dry-run"
+    When I run "ticket scion-taskforce sync --dry-run"
     Then the command should succeed
-    And the output should contain "spawned=1"
+    And the output should contain "started=1"
     And ticket "tf-0001" should have field "status" with value "in_progress"
     And ticket "tf-0001" should contain "tags: [taskforce]"
     And ticket "tf-0002" should have field "status" with value "open"
@@ -76,9 +53,9 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0011" has tags "taskforce"
     And a ticket exists with ID "tf-0012" and title "Second"
     And ticket "tf-0012" has tags "taskforce"
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "spawned=0"
+    And the output should contain "started=0"
     And the output should contain "errors=1"
     And ticket "tf-0011" should have field "status" with value "open"
     And ticket "tf-0012" should have field "status" with value "open"
@@ -125,18 +102,18 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0042" has tags "taskforce"
     And a ticket exists with ID "tf-0043" and title "C" with priority 2
     And ticket "tf-0043" has tags "taskforce"
-    When I run "ticket scion-taskforce watch --once"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "spawned=2"
+    And the output should contain "started=2"
     And ticket "tf-0041" should have field "status" with value "in_progress"
     And ticket "tf-0042" should have field "status" with value "in_progress"
     And ticket "tf-0043" should have field "status" with value "open"
     And the fake scion runtime should have 2 pod(s)
     Given ticket "tf-0041" has tags "taskforce, waiting-for-review"
-    When I run "ticket scion-taskforce watch --once"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
     And the output should contain "paused=1"
-    And the output should contain "spawned=1"
+    And the output should contain "started=1"
     And ticket "tf-0043" should have field "status" with value "in_progress"
     And the fake scion runtime should have 3 pod(s)
 
@@ -148,7 +125,7 @@ Feature: SCION Task Force Plugin
     Then the command should succeed
     And ticket "tf-0010" should have field "status" with value "in_progress"
     Given ticket "tf-0010" has tags "taskforce, waiting-for-review"
-    When I run "ticket scion-taskforce watch --once --dry-run"
+    When I run "ticket scion-taskforce sync --dry-run"
     Then the command should succeed
     And the output should contain "paused=1"
     When I run "ticket scion-taskforce feedback tf-0010 \"Please add unit tests\" --dry-run"
@@ -189,9 +166,9 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0071" has external ref "gh-pr-2246"
     And a ticket exists with ID "tf-0072" and title "Implement retry in client"
     And ticket "tf-0072" has tags "taskforce"
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "spawned=2"
+    And the output should contain "started=2"
     And the fake scion prompt for "tf-0071" should contain "Your Job: Pull-Request Review"
     And the fake scion prompt for "tf-0071" should contain "gh pr checkout 2246"
     And the fake scion prompt for "tf-0071" should contain "never approve/merge"
@@ -220,13 +197,13 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0081" has tags "taskforce"
     And a ticket exists with ID "tf-0082" and title "Waiting for a slot"
     And ticket "tf-0082" has tags "taskforce"
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "spawned=1"
+    And the output should contain "started=1"
     And ticket "tf-0081" should have field "status" with value "in_progress"
     And ticket "tf-0082" should have field "status" with value "open"
     Given the fake scion pod "tf-0081" is in state "stopped"
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
     And the output should contain "lost=1"
     And ticket "tf-0081" should contain "Task Force: worker lost"
@@ -242,15 +219,15 @@ Feature: SCION Task Force Plugin
     And a fake "scion" runtime in mode "ok"
     And a ticket exists with ID "tf-0085" and title "Lost then retried"
     And ticket "tf-0085" has tags "taskforce"
-    When I run "ticket scion-taskforce dispatch"
-    Then the output should contain "spawned=1"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "started=1"
     Given the fake scion pod "tf-0085" is in state "stopped"
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the output should contain "lost=1"
     When I run "ticket reopen tf-0085"
-    And I run "ticket scion-taskforce dispatch"
+    And I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "spawned=1"
+    And the output should contain "started=1"
     And ticket "tf-0085" should have field "status" with value "in_progress"
     And the fake scion runtime should have 1 pod(s)
     When I run "ticket scion-taskforce logs"
@@ -262,8 +239,8 @@ Feature: SCION Task Force Plugin
     And a ticket exists with ID "tf-0090" and title "Isolated worktree job"
     And ticket "tf-0090" has tags "taskforce"
     And a file ".scion/agents/tf-0090/workspace/.keep" with content "simulated scion worktree"
-    When I run "ticket scion-taskforce dispatch"
-    Then the output should contain "spawned=1"
+    When I run "ticket scion-taskforce sync"
+    Then the output should contain "started=1"
     When I run "ticket scion-taskforce logs"
     Then the output should contain "isolated workspace"
     Given I am in subdirectory ".scion/agents/tf-0090/workspace"
@@ -272,7 +249,7 @@ Feature: SCION Task Force Plugin
     Then the command should succeed
     And ticket "tf-0090" should have field "status" with value "in_progress"
     Given I am back in the root directory
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the output should contain "paused=1"
     When I run "ticket show tf-0090"
     Then the output should contain "waiting-for-review"
@@ -302,8 +279,160 @@ Feature: SCION Task Force Plugin
     And ticket "tf-0102" has tags "taskforce"
     And a ticket exists with ID "tf-0103" and title "W3" with priority 1
     And ticket "tf-0103" has tags "taskforce"
-    When I run "ticket scion-taskforce dispatch"
+    When I run "ticket scion-taskforce sync"
     Then the command should succeed
-    And the output should contain "spawned=3"
+    And the output should contain "started=3"
     And the fake scion runtime should have 3 pod(s)
+
+  Scenario: Dispatch never links an unlinked project folder to the Scion Hub
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the fake Scion Hub reports the project as "unlinked"
+    And a ticket exists with ID "tf-0111" and title "Unlinked project task"
+    And ticket "tf-0111" has tags "taskforce"
+    When I run "ticket scion-taskforce dispatch tf-0111"
+    Then the command should fail
+    And the output should contain "not linked to the Scion Hub"
+    And the output should contain "tk scion-taskforce init"
+    And ticket "tf-0111" should have field "status" with value "open"
+    And the fake Scion Hub should have received "link" 0 time(s)
+    And the fake scion runtime should have 0 pod(s)
+
+  Scenario: Init links the project folder to the Scion Hub exactly once
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the fake Scion Hub reports the project as "unlinked"
+    When I run "ticket scion-taskforce init"
+    Then the command should succeed
+    And the output should contain "project linked to the Scion Hub"
+    When I run "ticket scion-taskforce init --force"
+    Then the command should succeed
+    And the output should contain "project already linked to the Scion Hub"
+    And the fake Scion Hub should have received "link" 1 time(s)
+
+  Scenario: Init installs the save hook and uninit removes it
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce init"
+    Then the command should succeed
+    And the file ".tickets/.hooks/post-write.d/scion-taskforce" should contain "scion-taskforce on-save"
+    When I run "ticket scion-taskforce hook status"
+    Then the output should contain "installed"
+    When I run "ticket scion-taskforce uninit"
+    Then the output should contain "Removed save hook"
+    When I run "ticket scion-taskforce hook status"
+    Then the output should contain "not installed"
+
+  Scenario: Removed daemon commands fail with a migration hint
+    Given a clean tickets directory
+    When I run "ticket scion-taskforce start"
+    Then the command should fail
+    And the output should contain "`start` was removed: the polling daemon is gone"
+    And the output should contain "tk scion-taskforce hook install"
+    When I run "ticket scion-taskforce stop --all"
+    Then the command should fail
+    And the output should contain "tk scion-taskforce pause <id>"
+
+  Scenario: sync warns when the save hook is not installed
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    When I run "ticket scion-taskforce sync"
+    Then the command should succeed
+    And the output should contain "Save hook not installed"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket scion-taskforce sync"
+    Then the output should not contain "Save hook not installed"
+
+  Scenario: Tagging a ready ticket starts a worker on save
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0201" and title "Event driven job"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0201 --tags taskforce"
+    Then the command should succeed
+    And ticket "tf-0201" should contain "Task Force:** request noted; no existing worker found"
+    And ticket "tf-0201" should contain "started Scion worker `tf-0201` on branch `tf-0201`"
+    And ticket "tf-0201" should have field "status" with value "in_progress"
+    And the fake scion runtime should have 1 pod(s)
+
+  Scenario: Saving an untagged ticket does nothing
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0205" and title "Not for the task force"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0205 --priority 1"
+    Then ticket "tf-0205" should not contain "Task Force:"
+    And ticket "tf-0205" should have field "status" with value "open"
+    And the fake scion runtime should have 0 pod(s)
+
+  Scenario: A tagged ticket queues when slots are full and starts when a worker reports back
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0211" and title "First"
+    And a ticket exists with ID "tf-0212" and title "Second"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0211 --tags taskforce"
+    And I run "ticket update tf-0212 --tags taskforce"
+    Then ticket "tf-0212" should contain "queued (1 of 1 workers busy)"
+    And ticket "tf-0212" should have field "status" with value "open"
+    When I run "ticket update tf-0211 --tags taskforce,waiting-for-review"
+    Then ticket "tf-0212" should contain "a worker slot is free; starting a new Scion worker"
+    And ticket "tf-0212" should have field "status" with value "in_progress"
+    And the fake scion runtime should have 2 pod(s)
+
+  Scenario: A note on a ticket with an active worker is forwarded once; status notes are not
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0221" and title "Needs feedback"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0221 --tags taskforce"
+    And I run "ticket add-note tf-0221 'Please also add tests'"
+    And I run "ticket update tf-0221 --priority 1"
+    Then ticket "tf-0221" should contain "already in progress; forwarded the latest update" 1 time(s)
+    And the fake scion runtime should have 1 pod(s)
+
+  Scenario: Closing a ticket stops its worker
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0231" and title "Done soon"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0231 --tags taskforce"
+    And I run "ticket close tf-0231"
+    Then ticket "tf-0231" should contain "ticket closed; stopped worker `tf-0231`"
+    And the fake scion pod "tf-0231" should be in state "stopped"
+
+  Scenario: A tagged ticket waiting on dependencies starts when the blocker closes
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0250" and title "Blocker"
+    And a ticket exists with ID "tf-0251" and title "Blocked"
+    And ticket "tf-0251" depends on "tf-0250"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0251 --tags taskforce"
+    Then ticket "tf-0251" should contain "waiting on dependencies: tf-0250"
+    And the fake scion runtime should have 0 pod(s)
+    When I run "ticket close tf-0250"
+    Then ticket "tf-0251" should have field "status" with value "in_progress"
+    And the fake scion runtime should have 1 pod(s)
+
+  Scenario: sync catches up on a worker report written straight to the file
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0241" and title "Worker reports by file"
+    And a ticket exists with ID "tf-0242" and title "Queued behind it"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0241 --tags taskforce"
+    And I run "ticket update tf-0242 --tags taskforce"
+    Given ticket "tf-0241" has tags "taskforce, waiting-for-review"
+    When I run "ticket scion-taskforce sync"
+    Then the command should succeed
+    And the output should contain "started=1"
+    And ticket "tf-0242" should have field "status" with value "in_progress"
 

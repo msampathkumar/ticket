@@ -64,7 +64,7 @@ Extend `ticket` with modular plugins discovered automatically via `$PATH`:
 
 - **[Web UI (`tk webui`)](https://msampathkumar.github.io/ticket/plugins/webui/)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager (`tk webui server start`).
 - **[GitHub Sync (`tk github`)](https://msampathkumar.github.io/ticket/plugins/github/)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
-- **[SCION Task Force (`tk scion-taskforce`)](https://msampathkumar.github.io/ticket/plugins/scion-taskforce/)**: Autonomous multi-agent worker orchestration daemon with human review checkpoints.
+- **[SCION Task Force (`tk scion-taskforce`)](https://msampathkumar.github.io/ticket/plugins/scion-taskforce/)**: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.
 
 To author your own plugin, see the **[Plugin Architecture Guide](https://msampathkumar.github.io/ticket/plugins/architecture/)**.
 

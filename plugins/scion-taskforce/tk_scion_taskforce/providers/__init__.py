@@ -95,10 +95,18 @@ class WorkerProvider(ABC):
         """Return the worker's *isolated* checkout on the host, if the runtime gives it one.
 
         ``None`` means the worker operates directly on ``project_dir`` (shared checkout).
-        When a path is returned, the daemon mirrors the ticket file into it after spawn and
+        When a path is returned, the task force mirrors the ticket file into it after spawn and
         merges the worker's edits (notes, review tag) back into the project's ``.tickets/``.
         """
         return None
+
+    def ensure_project_registered(self, project_dir: str) -> ProviderResult:
+        """Register ``project_dir`` with the runtime's control plane once (e.g. link it to a Hub).
+
+        Called explicitly by ``init``/``start`` only — never by dispatch — so exactly one
+        runtime project exists per registered folder. Default: nothing to do.
+        """
+        return ProviderResult(ok=True, message="no project registration required")
 
     def post_spawn(self, project_dir: str, worker_id: str, timeout_seconds: float = 40.0) -> str:
         """Best-effort hook after a verified spawn (e.g. dismiss interactive harness prompts).

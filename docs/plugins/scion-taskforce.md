@@ -11,7 +11,7 @@ It is a simple, straightforward integration tool for SCION: it bridges `tk` depe
 
 ## Prerequisites
 
-Before running the SCION Task Force daemon, ensure your system meets the following requirements:
+Before using the SCION Task Force, ensure your system meets the following requirements:
 
 1. **Python 3.9+**: Required for the task force CLI and OpenTelemetry logging.
 2. **SCION CLI (`scion`)**: Must be installed and available in your `$PATH` ([GoogleCloudPlatform/scion](https://github.com/GoogleCloudPlatform/scion)):
@@ -90,34 +90,49 @@ The test runner:
 
 ## How It Works
 
+The task force is event-driven. `tk scion-taskforce init` installs a `tk` post-write hook at `.tickets/.hooks/post-write.d/scion-taskforce`. Every successful ticket write (`create`, `update`, `add-note`, `start`, `close`, …, from the CLI or the Web UI) runs `tk scion-taskforce on-save <id>` in the background.
+
 ```mermaid
 sequenceDiagram
     autonumber
     actor Dev as Human Developer
-    participant TK as ticket (.tickets/)
-    participant TF as Task Force Daemon
+    participant TK as tk (.tickets/)
+    participant Hook as on-save (one-shot)
     participant Hub as SCION Hub (:8080)
-    participant Worker as Autonomous AI Worker Pod
+    participant Worker as Worker Pod
 
-    Dev->>TK: Creates ticket & tags 'taskforce'
-    TF->>TK: Watches for `tk ready` with tag:taskforce
-    TF->>Hub: Spawns worker using 'taskforce-worker' template
-    Hub->>Worker: Starts container with workspace mount
-    Worker->>TK: Claims task via `tk start (id)`
-    Worker->>Worker: Writes code & executes tests
-    Worker->>TK: Logs audit note & sets tag `waiting-for-review`
-    Worker->>TF: Pauses container execution
-    Dev->>TK: Reviews notes & diffs in Web UI
-    Dev->>TK: Approves and marks `tk close (id)`
-    TF->>Hub: Cleans up worker container
+    Dev->>TK: tk update (id) --tags taskforce
+    TK->>Hook: post-write hook (background)
+    Hook->>TK: Note: request noted, starting worker
+    Hook->>Hub: scion start (id), verify running
+    Hook->>TK: Note: started worker, status in_progress
+    Worker->>TK: Report note + tag waiting-for-review
+    Hook->>Worker: Next save or sync: pause worker
+    Dev->>TK: tk add-note (id) "feedback"
+    TK->>Hook: post-write hook
+    Hook->>Worker: scion message --wake (forwarded note)
+    Dev->>TK: tk close (id)
+    TK->>Hook: post-write hook
+    Hook->>Hub: Stop worker, start next queued ticket
 ```
 
-1. **SCION Hub Wrapper**: The task force bridges `tk` tickets to the SCION daemon/Hub running on `http://127.0.0.1:8080`.
-2. **1:1 Worker Mapping**: When a ticket becomes `ready` with the `taskforce` tag, a dedicated worker container is spawned named after the ticket ID.
-3. **Workspace Isolation**: Workers execute inside containers mounting the repository checkout, with branch isolation per ticket.
-4. **Review Pause**: The worker passes tests, logs findings with `tk add-note`, and pauses on `waiting-for-review`.
-5. **Feedback Loop**: Engineers can send review feedback using `tk scion-taskforce feedback <id> "..."` which wakes the paused worker with your comments.
-6. **Human Verification**: Human engineers review output in the Web UI and close the ticket, triggering pod garbage collection.
+| On save of a ticket… | `on-save` does |
+| :--- | :--- |
+| tagged `taskforce`, `open`, deps closed, no worker | Note "request noted", start a verified Scion worker, set `in_progress` |
+| tagged, but all worker slots busy | Note "queued (N of N workers busy)"; starts when a slot frees |
+| tagged, deps still open | Note "waiting on dependencies: …"; starts when the blocker closes |
+| with an active worker, after `tk add-note` by a human | Forward the note to the worker (`scion message --wake`) |
+| whose worker added `waiting-for-review` | Pause the worker, free its slot, start the next queued ticket |
+| closed | Stop its worker, then start the next queued ticket |
+| not tagged | Nothing |
+
+Notes are written straight to the ticket file with a `**Task Force:**` prefix, so they never re-trigger the hook and are never forwarded to workers. A per-project lock prevents two quick saves from starting two workers.
+
+**Catching up.** Saves that bypass `tk` (hand edits, `git pull`, a worker editing the file or its isolated worktree) fire no hook. Run `tk scion-taskforce sync` to merge worker reports, pause reviewed workers, flag workers whose pods died, and start queued tickets.
+
+1. **One Hub Project per Folder**: `init` links the project folder to the Hub once (`scion hub link`). Dispatch never creates Hub projects; an unlinked folder fails preflight with a hint.
+2. **1:1 Worker Mapping**: Each ticket gets its own worker in that folder's Hub project, named after the ticket ID, on a branch named after the ticket ID.
+3. **Human Verification**: Workers never close tickets. Humans review in the Web UI and run `tk close`, which stops the worker.
 
 ---
 
@@ -125,20 +140,25 @@ sequenceDiagram
 
 | Command | Description |
 | :--- | :--- |
-| `tk scion-taskforce init [--defaults] [--force]` | Initialize project configuration and worker templates |
+| `tk scion-taskforce init [--defaults] [--force]` | Initialize config and worker template, link the folder to the SCION Hub, install the save hook |
+| `tk scion-taskforce hook install\|uninstall\|status` | Manage the `tk` post-write hook for this project |
+| `tk scion-taskforce on-save <id> [--event <e>]` | Handle one ticket save (called by the hook) |
+| `tk scion-taskforce sync [dir]` | Catch up on saves the hook missed; flag dead workers; start queued tickets |
 | `tk scion-taskforce test [--prompt "<text>"]` | Run end-to-end test worker to verify SCION Hub & LLM credentials |
-| `tk scion-taskforce start [dir]` | Start task force for project (boots global daemon if not running) |
-| `tk scion-taskforce status` | Inspect daemon status, watched projects, and active workers |
-| `tk scion-taskforce stop [dir] \| --all` | Stop task force for one project or terminate global daemon (`--all`) |
-| `tk scion-taskforce dispatch [<id>]` | Claim and spawn worker for `<id>` or all ready tickets |
+| `tk scion-taskforce dispatch <id>` | Start a verified worker for one opted-in ticket now |
+| `tk scion-taskforce status` | Save hook, provider health and workers for this project |
+| `tk scion-taskforce list` | All tracked workers across projects |
 | `tk scion-taskforce feedback <id> "<msg>"` | Add review feedback, remove `waiting-for-review`, and wake worker |
 | `tk scion-taskforce attach <id>` | Attach interactively to worker terminal session |
 | `tk scion-taskforce pause <id>` | Manually pause worker container |
-| `tk scion-taskforce logs [<id>]` | View OpenTelemetry daemon or worker logs (including rotated `.gz`) |
+| `tk scion-taskforce logs [<id>]` | View OpenTelemetry logs (including rotated `.gz`) |
 | `tk scion-taskforce brief <id>` | Inspect generated worker brief for a ticket |
 | `tk scion-taskforce trace [<id>]` | Inspect OpenTelemetry trace spans |
 | `tk scion-taskforce gc [--force]` | Run 5-day closed pod garbage collection and 30-day log cleanup |
-| `tk scion-taskforce project list` | List all registered project directories |
+
+The old daemon commands (`start`, `stop`, `server`, `watch`, `project`) were removed; running one prints what to use instead. `sync` warns when the save hook is missing.
+
+The hook's output is appended to `.tickets/.hooks/hooks.log` (git-ignored). Set `TK_NO_HOOKS=1` to skip hooks for one `tk` call.
 
 ---
 
@@ -155,12 +175,9 @@ tags:
   review: waiting-for-review      # Tag added by worker when pausing for review
 
 watcher:
-  poll_interval_seconds: 15       # Reconcile interval across projects
   max_concurrent: 10              # Maximum workers across all projects
   max_concurrent_per_project: 1   # Max concurrent workers per repository
   gc_retention_days: 5            # Days to retain paused pods after ticket closed
-  auto_pause_on_review: true      # Pause pod when waiting-for-review tag is added
-  auto_wake_on_feedback: true     # Resume pod when review note is added
 
 provider:
   driver: scion                   # Backend driver

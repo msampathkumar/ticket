@@ -163,35 +163,91 @@ class ScionProvider(WorkerProvider):
         if res.returncode != 0:
             return ProviderResult(ok=False, message=self.last_error)
 
-        # Seamless Hub Integration: auto-link and enable Hub for project if Hub is active
+        # DEPRECATED: silent Hub auto-link on every preflight. It ran `scion hub link --yes` for
+        # ANY unlinked directory dispatch touched, creating a stray Hub project per directory
+        # (e.g. BDD temp dirs `ticket_test_xxxxxxxx` -> Hub projects `ticket-test-xxxxxxxx`).
+        # Linking is now an explicit one-time step in `init`/`start` (ensure_project_registered).
+        # try:
+        #     hub_stat = self._run(
+        #         [binary, "--project", proj, "hub", "status", "--non-interactive"],
+        #         cwd=proj,
+        #         timeout=15,
+        #     )
+        #     if hub_stat.returncode == 0:
+        #         if "Linked: no" in hub_stat.stdout:
+        #             self._run(
+        #                 [binary, "--project", proj, "hub", "link", "--yes", "--non-interactive"],
+        #                 cwd=proj,
+        #                 timeout=30,
+        #             )
+        #             self._run(
+        #                 [binary, "--project", proj, "hub", "enable", "--non-interactive"],
+        #                 cwd=proj,
+        #                 timeout=15,
+        #             )
+        #         elif "Enabled: false" in hub_stat.stdout:
+        #             self._run(
+        #                 [binary, "--project", proj, "hub", "enable", "--non-interactive"],
+        #                 cwd=proj,
+        #                 timeout=15,
+        #             )
+        # except Exception:
+        #     pass
+
+        # Dispatch must never create a Hub project: refuse to run in an unlinked folder.
+        if self._hub_unlinked(self._hub_status(binary, proj)):
+            return ProviderResult(
+                ok=False,
+                message=(
+                    f"project {proj} is not linked to the Scion Hub"
+                    f" → HINT: run `tk scion-taskforce init` in {proj} once to link it, then retry."
+                ),
+            )
+
+        return ProviderResult(ok=True, message="ok")
+
+    def _hub_status(self, binary: str, proj: str) -> str | None:
+        """Read-only `scion hub status` output, or ``None`` if the command failed."""
         try:
-            hub_stat = self._run(
+            res = self._run(
                 [binary, "--project", proj, "hub", "status", "--non-interactive"],
                 cwd=proj,
                 timeout=15,
             )
-            if hub_stat.returncode == 0:
-                if "Linked: no" in hub_stat.stdout:
-                    self._run(
-                        [binary, "--project", proj, "hub", "link", "--yes", "--non-interactive"],
-                        cwd=proj,
-                        timeout=30,
-                    )
-                    self._run(
-                        [binary, "--project", proj, "hub", "enable", "--non-interactive"],
-                        cwd=proj,
-                        timeout=15,
-                    )
-                elif "Enabled: false" in hub_stat.stdout:
-                    self._run(
-                        [binary, "--project", proj, "hub", "enable", "--non-interactive"],
-                        cwd=proj,
-                        timeout=15,
-                    )
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - status probe is best effort
+            return None
+        if res.returncode != 0:
+            return None
+        return _ANSI_RE.sub("", res.stdout or "")
 
-        return ProviderResult(ok=True, message="ok")
+    @staticmethod
+    def _hub_unlinked(status: str | None) -> bool:
+        """True only when the Hub is reachable and this folder is not linked to it."""
+        return bool(status) and "Connection: ok" in status and "Linked: no" in status
+
+    def ensure_project_registered(self, project_dir: str) -> ProviderResult:
+        """Link ``project_dir`` to the Scion Hub once: one Hub project per project folder.
+
+        No-op when already linked or when the Hub is unreachable (local mode).
+        """
+        proj = self._validate_project_dir(project_dir)
+        if self.dry_run:
+            return ProviderResult(ok=True, message="[dry-run] Hub link skipped")
+        binary = self._resolve_binary()
+        status = self._hub_status(binary, proj)
+        if not status or "Connection: ok" not in status:
+            return ProviderResult(ok=True, message="Hub not reachable; project runs in local mode")
+        if "Linked: no" not in status:
+            return ProviderResult(ok=True, message="project already linked to the Scion Hub")
+        link = self._run(
+            [binary, "--project", proj, "hub", "link", "--yes", "--non-interactive"],
+            cwd=proj,
+            timeout=30,
+        )
+        if link.returncode != 0:
+            return ProviderResult(ok=False, message=f"Hub link failed: {self.last_error}")
+        self._run([binary, "--project", proj, "hub", "enable", "--non-interactive"], cwd=proj, timeout=15)
+        return ProviderResult(ok=True, message="project linked to the Scion Hub")
 
     def health(self, project_dir: str, worker_id: str) -> WorkerStatus | None:
         clean_id = validate_ticket_id(worker_id)

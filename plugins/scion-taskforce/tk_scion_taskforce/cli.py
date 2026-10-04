@@ -16,72 +16,70 @@ from tk_scion_taskforce.config import (
     resolve_config_path,
     uninit_config,
 )
-from tk_scion_taskforce.daemon import (
+from tk_scion_taskforce.events import hook_path, install_hook, on_save, sync_project, uninstall_hook
+from tk_scion_taskforce.providers import get_provider
+from tk_scion_taskforce.state import known_projects, load_state, normalize_project_dir
+from tk_scion_taskforce.telemetry import TelemetryManager, new_trace_id, project_slug
+from tk_scion_taskforce.tickets import parse_ticket_file, resolve_ticket_path
+from tk_scion_taskforce.workers import (
     DispatchError,
     dispatch_ticket,
     is_eligible_for_dispatch,
     pause_worker_for_ticket,
-    reconcile_once,
-    run_daemon,
+    project_lock,
     run_gc,
     send_feedback_to_worker,
 )
-from tk_scion_taskforce.providers import get_provider
-from tk_scion_taskforce.server import (
-    add_project,
-    list_projects,
-    load_state,
-    normalize_project_dir,
-    remove_project,
-    restart_server,
-    start_server,
-    status_server,
-    stop_project,
-    stop_server,
-)
-from tk_scion_taskforce.telemetry import TelemetryManager, new_trace_id, project_slug
-from tk_scion_taskforce.tickets import parse_ticket_file, resolve_ticket_path
 
 HELP_TEXT = """tk-scion-taskforce - Autonomous SCION task force orchestrator plugin for tk
 
 Usage:
-  tk scion-taskforce [--config <path>] <subcommand> [args...]
+  tk scion-taskforce [--config <path>] [--dry-run] <subcommand> [args...]
 
-Daemon & Multi-Project Management (Single Global Instance):
-  start [dir]                      Start the task force for project [dir] (default: cwd);
-                                   boots the single global daemon if it is not running
-  stop [dir] | stop --all          Stop the task force for ONE project (pause its workers, unregister;
-                                   daemon exits when no projects remain) or stop everything (--all)
-  status                           Show daemon status, watched projects, provider health, worker counts
-  restart [dir]                    Restart the global daemon
-  server start|status|stop|restart Explicit global daemon lifecycle commands
-  project add <dir>                Register a project directory with the global task force
-  project stop|remove <dir>        Stop the task force for a project (alias of 'stop <dir>')
-  project list                     List all registered project directories
+`init` installs a tk post-write hook. Every ticket save (CLI or Web UI) runs `on-save <id>`
+in the background: a READY ticket YOU tagged `taskforce` gets a status note and a Scion worker;
+a note added to a ticket with an active worker is forwarded to it; a worker that reports back
+(`waiting-for-review`) is paused; closing a ticket stops its worker and starts the next queued one.
 
-Opt-in model: the task force only picks up READY tickets that YOU tagged `taskforce`
-(tags.claim). It never adds that tag itself. A pod must be verified running before a
-ticket is moved to in_progress; failures leave the ticket untouched.
-
-Task Force Operations:
+Setup:
   init [--global] [--force] [--defaults]
-                                   Interactive setup wizard for project config & SCION template
+                                   Setup wizard: config, SCION template, Hub link, save hook
+  uninit [--global]                Remove .scion-taskforce/ and the save hook
+  hook install|uninstall|status    Manage the tk post-write hook for this project
   test [--prompt "<text>"]         Run an end-to-end test worker to verify SCION Hub & worker execution
-  uninit [--global]                Remove project-scoped .scion-taskforce/ directory & unregister project
-  watch [dir] [--interval <sec>] [--max-concurrent <n>] [--once] [--dry-run]
-                                   Run the task force reconciler in the foreground
-  dispatch [<id>] [--dry-run]      Claim and spawn worker(s) for <id> or all ready tickets
-  list | ps                        List all tracked task force workers across projects
-  feedback <id> "<msg>"            Add review feedback note, remove waiting-for-review, & wake worker
+
+Dispatch:
+  on-save <id> [--event <e>]       Handle one ticket save (called by the hook)
+  sync [dir]                       Catch up on saves the hook missed (hand edits, git pull,
+                                   worker reports), flag dead workers, start queued tickets
+  dispatch <id>                    Start a verified worker for one opted-in ticket now
+
+Workers:
+  status                           Save hook, provider health and workers for this project
+  list | ps                        List all tracked workers across projects
+  feedback <id> "<msg>"            Add a review note, remove waiting-for-review, wake the worker
   attach <id>                      Attach interactively to worker <id>
-  pause <id>                       Manually pause worker <id>
-  logs [<id>]                      View local OpenTelemetry daemon or worker logs (including .gz)
-  brief <id>                       View the persisted worker brief for worker <id>
+  pause <id>                       Pause worker <id>
+  logs [<id>]                      View task force or worker logs (including .gz)
+  brief <id>                       View the persisted worker brief for <id>
   trace [<id>]                     Inspect OpenTelemetry trace spans (filtered by ticket <id>)
-  gc [--force]                     Run 5-day closed pod GC and 30-day rotated log cleanup
-  version                          Print plugin version
-  help                             Show this help message
+  gc [--force]                     Delete workers of tickets closed > 5 days; purge logs > 30 days
+  version | help
+
+Opt-in model: only tickets YOU tagged `taskforce` (tags.claim) are picked up; the task force
+never adds that tag itself. A ticket moves to in_progress only after its worker is verified running.
 """
+
+
+_HOOK_HINT = "Ticket saves now start workers; run `tk scion-taskforce hook install` once, then `sync` to catch up."
+REMOVED_COMMANDS = {
+    "start": _HOOK_HINT,
+    "restart": _HOOK_HINT,
+    "server": _HOOK_HINT,
+    "watch": _HOOK_HINT,
+    "project": "Each project uses its own save hook (`tk scion-taskforce hook install`); nothing to register.",
+    "stop": "To stop a worker, use `tk scion-taskforce pause <id>` or close its ticket; `hook uninstall` stops dispatch.",
+}
 
 
 def _infer_project_dir() -> Path:
@@ -101,12 +99,12 @@ def _find_ticket_across_projects(
     t_path = resolve_ticket_path(default_project, ticket_id)
     if t_path:
         return default_project, t_path
-    for proj_str in list_projects():
+    for proj_str in known_projects(load_state()):
         proj_p = Path(proj_str)
         t_path = resolve_ticket_path(proj_p, ticket_id)
         if t_path:
             return proj_p, t_path
-    raise ValueError(f"Ticket {ticket_id!r} not found in {default_project} or registered projects.")
+    raise ValueError(f"Ticket {ticket_id!r} not found in {default_project} or projects with workers.")
 
 
 def _extract_global_flags(argv: list[str]) -> tuple[str | None, bool, list[str]]:
@@ -156,6 +154,21 @@ def _prompt_user(prompt: str, default: str) -> str:
     except (EOFError, KeyboardInterrupt):
         print()
         return default
+
+
+def _ensure_runtime_project(project_dir: Path, explicit_config: str | None = None, dry_run: bool = False) -> None:
+    """Register the project folder with the runtime once (Scion: link it to the Hub).
+
+    Only `init` calls this; dispatch never creates runtime/Hub projects.
+    Best effort: a failure is reported but never aborts the calling command.
+    """
+    try:
+        cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
+        res = get_provider(cfg, dry_run=dry_run).ensure_project_registered(str(project_dir))
+    except Exception as exc:  # noqa: BLE001 - registration must not break init
+        print(f"⚠️  Scion Hub: could not check project link: {exc}")
+        return
+    print(f"{'🔗' if res.ok else '⚠️ '} Scion Hub: {res.message}")
 
 
 def cmd_test(args: list[str], project_dir: Path) -> int:
@@ -351,7 +364,11 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
     print(f"   • Config:   `{target}`")
     print(f"   • Template: `{project_dir / '.scion' / 'templates' / 'taskforce-worker'}` (harness={harness}, model={model})")
     print(f"   • Brief:    `{target.parent / 'prompt.md'}`")
-    print("✅ Initialization successful! You can now run 'tk scion-taskforce start' to launch the task force.")
+    if not global_scope:
+        _ensure_runtime_project(project_dir)
+        hook = install_hook(project_dir)
+        print(f"🪝 Save hook:  `{hook}` (ticket saves now trigger the task force)")
+    print("✅ Initialization successful! Tag a ready ticket `taskforce` to hand it to the task force.")
 
     if is_interactive:
         try:
@@ -370,38 +387,53 @@ def cmd_uninit(args: list[str], project_dir: Path) -> int:
     scope_desc = "global config" if global_scope else f"project directory `{project_dir}`"
     print(f"🗑️ Uninitializing SCION Task Force for {scope_desc}...")
     success, path = uninit_config(project_dir=project_dir, global_scope=global_scope)
+    if not global_scope and uninstall_hook(project_dir):
+        print(f"ℹ️ Removed save hook `{hook_path(project_dir)}`.")
     if success:
-        if not global_scope:
-            removed = remove_project(project_dir)
-            if removed:
-                print(f"ℹ️ Unregistered project `{project_dir}` from global daemon state registry.")
         print(f"✅ Successfully removed `{path}`.")
     else:
         print(f"ℹ️ No SCION task force configuration found at `{path}`.")
     return 0
 
 
-def cmd_project(args: list[str], default_project: Path) -> int:
-    action = args[0] if args else "list"
-    if action == "add":
-        target = args[1] if len(args) > 1 else str(default_project)
-        norm = add_project(target)
-        print(f"✅ Registered project with scion-taskforce: {norm}")
+def cmd_hook(args: list[str], project_dir: Path) -> int:
+    action = args[0] if args else "status"
+    if action == "install":
+        print(f"🪝 Installed save hook: {install_hook(project_dir)}")
         return 0
-    if action in ("remove", "rm", "stop"):
-        target = args[1] if len(args) > 1 else str(default_project)
-        return stop_project(target)
-    if action in ("list", "ls"):
-        projs = list_projects()
-        if not projs:
-            print("No projects registered with tk-scion-taskforce.")
-            return 0
-        print(f"Registered projects ({len(projs)}):")
-        for p in projs:
-            print(f"  - {p}")
+    if action in ("uninstall", "remove", "rm"):
+        removed = uninstall_hook(project_dir)
+        print("🗑️ Removed save hook." if removed else "ℹ️ No save hook installed.")
         return 0
-    print(f"Unknown project subcommand: {action}", file=sys.stderr)
+    if action == "status":
+        target = hook_path(project_dir)
+        print(f"{'✅ installed' if target.exists() else '❌ not installed'}: {target}")
+        return 0
+    print(f"Unknown hook action: {action} (use install|uninstall|status)", file=sys.stderr)
     return 1
+
+
+def cmd_on_save(args: list[str], project_dir: Path, explicit_config: str | None, dry_run: bool) -> int:
+    ticket_id = next((a for a in args if not a.startswith("-")), None)
+    event = next((args[i + 1] for i, a in enumerate(args) if a == "--event" and i + 1 < len(args)), "")
+    if not ticket_id:
+        print("Usage: tk scion-taskforce on-save <id> [--event <event>]", file=sys.stderr)
+        return 1
+    summary = on_save(project_dir, ticket_id, event=event, explicit_config=explicit_config, dry_run=dry_run)
+    print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')}] on-save {event or '-'}: {summary}")
+    return 0
+
+
+def cmd_sync(args: list[str], project_dir: Path, explicit_config: str | None, dry_run: bool) -> int:
+    target = next((a for a in args if not a.startswith("-")), None)
+    if not hook_path(Path(target) if target else project_dir).exists():
+        print("⚠️  Save hook not installed: ticket saves will not start workers. Run `tk scion-taskforce hook install`.")
+    stats = sync_project(Path(target) if target else project_dir, explicit_config=explicit_config, dry_run=dry_run)
+    print(
+        f"✅ Sync complete: started={stats['started']}, paused={stats['paused']}, "
+        f"lost={stats['lost']}, errors={stats['errors']}"
+    )
+    return 0
 
 
 def cmd_dispatch(
@@ -410,46 +442,30 @@ def cmd_dispatch(
     explicit_config: str | None,
     dry_run: bool,
 ) -> int:
-    cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
-    telemetry = TelemetryManager(cfg)
-    provider = get_provider(cfg, dry_run=dry_run)
-    state = load_state()
-    add_project(project_dir)
-    state = load_state()
-
     ticket_arg = next((a for a in args if not a.startswith("-")), None)
-    if ticket_arg:
-        proj, t_path = _find_ticket_across_projects(ticket_arg, project_dir)
-        ticket = parse_ticket_file(t_path, project_dir=proj)
-        eligible, reason = is_eligible_for_dispatch(ticket, cfg)
-        if not eligible:
-            claim_tag = str(cfg.get("tags", {}).get("claim", "taskforce"))
-            print(f"⏭️  Not dispatching {ticket.id}: {reason}.")
-            print(f"   Opt a ticket in with: tk update {ticket.id} --tags <existing>,{claim_tag}")
-            return 1
-        try:
-            ok = dispatch_ticket(proj, ticket, cfg, telemetry, provider, state)
-        except DispatchError as exc:
-            print(f"❌ Could not launch a verified worker for '{ticket.id}': {exc}", file=sys.stderr)
-            print("   Ticket left untouched. Check the provider runtime (e.g. `podman machine start`).", file=sys.stderr)
-            return 1
-        if ok:
-            print(f"🚀 Dispatched & verified task force worker '{ticket.id}' in {proj}")
-            return 0
-        print(f"❌ Did not dispatch worker for ticket '{ticket.id}' (see `tk scion-taskforce logs`)", file=sys.stderr)
+    if not ticket_arg:
+        print("Usage: tk scion-taskforce dispatch <id>   (use `sync` to start all queued tickets)", file=sys.stderr)
         return 1
-
-    stats = reconcile_once(
-        projects=[str(project_dir)],
-        explicit_config=explicit_config,
-        dry_run=dry_run,
-    )
-    print(
-        f"✅ Reconcile complete: spawned={stats['spawned']}, "
-        f"paused={stats['paused']}, woken={stats['woken']}, lost={stats.get('lost', 0)}, "
-        f"gc_deleted={stats['gc_deleted']}, errors={stats['errors']}"
-    )
-    return 0
+    cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
+    proj, t_path = _find_ticket_across_projects(ticket_arg, project_dir)
+    ticket = parse_ticket_file(t_path, project_dir=proj)
+    eligible, reason = is_eligible_for_dispatch(ticket, cfg)
+    if not eligible:
+        claim_tag = str(cfg.get("tags", {}).get("claim", "taskforce"))
+        print(f"⏭️  Not dispatching {ticket.id}: {reason}.")
+        print(f"   Opt a ticket in with: tk update {ticket.id} --tags <existing>,{claim_tag}")
+        return 1
+    try:
+        ok = dispatch_ticket(proj, ticket, cfg, TelemetryManager(cfg), get_provider(cfg, dry_run=dry_run), load_state())
+    except DispatchError as exc:
+        print(f"❌ Could not launch a verified worker for '{ticket.id}': {exc}", file=sys.stderr)
+        print("   Ticket left untouched. Check the provider runtime (e.g. `podman machine start`).", file=sys.stderr)
+        return 1
+    if ok:
+        print(f"🚀 Dispatched & verified task force worker '{ticket.id}' in {proj}")
+        return 0
+    print(f"❌ Did not dispatch worker for ticket '{ticket.id}' (see `tk scion-taskforce logs`)", file=sys.stderr)
+    return 1
 
 
 def cmd_list(project_dir: Path, explicit_config: str | None) -> int:
@@ -461,7 +477,7 @@ def cmd_list(project_dir: Path, explicit_config: str | None) -> int:
 
     print(f"{'WORKER ID':<14} {'STATE':<10} {'PROVIDER':<10} {'CYCLES':<7} {'PROJECT':<30} {'TRACE ID'}")
     print("-" * 105)
-    # states: running | paused | error (spawned but never verified) | deleted
+    # states: running | paused | stopped (ticket closed) | error (never verified or pod lost) | deleted
     for w in sorted(workers.values(), key=lambda x: (str(x.get("project_dir", "")), str(x.get("ticket_id", "")))):
         wid = str(w.get("ticket_id", ""))
         st = str(w.get("state", "unknown"))
@@ -470,6 +486,23 @@ def cmd_list(project_dir: Path, explicit_config: str | None) -> int:
         proj = str(w.get("project_dir", str(project_dir)))
         trace_id = str(w.get("trace_id", ""))
         print(f"{wid:<14} {st:<10} {prov:<10} {cycles:<7} {proj:<30} {trace_id}")
+    return 0
+
+
+def cmd_status(project_dir: Path, explicit_config: str | None) -> int:
+    proj = normalize_project_dir(project_dir)
+    hook = hook_path(project_dir)
+    print(f"Project:   {proj}")
+    print(f"Save hook: {'✅ installed' if hook.exists() else '❌ not installed (run `tk scion-taskforce hook install`)'}")
+    state = load_state()
+    health = state.get("project_health", {}).get(proj)
+    if health:
+        label = "ok" if health.get("ok") else f"provider unavailable: {health.get('message', '')}"
+        print(f"Provider:  {label} (checked {health.get('checked_at', '?')})")
+    mine = [w for w in state.get("workers", {}).values() if w.get("project_dir") == proj]
+    print(f"Workers:   {len(mine)}")
+    for w in sorted(mine, key=lambda x: str(x.get("ticket_id", ""))):
+        print(f"  {str(w.get('ticket_id', '')):<14} {str(w.get('state', 'unknown')):<10}")
     return 0
 
 
@@ -596,9 +629,9 @@ def cmd_logs(
     pos = [a for a in args if not a.startswith("-")]
 
     if not pos:
-        lines = telemetry.read_daemon_logs(limit=200)
+        lines = telemetry.read_logs(limit=200)
         if not lines:
-            print(f"No daemon logs found at {telemetry.daemon_log_file}")
+            print(f"No task force logs found at {telemetry.log_file}")
             return 0
         for line in lines:
             print(line)
@@ -694,7 +727,7 @@ def cmd_gc(
     telemetry = TelemetryManager(cfg)
     provider = get_provider(cfg, dry_run=dry_run)
     state = load_state()
-    projects = list(state.get("projects", []))
+    projects = known_projects(state)
     norm_default = normalize_project_dir(project_dir)
     if norm_default not in projects:
         projects.append(norm_default)
@@ -714,61 +747,6 @@ def cmd_gc(
         f"(retention={cfg['telemetry']['rotation']['retention_days']}d)"
     )
     return 0
-
-
-def cmd_watch(
-    args: list[str],
-    project_dir: Path,
-    explicit_config: str | None,
-    dry_run: bool,
-) -> int:
-    once = "--once" in args
-    interval: int | None = None
-    max_concurrent: int | None = None
-    dir_arg: str | None = None
-
-    i = 0
-    while i < len(args):
-        a = args[i]
-        if a == "--interval" and i + 1 < len(args):
-            interval = int(args[i + 1])
-            i += 2
-        elif a == "--max-concurrent" and i + 1 < len(args):
-            max_concurrent = int(args[i + 1])
-            i += 2
-        elif a == "--once":
-            i += 1
-        elif not a.startswith("-") and dir_arg is None:
-            dir_arg = a
-            i += 1
-        else:
-            i += 1
-
-    target_proj = normalize_project_dir(dir_arg or project_dir)
-    add_project(target_proj)
-
-    if once:
-        projs = list_projects() or [target_proj]
-        stats = reconcile_once(
-            projects=projs,
-            explicit_config=explicit_config,
-            dry_run=dry_run,
-            max_concurrent_override=max_concurrent,
-        )
-        print(
-            f"✅ Reconcile pass complete: spawned={stats['spawned']}, "
-            f"paused={stats['paused']}, woken={stats['woken']}, lost={stats.get('lost', 0)}, "
-            f"gc_deleted={stats['gc_deleted']}, errors={stats['errors']}"
-        )
-        return 0
-
-    return run_daemon(
-        initial_projects=[target_proj],
-        explicit_config=explicit_config,
-        poll_interval_override=interval,
-        max_concurrent_override=max_concurrent,
-        dry_run=dry_run,
-    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -799,61 +777,27 @@ def main(argv: list[str] | None = None) -> int:
     if subcmd == "uninit":
         return cmd_uninit(subargs, project_dir)
 
-    if subcmd == "project":
-        return cmd_project(subargs, project_dir)
+    if subcmd == "hook":
+        return cmd_hook(subargs, project_dir)
 
-    if subcmd == "server":
-        action = subargs[0] if subargs else "status"
-        rest = subargs[1:] if len(subargs) > 1 else []
-        target_dir = rest[0] if rest and not rest[0].startswith("-") else str(project_dir)
-        cfg = load_config(project_dir=Path(target_dir), explicit_config=explicit_config)
-        tel = TelemetryManager(cfg)
-        if action == "start":
-            return start_server(directory=target_dir, explicit_config=explicit_config)
-        if action == "stop":
-            return stop_server()
-        if action == "restart":
-            return restart_server(directory=target_dir, explicit_config=explicit_config)
-        return status_server(log_dir=tel.log_dir)
+    if subcmd == "on-save":
+        return cmd_on_save(subargs, project_dir, explicit_config, dry_run)
 
-    if subcmd == "start":
-        target_dir = subargs[0] if subargs and not subargs[0].startswith("-") else str(project_dir)
-        return start_server(directory=target_dir, explicit_config=explicit_config)
-
-    if subcmd == "stop":
-        if "--all" in subargs:
-            return stop_server()
-        target = next((a for a in subargs if not a.startswith("-")), None)
-        if target:
-            return stop_project(target, explicit_config=explicit_config)
-        # No project given: if exactly this cwd is registered, stop it; otherwise stop the daemon.
-        if normalize_project_dir(project_dir) in list_projects():
-            return stop_project(project_dir, explicit_config=explicit_config)
-        return stop_server()
-
-    if subcmd == "restart":
-        target_dir = subargs[0] if subargs and not subargs[0].startswith("-") else str(project_dir)
-        return restart_server(directory=target_dir, explicit_config=explicit_config)
+    if subcmd == "sync":
+        return cmd_sync(subargs, project_dir, explicit_config, dry_run)
 
     if subcmd == "status":
-        cfg = load_config(project_dir=project_dir, explicit_config=explicit_config)
-        tel = TelemetryManager(cfg)
-        return status_server(log_dir=tel.log_dir)
+        return cmd_status(project_dir, explicit_config)
 
-    if subcmd == "watch":
-        return cmd_watch(subargs, project_dir, explicit_config, dry_run)
-
-    if subcmd == "dispatch":
-        return cmd_dispatch(subargs, project_dir, explicit_config, dry_run)
+    # Commands that write worker state share the per-project lock with the background hook.
+    # shortcut: locks only the current project; lock per touched project if cross-project writes race.
+    writers = {"dispatch": cmd_dispatch, "feedback": cmd_feedback, "pause": cmd_pause, "gc": cmd_gc}
+    if subcmd in writers:
+        with project_lock(Path(normalize_project_dir(project_dir))):
+            return writers[subcmd](subargs, project_dir, explicit_config, dry_run)
 
     if subcmd in ("list", "ps"):
         return cmd_list(project_dir, explicit_config)
-
-    if subcmd == "feedback":
-        return cmd_feedback(subargs, project_dir, explicit_config, dry_run)
-
-    if subcmd == "pause":
-        return cmd_pause(subargs, project_dir, explicit_config, dry_run)
 
     if subcmd == "attach":
         return cmd_attach(subargs, project_dir, explicit_config, dry_run)
@@ -867,8 +811,9 @@ def main(argv: list[str] | None = None) -> int:
     if subcmd == "trace":
         return cmd_trace(subargs, project_dir, explicit_config)
 
-    if subcmd == "gc":
-        return cmd_gc(subargs, project_dir, explicit_config, dry_run)
+    if subcmd in REMOVED_COMMANDS:
+        print(f"`{subcmd}` was removed: the polling daemon is gone. {REMOVED_COMMANDS[subcmd]}", file=sys.stderr)
+        return 2
 
     print(f"Unknown subcommand: {subcmd!r}. Run 'tk scion-taskforce help' for usage.", file=sys.stderr)
     return 1

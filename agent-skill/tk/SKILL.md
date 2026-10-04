@@ -172,7 +172,7 @@ tk github unsync -y                        # Remove synced tickets
 ```
 
 ### 5.3 SCION Task Force (`tk scion-taskforce`)
-Autonomous multi-agent worker orchestration daemon wrapping the SCION agent runtime with human review checkpoints:
+Event-driven multi-agent worker orchestration on the SCION agent runtime, with human review checkpoints. `init` installs a `tk` save hook; no daemon runs:
 ```bash
 # Interactive project setup wizard & template seeder
 tk scion-taskforce init                    # Interactive setup (wizard)
@@ -181,14 +181,13 @@ tk scion-taskforce init --defaults         # Non-interactive with sensible defau
 # Verification test run
 tk scion-taskforce test                    # Verifies provider, model garden, and agent container
 
-# Global daemon management
-tk scion-taskforce server start [dir]      # Start daemon for project
-tk scion-taskforce status                  # Inspect worker pool and project status
-tk scion-taskforce server stop             # Stop taskforce daemon
+# Workers
+tk scion-taskforce status                  # Save hook, provider health, workers for this project
+tk scion-taskforce sync                    # Catch up after hand edits or git pull
 tk scion-taskforce attach <id>             # Attach to an active worker session
 ```
 
 > **Rules for Task Force**:
-> - Only tickets tagged `taskforce` by human operators are claimed by autonomous workers.
+> - Only tickets tagged `taskforce` by human operators are claimed; saving such a ticket starts its worker.
 > - Workers keep the ticket `in_progress` with the label `waiting-for-review`, record progress via `tk add-note`, and pause.
-> - When feedback is added via `tk add-note`, the daemon wakes the worker to iterate.
+> - When feedback is added via `tk add-note`, the save hook forwards it and wakes the worker. `tk close` stops the worker.

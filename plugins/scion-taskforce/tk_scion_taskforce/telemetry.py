@@ -37,7 +37,7 @@ def utc_now_iso() -> str:
 
 
 class TelemetryManager:
-    """Manages local OpenTelemetry traces, metrics, daemon logs, and 30-day log rotation."""
+    """Manages local OpenTelemetry traces, metrics, task force logs, and 30-day log rotation."""
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -53,7 +53,7 @@ class TelemetryManager:
 
         self.traces_file = self.log_dir / str(tel_cfg.get("traces_file", "otel-traces.jsonl"))
         self.metrics_file = self.log_dir / str(tel_cfg.get("metrics_file", "otel-metrics.jsonl"))
-        self.daemon_log_file = self.log_dir / str(tel_cfg.get("daemon_log_file", "daemon.log"))
+        self.log_file = self.log_dir / str(tel_cfg.get("log_file", "taskforce.log"))
         self.workers_dir = self.log_dir / str(tel_cfg.get("worker_logs_dir", "workers"))
 
         rot_cfg = tel_cfg.get("rotation", {})
@@ -201,7 +201,7 @@ class TelemetryManager:
             self.emit_metric("taskforce.logs.rotated_purged", purged, unit="files")
         return purged
 
-    def log_daemon(
+    def log_event(
         self,
         level: str,
         message: str,
@@ -210,7 +210,7 @@ class TelemetryManager:
         **extra: Any,
     ) -> None:
         self.ensure_dirs()
-        self._maybe_rotate_file(self.daemon_log_file)
+        self._maybe_rotate_file(self.log_file)
         record: dict[str, Any] = {
             "timestamp": utc_now_iso(),
             "severity": level.upper(),
@@ -223,7 +223,7 @@ class TelemetryManager:
             record["span_id"] = span_id
         if extra:
             record["attributes"] = extra
-        with open(self.daemon_log_file, "a", encoding="utf-8") as f:
+        with open(self.log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
 
     def log_worker(
@@ -350,8 +350,8 @@ class TelemetryManager:
             spans.append(item)
         return spans
 
-    def read_daemon_logs(self, limit: int = 100) -> list[str]:
-        lines = self._iter_file_lines_with_archives(self.daemon_log_file)
+    def read_logs(self, limit: int = 100) -> list[str]:
+        lines = self._iter_file_lines_with_archives(self.log_file)
         return lines[-limit:] if limit > 0 else lines
 
     def read_worker_logs(

@@ -20,15 +20,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "review": "waiting-for-review",
     },
     "watcher": {
-        "poll_interval_seconds": 15,
         "max_concurrent": 10,
         "max_concurrent_per_project": 1,
         "spawn_verify_timeout_seconds": 30,
         "spawn_verify_poll_seconds": 2,
         "spawn_prompt_unblock_seconds": 40,
         "gc_retention_days": 5,
-        "auto_pause_on_review": True,
-        "auto_wake_on_feedback": True,
     },
     "worker": {
         "prompt_file": "",
@@ -55,7 +52,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "project_log_symlink": True,
         "traces_file": "otel-traces.jsonl",
         "metrics_file": "otel-metrics.jsonl",
-        "daemon_log_file": "daemon.log",
+        "log_file": "taskforce.log",
         "worker_logs_dir": "workers",
         "otlp_endpoint": "",
         "rotation": {
@@ -83,9 +80,8 @@ tags:
   ignore: no-taskforce            # Tickets with this tag are never picked up (safety override)
   review: waiting-for-review      # Added by the worker when it finishes and pauses for review
 
-# 2. Global Daemon & Concurrency Settings
+# 2. Concurrency & Launch Settings
 watcher:
-  poll_interval_seconds: 15       # Reconcile interval across registered projects (seconds)
   max_concurrent: 10              # Maximum total running workers across all projects
   max_concurrent_per_project: 1   # Max working tasks per project; next one starts when one finishes.
                                   # SAFETY: SCION mounts the project checkout directly into each pod
@@ -97,8 +93,6 @@ watcher:
   spawn_prompt_unblock_seconds: 40 # After launch, watch the pod up to N s for interactive harness
                                   # prompts (e.g. Claude's "trust this folder?") and auto-accept them
   gc_retention_days: 5            # Days to retain paused pods after ticket status == closed
-  auto_pause_on_review: true      # Automatically pause worker when waiting-for-review is set
-  auto_wake_on_feedback: true     # Automatically wake worker when a new review note is added
 
 # 3. Worker Prompt Settings
 #    Workers get an auto-generated brief: "implement" for normal tickets, "review" for
@@ -135,7 +129,7 @@ telemetry:
   project_log_symlink: true       # Symlink <project>/.tickets/.scion-taskforce-logs -> global log dir
   traces_file: otel-traces.jsonl
   metrics_file: otel-metrics.jsonl
-  daemon_log_file: daemon.log
+  log_file: taskforce.log
   worker_logs_dir: workers
   otlp_endpoint: ""               # Optional OTLP HTTP/gRPC collector endpoint
   rotation:

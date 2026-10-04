@@ -46,7 +46,7 @@ Extend `ticket` with modular plugins discovered automatically via `$PATH`:
 
 - **[Web UI (`tk webui`)](plugins/webui.md)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.
 - **[GitHub Sync (`tk github`)](plugins/github.md)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
-- **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Autonomous multi-agent worker orchestration daemon with human review checkpoints.
+- **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.
 
 Learn how to write custom plugins in pure Bash or Python in the [Plugin Architecture Guide](plugins/architecture.md).
 
