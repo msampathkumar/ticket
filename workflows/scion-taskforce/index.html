@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Autonomous multi-agent engineering workflows with 1:1 ticket workers, SCION Hub execution, and human review checkpoints.">
+        <meta name="description" content="Delegate a ticket to a SCION coding agent, review its report, send feedback and close.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../images/favicon.svg">
-      <meta name="generator" content="zensical-0.0.67">
+      <meta name="generator" content="zensical-0.0.68">
     
     
       
@@ -36,12 +36,12 @@
       
         
       
-      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.4ae390e2.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.595f2bf5.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.96d1a7e4.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.b27955a4.min.css">
       
       
 
@@ -81,14 +81,11 @@
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
-    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
     <div data-md-component="skip">
-      
-        
-        <a href="#lifecycle-overview" class="md-skip">
-          Skip to content
-        </a>
-      
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
     </div>
     <div data-md-component="announce">
       
@@ -563,10 +560,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-overview" class="md-nav__link">
+  <a href="#1-tag-the-ticket" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Lifecycle Overview
+        1. Tag the ticket
       </span>
     </span>
   </a>
@@ -574,85 +571,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-by-step-walkthrough" class="md-nav__link">
+  <a href="#2-review-the-report" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step-by-Step Walkthrough
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step-by-Step Walkthrough">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-initialize-task-force-for-your-project" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Initialize Task Force for Your Project
+        2. Review the report
       </span>
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#2-verify-hub-model-credentials" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#3-send-feedback" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        2. Verify Hub &amp; Model Credentials
+        3. Send feedback
       </span>
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#3-tag-actionable-work-for-autonomous-execution" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#4-close-the-ticket" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        3. Tag Actionable Work for Autonomous Execution
+        4. Close the ticket
       </span>
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-background-worker-spawning" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Background Worker Spawning
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-review-checkpoint-feedback" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Review Checkpoint &amp; Feedback
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-human-approval-ticket-closure" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        6. Human Approval &amp; Ticket Closure
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1331,10 +1278,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-overview" class="md-nav__link">
+  <a href="#1-tag-the-ticket" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Lifecycle Overview
+        1. Tag the ticket
       </span>
     </span>
   </a>
@@ -1342,85 +1289,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-by-step-walkthrough" class="md-nav__link">
+  <a href="#2-review-the-report" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step-by-Step Walkthrough
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step-by-Step Walkthrough">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-initialize-task-force-for-your-project" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Initialize Task Force for Your Project
+        2. Review the report
       </span>
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#2-verify-hub-model-credentials" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#3-send-feedback" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        2. Verify Hub &amp; Model Credentials
+        3. Send feedback
       </span>
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#3-tag-actionable-work-for-autonomous-execution" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#4-close-the-ticket" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        3. Tag Actionable Work for Autonomous Execution
+        4. Close the ticket
       </span>
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-background-worker-spawning" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Background Worker Spawning
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-review-checkpoint-feedback" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Review Checkpoint &amp; Feedback
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-human-approval-ticket-closure" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        6. Human Approval &amp; Ticket Closure
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1497,6 +1394,7 @@
 
               
               <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
                 
                   
 
@@ -1504,92 +1402,50 @@
   
 
 
-  <h1 id="__skip">SCION Task Force Workflow</h1>
+  <h1>SCION Task Force Workflow</h1>
 
-<p>The <strong>SCION Task Force Workflow</strong> allows teams to delegate actionable engineering tasks directly to autonomous coding agents while maintaining oversight through human review checkpoints.</p>
-<hr />
-<h2 id="lifecycle-overview">Lifecycle Overview<a class="headerlink" href="#lifecycle-overview" title="Permanent link">&para;</a></h2>
+<p>This workflow hands well-scoped tickets to AI coding agents while you keep the review and the merge. Set up the plugin first with the <a href="../../plugins/scion-taskforce/">SCION Task Force guide</a>; it also holds the command reference and troubleshooting.</p>
 <pre class="mermaid"><code>sequenceDiagram
     autonumber
-    actor Developer as Human Developer
-    participant TK as ticket (.tickets/)
-    participant TF as Task Force Orchestrator
-    participant Hub as SCION Hub (:8080)
-    participant Worker as Autonomous AI Worker
+    actor Dev as Developer
+    participant TK as tk (.tickets/)
+    participant TF as on-save hook
+    participant W as Scion worker
 
-    Developer-&gt;&gt;TF: tk scion-taskforce init (--defaults)
-    Developer-&gt;&gt;TF: tk scion-taskforce test (Verify setup)
-    Developer-&gt;&gt;TK: Creates ticket &amp; tags 'taskforce'
-    TF-&gt;&gt;TK: Polls `tk ready` with tag:taskforce
-    TF-&gt;&gt;Hub: Spawns 1:1 worker container
-    Worker-&gt;&gt;TK: Runs `tk start &lt;id&gt;`
-    Worker-&gt;&gt;Worker: Writes code &amp; executes tests
-    Worker-&gt;&gt;TK: Runs `tk add-note` &amp; sets tag `waiting-for-review`
-    Worker-&gt;&gt;TF: Pauses execution
-    Developer-&gt;&gt;TK: Reviews notes &amp; diffs in Web UI
-    alt Additional Changes Needed
-        Developer-&gt;&gt;TF: tk scion-taskforce feedback &lt;id&gt; "..."
-        TF-&gt;&gt;Worker: Wakes worker to continue implementation
-    else Approved
-        Developer-&gt;&gt;TK: Approves &amp; closes ticket (`tk close &lt;id&gt;`)
-        TF-&gt;&gt;Hub: Cleans up worker container
-    end</code></pre>
-<hr />
-<h2 id="step-by-step-walkthrough">Step-by-Step Walkthrough<a class="headerlink" href="#step-by-step-walkthrough" title="Permanent link">&para;</a></h2>
-<h3 id="1-initialize-task-force-for-your-project">1. Initialize Task Force for Your Project<a class="headerlink" href="#1-initialize-task-force-for-your-project" title="Permanent link">&para;</a></h3>
-<p>Run the setup wizard to configure orchestrator defaults and seed the project worker template:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Guided interactive setup</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Or 1-step non-interactive initialization</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>init<span class="w"> </span>--defaults
+    Dev-&gt;&gt;TK: tk create ... --tags taskforce
+    TK-&gt;&gt;TF: post-write hook (background)
+    TF-&gt;&gt;W: scion start (verified), ticket in_progress
+    W-&gt;&gt;TK: report note + waiting-for-review
+    TF-&gt;&gt;W: next save or sync: pause
+    Dev-&gt;&gt;TK: tk add-note (feedback)
+    TK-&gt;&gt;TF: post-write hook
+    TF-&gt;&gt;W: forward note, wake worker
+    Dev-&gt;&gt;TK: tk close
+    TF-&gt;&gt;W: stop worker, start next queued ticket</code></pre>
+<h2 id="1-tag-the-ticket">1. Tag the ticket<a class="headerlink" href="#1-tag-the-ticket" title="Permanent link">&para;</a></h2>
+<p>Write clear acceptance criteria, then add the opt-in tag. The save starts a worker in the project folder. Add <code>role:&lt;name&gt;</code> (for example <code>role:code-reviewer</code>) to make the worker follow an installed <a href="../../plugins/scion-taskforce/#role-skills">role skill</a>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add input sanitization to auth endpoints"</span><span class="w"> </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--tags<span class="w"> </span>backend,taskforce<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--acceptance<span class="w"> </span><span class="s2">"make test passes; invalid input returns 400"</span>
 </span></code></pre></div>
-<p>This creates:
-- <code>.scion-taskforce/scion-taskforce.yaml</code>: Project orchestrator configuration.
-- <code>.scion/templates/taskforce-worker/</code>: Worker template with custom instructions.</p>
-<h3 id="2-verify-hub-model-credentials">2. Verify Hub &amp; Model Credentials<a class="headerlink" href="#2-verify-hub-model-credentials" title="Permanent link">&para;</a></h3>
-<p>Run the end-to-end verification test before delegating real tasks:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span><span class="nb">test</span>
+<p>If the ticket has open dependencies, it waits for them. If all worker slots are busy, it queues. Either way, a <code>**Task Force:**</code> note on the ticket says why.</p>
+<h2 id="2-review-the-report">2. Review the report<a class="headerlink" href="#2-review-the-report" title="Permanent link">&para;</a></h2>
+<p>The worker leaves its changes in the working tree, adds a report note listing the changed files and tags the ticket <code>waiting-for-review</code>. With <code>worker.git: branch</code> it commits on a branch named after the ticket instead. The next save in the project, or <code>tk scion-taskforce sync</code>, merges the report and pauses the worker. To have reports picked up without saving, keep <code>tk scion-taskforce watch</code> running in a spare terminal.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>sync
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>tk<span class="w"> </span>show<span class="w"> </span>&lt;id&gt;
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>git<span class="w"> </span>diff<span class="w">            </span><span class="c1"># worker.git: off (in a git repo)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>git<span class="w"> </span>diff<span class="w"> </span>main...&lt;id&gt;<span class="w"> </span><span class="c1"># worker.git: branch</span>
 </span></code></pre></div>
-<p>This verifies that:
-- Your local container runtime and SCION Hub (<code>http://127.0.0.1:8080</code>) are active.
-- Google Cloud Application Default Credentials (ADC) or API keys are valid.
-- The worker can read/write files in the mounted repository workspace.</p>
-<h3 id="3-tag-actionable-work-for-autonomous-execution">3. Tag Actionable Work for Autonomous Execution<a class="headerlink" href="#3-tag-actionable-work-for-autonomous-execution" title="Permanent link">&para;</a></h3>
-<p>Delegate actionable tickets to autonomous workers by adding the <code>taskforce</code> tag:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add input sanitization to auth endpoints"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--tags<span class="w"> </span>backend,taskforce<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--acceptance<span class="w"> </span><span class="s2">"Run make test and ensure all pass"</span>
+<h2 id="3-send-feedback">3. Send feedback<a class="headerlink" href="#3-send-feedback" title="Permanent link">&para;</a></h2>
+<p>Add a note. The hook forwards it to the worker, wakes it and removes <code>waiting-for-review</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>add-note<span class="w"> </span>&lt;id&gt;<span class="w"> </span><span class="s2">"Also reject empty usernames"</span>
 </span></code></pre></div>
-<h3 id="4-background-worker-spawning">4. Background Worker Spawning<a class="headerlink" href="#4-background-worker-spawning" title="Permanent link">&para;</a></h3>
-<p>Start the task force daemon (or run it in the foreground for live logs):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Start background daemon</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>start
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Check active workers and project status</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>status
+<p><code>tk scion-taskforce feedback &lt;id&gt; "..."</code> does the same in one command. For a live conversation, run <code>tk scion-taskforce attach &lt;id&gt;</code>.</p>
+<h2 id="4-close-the-ticket">4. Close the ticket<a class="headerlink" href="#4-close-the-ticket" title="Permanent link">&para;</a></h2>
+<p>Commit or merge the changes the usual way, then close the ticket. Closing stops the worker, unblocks dependent tickets and starts the next queued one.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>close<span class="w"> </span>&lt;id&gt;
 </span></code></pre></div>
-<p>When a ticket's dependencies are satisfied (<code>tk ready</code>), the task force spawns an isolated container via the SCION Hub, moves the ticket to <code>in_progress</code>, and mounts the project directory.</p>
-<h3 id="5-review-checkpoint-feedback">5. Review Checkpoint &amp; Feedback<a class="headerlink" href="#5-review-checkpoint-feedback" title="Permanent link">&para;</a></h3>
-<p>When the worker finishes writing code and passing local tests:</p>
-<ol>
-<li>It records verification notes via <code>tk add-note &lt;id&gt; "..."</code>.</li>
-<li>It tags the ticket with <code>waiting-for-review</code>.</li>
-<li>The worker container automatically pauses.</li>
-</ol>
-<p>Inspect the work in the Web UI (<code>http://localhost:8475</code>) or CLI:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>show<span class="w"> </span>&lt;ticket-id&gt;
-</span></code></pre></div>
-<p>If modifications are needed, send feedback directly to the paused worker:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tk<span class="w"> </span>scion-taskforce<span class="w"> </span>feedback<span class="w"> </span>&lt;ticket-id&gt;<span class="w"> </span><span class="s2">"Fix the edge case in auth validation"</span>
-</span></code></pre></div>
-<p>The worker wakes up, reads the feedback, and resumes execution.</p>
-<h3 id="6-human-approval-ticket-closure">6. Human Approval &amp; Ticket Closure<a class="headerlink" href="#6-human-approval-ticket-closure" title="Permanent link">&para;</a></h3>
-<p>Once satisfied with the changes and test results, close the ticket:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tk<span class="w"> </span>close<span class="w"> </span>&lt;ticket-id&gt;
-</span></code></pre></div>
-<p>Closing the ticket automatically unblocks downstream tasks in your dependency DAG and schedules the worker container for cleanup.</p>
+<p><code>tk scion-taskforce gc</code> deletes the stopped worker 5 days later. A worker branch, if any, is kept.</p>
 
 
 
@@ -1703,7 +1559,7 @@
       <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["announce.dismiss","content.code.annotate","content.code.copy","content.code.select","content.footnote.tooltips","content.tabs.link","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.instant.prefetch","navigation.path","navigation.sections","navigation.top","navigation.tracking","search.highlight"],"redirect":null,"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.67a597eb.min.js"></script>
+      <script src="../../assets/javascripts/bundle.3c842f4c.min.js"></script>
       
     
   </body>

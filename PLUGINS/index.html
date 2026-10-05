@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../images/favicon.svg">
-      <meta name="generator" content="zensical-0.0.67">
+      <meta name="generator" content="zensical-0.0.68">
     
     
       
@@ -32,12 +32,12 @@
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/modern/main.4ae390e2.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.595f2bf5.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.96d1a7e4.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.b27955a4.min.css">
       
       
 
@@ -77,14 +77,11 @@
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
-    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
     <div data-md-component="skip">
-      
-        
-        <a href="#tk-plugin-architecture-development-guide" class="md-skip">
-          Skip to content
-        </a>
-      
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
     </div>
     <div data-md-component="announce">
       
@@ -1305,6 +1302,7 @@
 
               
               <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
                 
                   
 
@@ -1369,7 +1367,7 @@ Implement the <code>--tk-describe</code> flag:
 <ul>
 <li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.</li>
 <li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. <em>(optional)</em></li>
-<li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Autonomous worker orchestrator wrapping SCION Hub (<code>http://127.0.0.1:8080</code>). Features an interactive setup wizard (<code>tk scion-taskforce init</code>), automated test runner (<code>tk scion-taskforce test</code>), project worker templates (<code>.scion/templates/taskforce-worker</code>), Vertex AI Model Garden integration, and OpenTelemetry logging. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
+<li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Hands tickets tagged <code>taskforce</code> to SCION coding agents through a <code>tk</code> save hook; humans review and close. See the <a href="../plugins/scion-taskforce/">user guide</a>. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
 </ul>
 <hr />
 <h2 id="6-example-plugin-tk-stats">6. Example Plugin: <code>tk-stats</code><a class="headerlink" href="#6-example-plugin-tk-stats" title="Permanent link">&para;</a></h2>
@@ -1475,7 +1473,7 @@ Make it executable:
       <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["announce.dismiss","content.code.annotate","content.code.copy","content.code.select","content.footnote.tooltips","content.tabs.link","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.instant.prefetch","navigation.path","navigation.sections","navigation.top","navigation.tracking","search.highlight"],"redirect":null,"search":"../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.67a597eb.min.js"></script>
+      <script src="../assets/javascripts/bundle.3c842f4c.min.js"></script>
       
     
   </body>
