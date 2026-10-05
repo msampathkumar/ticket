@@ -260,10 +260,23 @@ Logs rotate daily (UTC) or at 100 MB. Set `TK_SCION_TASKFORCE_LOG_DIR` or `TK_SC
 | Note: "stopped without a report" | The worker's turn ended (finished, asked a question, or hit a limit) without the review tag | Add a note to answer or redirect it; `attach <id>` shows the session |
 | Note: "worker lost" | The pod died without reporting | Inspect with `logs <id>`. `tk reopen <id>` (tag kept) relaunches; remove the tag to abandon |
 | `test` times out | Worker slow, stuck or queued | `tk scion-taskforce attach <id>` or `logs <id>`; the ticket stays open |
-| Resumed worker fails with a model error such as `--model medium` | Older versions passed the alias to `scion resume` | Fixed: `start` now resolves aliases. To restart an old worker, remove `taskforce` and `waiting-for-review`, run `tk reopen <id>`, then add `taskforce` again |
+| Resumed worker fails with a model error such as `--model medium` | Older versions passed the alias to `scion resume` | Fixed: `start` now resolves aliases. To restart an old worker, remove `taskforce`, run `tk reopen <id>`, then add `taskforce` again |
+| gemini-cli worker shows a "Topic:" line after a note, then idles | The model sent an empty reply after `update_topic` | Re-run `tk scion-taskforce init`: it adds `home/.gemini/tk-system-settings.json` and its env var to the worker template |
 | Worker fails to authenticate | Wrong credentials for the harness | `gemini-cli`: add `GEMINI_API_KEY` as a Hub secret. Vertex AI: `gcloud auth application-default login` and set `provider.gcp_project` |
 | Ticket stays "queued" | All slots busy | Check `status`; close or review a worker, or run `dispatch <id>` |
 | Error: "worker state file … is not valid JSON" | Corrupt state file | Fix or delete the file (a backup is kept), then `sync` |
+
+## Live test
+
+After changing the plugin, run the black-box live test with real Scion workers in a scratch project
+(initialised, with `tk scion-taskforce skills install doc-writer`):
+
+```bash
+cd /path/to/scratch-project && bash /path/to/ticket/plugins/scion-taskforce/scripts/live-test.sh
+```
+
+It covers create, a note to a paused worker, close, reopen with a new note, and a `role:doc-writer`
+review ticket, and prints each step's time and `PASS` or the failing step. Outputs go to `test-runs/<timestamp>/`.
 
 ## Uninstall
 

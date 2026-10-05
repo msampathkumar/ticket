@@ -330,6 +330,15 @@ def load_config(
     return cfg
 
 
+# gemini-cli overrides for workers, merged over Scion's ~/.gemini/settings.json (a template copy of that
+# file would replace it and drop Scion's status hooks). Live test 2026-10-05: after a forwarded note the
+# model called `update_topic`, then sent an empty reply, and with `skipNextSpeakerCheck` on the turn ended
+# without doing the work. Topic narration off removes the trigger; the next-speaker check recovers others.
+_GEMINI_SETTINGS_FILE = "home/.gemini/tk-system-settings.json"
+_GEMINI_ENV_BLOCK = """env:
+  GEMINI_CLI_SYSTEM_SETTINGS_PATH: /home/scion/.gemini/tk-system-settings.json
+"""
+
 WORKER_TEMPLATE_FILES = {
     "scion-agent.yaml": f"""# {WORKER_TEMPLATE}: standard tk task force worker.
 # Pairs with harness `gemini-cli` + `--harness-auth api-key` (set in scion-taskforce.yaml), the setup
@@ -338,6 +347,11 @@ schema_version: "1"
 description: "tk task force worker: works on one tk ticket, then reports back in the ticket for review"
 agent_instructions: agents.md
 system_prompt: system-prompt.md
+""" + _GEMINI_ENV_BLOCK,
+    _GEMINI_SETTINGS_FILE: """{
+  "general": {"topicUpdateNarration": false},
+  "model": {"skipNextSpeakerCheck": false}
+}
 """,
     "agents.md": """# tk Task Force Worker
 
@@ -377,7 +391,12 @@ def seed_project_scion_template(project_dir: Path, force: bool = False) -> Path:
     for name, content in WORKER_TEMPLATE_FILES.items():
         target = tmpl_dir / name
         if force or not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
+    manifest = tmpl_dir / "scion-agent.yaml"
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if "GEMINI_CLI_SYSTEM_SETTINGS_PATH" not in manifest_text and not re.search(r"(?m)^env:", manifest_text):
+        manifest.write_text(manifest_text.rstrip("\n") + "\n" + _GEMINI_ENV_BLOCK, encoding="utf-8")
     agents = tmpl_dir / "agents.md"
     text = agents.read_text(encoding="utf-8")
     original = text

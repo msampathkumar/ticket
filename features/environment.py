@@ -42,6 +42,8 @@ def before_scenario(context, scenario):
     os.environ['XDG_CONFIG_HOME'] = str(Path(context.test_dir) / '.config')
     # ...and from the developer's real ~/.scion (default harness, harness model aliases)
     os.environ['TK_SCION_TASKFORCE_SCION_HOME'] = str(Path(context.test_dir) / '.scion-home')
+    # The fake scion harness is ready at once: no settle delay after resuming a paused worker.
+    os.environ['TK_SCION_TASKFORCE_WAKE_SETTLE_SECONDS'] = '0'
 
     # Initialize tracking
     context.tickets = {}

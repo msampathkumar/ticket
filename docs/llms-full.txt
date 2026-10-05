@@ -440,6 +440,11 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 ### Changed
 - SCION Task Force: agent-team roles ship as skills in `.agents/skills/tk-scion-*/` (`tk scion-taskforce skills install|list`) instead of per-role Scion templates. Every ticket runs on the one worker template; a `role:<name>` tag (several allowed) makes the brief name `.agents/skills/tk-scion-<name>/SKILL.md`, and untagged tickets get a list of installed role skills. A tag naming a missing skill gets a ticket note with the install command instead of a worker. `templates install|list` remain as deprecated aliases; existing `tk-<role>` templates keep working until removed. `uninit` removes generated skills.
 
+### Fixed
+- SCION Task Force: `tk reopen` on a reviewed ticket removes `waiting-for-review` (with a note) so a new worker starts; before, the tag blocked dispatch.
+- SCION Task Force: a note for a paused gemini-cli worker no longer stalls it. The worker template now ships `home/.gemini/tk-system-settings.json` (topic narration off, next-speaker check on), loaded through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` so Scion's own settings stay intact. Re-run `tk scion-taskforce init` in existing projects to add it.
+- SCION Task Force: a note for a paused worker resumes it first and sends the note once it runs (plus 8 s to settle). In live tests the resumed worker then acted in about 20 s instead of 2.5 min.
+
 ## [0.4.0] - 2026-10-03
 
 ### Added
@@ -1013,7 +1018,7 @@ The project lock stops two quick saves from starting two workers. The state lock
 | `health`, `wait_until_running` | `list --format json`, matched case-insensitively; reads `phase` and `activity`; polled until `running` or `error` |
 | `pause` | `suspend <id>`, falling back to `stop <id>` |
 | `stop` | `stop <id>` |
-| `wake_with_message` | `message <id> <text> --wake`, falling back to `resume <id> <text> --enable-telemetry [extra_resume_args]` |
+| `wake_with_message` | Paused worker: `resume <id> --enable-telemetry [extra_resume_args]`, wait until running plus 8 s; then `message <id> <text> --wake`, falling back to `resume <id> <text> --enable-telemetry [extra_resume_args]` |
 | `attach_command` | `attach <id>` when running, else `resume <id> --enable-telemetry --attach [extra_resume_args]` |
 | `delete` | `delete <id> --preserve-branch` |
 | `workspace_path` | No call. Returns `<project>/.scion/agents/<id>/workspace` if it exists, else `None` |
@@ -2404,10 +2409,23 @@ Logs rotate daily (UTC) or at 100 MB. Set `TK_SCION_TASKFORCE_LOG_DIR` or `TK_SC
 | Note: "stopped without a report" | The worker's turn ended (finished, asked a question, or hit a limit) without the review tag | Add a note to answer or redirect it; `attach <id>` shows the session |
 | Note: "worker lost" | The pod died without reporting | Inspect with `logs <id>`. `tk reopen <id>` (tag kept) relaunches; remove the tag to abandon |
 | `test` times out | Worker slow, stuck or queued | `tk scion-taskforce attach <id>` or `logs <id>`; the ticket stays open |
-| Resumed worker fails with a model error such as `--model medium` | Older versions passed the alias to `scion resume` | Fixed: `start` now resolves aliases. To restart an old worker, remove `taskforce` and `waiting-for-review`, run `tk reopen <id>`, then add `taskforce` again |
+| Resumed worker fails with a model error such as `--model medium` | Older versions passed the alias to `scion resume` | Fixed: `start` now resolves aliases. To restart an old worker, remove `taskforce`, run `tk reopen <id>`, then add `taskforce` again |
+| gemini-cli worker shows a "Topic:" line after a note, then idles | The model sent an empty reply after `update_topic` | Re-run `tk scion-taskforce init`: it adds `home/.gemini/tk-system-settings.json` and its env var to the worker template |
 | Worker fails to authenticate | Wrong credentials for the harness | `gemini-cli`: add `GEMINI_API_KEY` as a Hub secret. Vertex AI: `gcloud auth application-default login` and set `provider.gcp_project` |
 | Ticket stays "queued" | All slots busy | Check `status`; close or review a worker, or run `dispatch <id>` |
 | Error: "worker state file … is not valid JSON" | Corrupt state file | Fix or delete the file (a backup is kept), then `sync` |
+
+## Live test
+
+After changing the plugin, run the black-box live test with real Scion workers in a scratch project
+(initialised, with `tk scion-taskforce skills install doc-writer`):
+
+```bash
+cd /path/to/scratch-project && bash /path/to/ticket/plugins/scion-taskforce/scripts/live-test.sh
+```
+
+It covers create, a note to a paused worker, close, reopen with a new note, and a `role:doc-writer`
+review ticket, and prints each step's time and `PASS` or the failing step. Outputs go to `test-runs/<timestamp>/`.
 
 ## Uninstall
 

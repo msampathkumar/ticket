@@ -366,6 +366,19 @@ class ScionProvider:
         proj = self._validate_project_dir(project_dir)
         binary = self._resolve_binary()
 
+        # A paused worker is resumed first and messaged once its harness has settled. In live tests a
+        # note sent with `message --wake` to a just-resuming gemini-cli worker was handled much slower.
+        live = None if self.dry_run else self.health(proj, clean_id)
+        if live is not None and not live.is_running:
+            res = self._run(
+                [binary, "--project", proj, "resume", clean_id, "--enable-telemetry", "--non-interactive",
+                 *self.extra_resume_args],
+                cwd=proj,
+            )
+            up = self.wait_until_running(proj, clean_id, timeout_seconds=60) if res.returncode == 0 else None
+            if up is not None and up.is_running:
+                time.sleep(float(os.environ.get("TK_SCION_TASKFORCE_WAKE_SETTLE_SECONDS", "8")))
+
         res = self._run(
             [binary, "--project", proj, "message", clean_id, message, "--wake", "--non-interactive"],
             cwd=proj,

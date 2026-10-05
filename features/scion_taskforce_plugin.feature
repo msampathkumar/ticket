@@ -90,6 +90,7 @@ Feature: SCION Task Force Plugin
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "api-key"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "tk-worker-gemini-cli-with-api-key-auth"
     And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/scion-agent.yaml" should contain "agent_instructions: agents.md"
+    And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/scion-agent.yaml" should contain "GEMINI_CLI_SYSTEM_SETTINGS_PATH"
     And the file ".scion/templates/tk-worker-gemini-cli-with-api-key-auth/agents.md" should contain "Git is optional: never run `git init`"
 
   Scenario: test verifies the task force through a real ticket and closes it
@@ -782,6 +783,21 @@ Feature: SCION Task Force Plugin
     And I run "ticket close tf-0231"
     Then ticket "tf-0231" should contain "ticket closed; stopped worker `tf-0231`"
     And the fake scion pod "tf-0231" should be in state "stopped"
+
+  Scenario: Reopening a reviewed ticket clears the review tag and starts a new worker
+    Given a clean tickets directory
+    And a fake "scion" runtime in mode "ok"
+    And the environment variable "TK_HOOKS_SYNC" is "1"
+    And a ticket exists with ID "tf-0233" and title "Do it again"
+    When I run "ticket scion-taskforce hook install"
+    And I run "ticket update tf-0233 --tags taskforce"
+    And I run "ticket update tf-0233 --tags taskforce,waiting-for-review"
+    And I run "ticket close tf-0233"
+    And I run "ticket reopen tf-0233"
+    Then ticket "tf-0233" should contain "ticket reopened; removed the `waiting-for-review` tag."
+    And ticket "tf-0233" should have field "tags" with value "[taskforce]"
+    And ticket "tf-0233" should have field "status" with value "in_progress"
+    And the fake scion pod "tf-0233" should be in state "running"
 
   Scenario: Removing the taskforce tag stops and removes the worker and notes it
     Given a clean tickets directory

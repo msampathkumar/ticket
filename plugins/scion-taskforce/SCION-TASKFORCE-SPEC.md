@@ -121,7 +121,7 @@ The project lock stops two quick saves from starting two workers. The state lock
 | `health`, `wait_until_running` | `list --format json`, matched case-insensitively; reads `phase` and `activity`; polled until `running` or `error` |
 | `pause` | `suspend <id>`, falling back to `stop <id>` |
 | `stop` | `stop <id>` |
-| `wake_with_message` | `message <id> <text> --wake`, falling back to `resume <id> <text> --enable-telemetry [extra_resume_args]` |
+| `wake_with_message` | Paused worker: `resume <id> --enable-telemetry [extra_resume_args]`, wait until running plus 8 s; then `message <id> <text> --wake`, falling back to `resume <id> <text> --enable-telemetry [extra_resume_args]` |
 | `attach_command` | `attach <id>` when running, else `resume <id> --enable-telemetry --attach [extra_resume_args]` |
 | `delete` | `delete <id> --preserve-branch` |
 | `workspace_path` | No call. Returns `<project>/.scion/agents/<id>/workspace` if it exists, else `None` |

@@ -9,6 +9,7 @@ catches up on worker reports, then decides what to do for the saved ticket:
 - worker reported back (``waiting-for-review``)       -> pause it, freeing its slot
 - no free slot                                        -> note "queued"
 - ticket closed                                       -> stop its worker, start the next queued
+- ticket reopened                                     -> drop ``waiting-for-review``, start a worker
 - ``taskforce`` removed / ``no-taskforce`` added      -> stop and delete its worker (branch kept), note it
 - ticket file deleted                                 -> stop and delete its worker (branch kept)
 - otherwise                                           -> nothing
@@ -38,6 +39,7 @@ from tk_scion_taskforce.tickets import (
     load_all_tickets,
     merge_worker_ticket_copy,
     parse_ticket_file,
+    remove_ticket_tag,
     validate_ticket_id,
 )
 from tk_scion_taskforce.workers import (
@@ -321,6 +323,13 @@ def _decide(ctx: _Ctx, ticket: TicketInfo, event: str) -> str:
                 _note(ticket.path, f"could not forward the update to worker `{ticket.id}`: {hint}")
             return f"{ticket.id}: forwarded note (ok={ok})"
         return f"{ticket.id}: worker already active"
+
+    review_tag = tags(ctx.cfg)[2]
+    if event in ("reopen", "status") and ticket.status == "open" and review_tag in ticket.tags:
+        # Reopening means "do more work": the old review tag would block dispatch.
+        remove_ticket_tag(ticket.path, review_tag)
+        _note(ticket.path, f"ticket reopened; removed the `{review_tag}` tag.")
+        ticket = parse_ticket_file(ticket.path, project_dir=ctx.project)
 
     eligible, reason = is_eligible_for_dispatch(ticket, ctx.cfg)
     if not eligible:
