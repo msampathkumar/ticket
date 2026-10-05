@@ -4,16 +4,10 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
 
-# Ensure virtual environment exists
-if [ ! -d ".venv" ]; then
+# Ensure virtual environment and tk_webui package are ready
+if [ ! -x "$DIR/.venv/bin/python3" ] || ! "$DIR/.venv/bin/python3" -c "import tk_webui" &>/dev/null; then
     echo "📦 Setting up local environment for tk-webui..."
-    if command -v uv &> /dev/null; then
-        uv venv
-        uv pip install -e .
-    else
-        python3 -m venv .venv
-        .venv/bin/pip install -e .
-    fi
+    "$DIR/install.sh" --webui
 fi
 
 # Run tk-webui directly
