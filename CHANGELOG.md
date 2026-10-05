@@ -2,13 +2,32 @@
 
 ## [Unreleased]
 
+### Added
+- Core: post-write hooks. Executables in `.tickets/.hooks/post-write.d/` run after each successful write with `TK_EVENT`, `TK_TICKET_ID`, `TK_TICKET_FILE`, `TICKETS_DIR` and `TK_SCRIPT`; in the background by default (`TK_HOOKS_SYNC=1` inline, `TK_NO_HOOKS=1` off); output goes to `.tickets/.hooks/hooks.log`.
+- SCION Task Force: menu-based `init` wizard with validation; runs `tk init` and `scion init` when missing.
+- SCION Task Force: standard worker template `tk-worker-gemini-cli-with-api-key-auth`; `test` verifies end to end through a real ticket.
+- SCION Task Force: `worker.git` (`off` default, or `branch`) and `worker.privacy` (`confidential` default, or `standard`); `status` lists what needs you and automatic actions.
+- SCION Task Force: `watch` repeats `sync`; workers whose turn ended without a report are paused and noted.
+- SCION Task Force: the host `tk` is mounted read-only in each worker; briefs, template and feedback tell workers to use `tk show`, `tk add-note` and `tk update`.
+- SCION Task Force: `scripts/live-test.sh`, a black-box live test with real Scion workers.
+
 ### Changed
+- SCION Task Force: event-driven. The per-project save hook runs `on-save <id>`; `sync` catches up. Close stops the worker; removing `taskforce`, adding `no-taskforce` or deleting the ticket removes it.
+- SCION Task Force: only `init` links a folder to the Scion Hub; dispatch may start Podman and re-link a configured project.
+- SCION Task Force: `.scion/agents/` is excluded through `.git/info/exclude`, never `.gitignore`.
+- SCION Task Force: re-running `init` keeps your values; `uninit` asks first and removes workers; `dispatch` checks dependencies.
 - SCION Task Force: agent-team roles ship as skills in `.agents/skills/tk-scion-*/` (`tk scion-taskforce skills install|list`) instead of per-role Scion templates. Every ticket runs on the one worker template; a `role:<name>` tag (several allowed) makes the brief name `.agents/skills/tk-scion-<name>/SKILL.md`, and untagged tickets get a list of installed role skills. A tag naming a missing skill gets a ticket note with the install command instead of a worker. `templates install|list` remain as deprecated aliases; existing `tk-<role>` templates keep working until removed. `uninit` removes generated skills.
+
+### Removed
+- SCION Task Force: the polling daemon and `server` commands (they print a migration hint), tmux auto-accept, `test --raw`.
 
 ### Fixed
 - SCION Task Force: `tk reopen` on a reviewed ticket removes `waiting-for-review` (with a note) so a new worker starts; before, the tag blocked dispatch.
 - SCION Task Force: a note for a paused gemini-cli worker no longer stalls it. The worker template now ships `home/.gemini/tk-system-settings.json` (topic narration off, next-speaker check on), loaded through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` so Scion's own settings stay intact. Re-run `tk scion-taskforce init` in existing projects to add it.
 - SCION Task Force: a note for a paused worker resumes it first and sends the note once it runs (plus 8 s to settle). In live tests the resumed worker then acted in about 20 s instead of 2.5 min.
+- SCION Task Force: `init` works in folders outside git. Scion writes `.scion` as a marker file there; the worker template now goes to Scion's project config under `~/.scion/project-configs/`.
+- SCION Task Force: Scion model aliases are resolved before start, so resumed workers keep a valid model; the worker keeps existing tags when it adds the review tag.
+- Docs: `make docs-build` and `make docs-dev` use `uvx zensical`, so a pyenv `zensical` shim on PATH no longer breaks them.
 
 ## [0.4.0] - 2026-10-03
 

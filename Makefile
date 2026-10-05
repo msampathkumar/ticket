@@ -7,7 +7,7 @@ docs-llms:
 	./scripts/build_llms_full.sh
 
 docs-dev: docs-llms
-	uv run --with zensical zensical serve
+	uvx zensical serve
 
 docs-build: docs-llms
-	uv run --with zensical zensical build
+	uvx zensical build

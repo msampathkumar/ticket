@@ -18,6 +18,7 @@ from tk_scion_taskforce.config import (
     init_config,
     load_config,
     project_config_path,
+    project_scion_dir,
     resolve_config_path,
     uninit_config,
 )
@@ -354,7 +355,7 @@ def cmd_init(args: list[str], project_dir: Path) -> int:
     if not global_scope:
         prov = load_config(project_dir=project_dir)["provider"]
         harness, model = prov.get("harness_config") or "default", prov.get("model") or "harness default"
-        print(f"   Template: `{project_dir / '.scion' / 'templates' / WORKER_TEMPLATE}` (harness={harness}, model={model})")
+        print(f"   Template: `{project_scion_dir(project_dir) / 'templates' / WORKER_TEMPLATE}` (harness={harness}, model={model})")
         _ensure_runtime_project(project_dir)
         hook = install_hook(project_dir)
         print(f"🪝 Save hook:  `{hook}` (ticket saves now trigger the task force)")

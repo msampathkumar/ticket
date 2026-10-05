@@ -72,7 +72,7 @@ Feature: SCION Task Force Plugin
     And the output should contain "Project IDs are 6-30 chars"
     And the output should contain "looks like an AWS region"
     And the output should contain "choose 4 to type your own value"
-    And the output should contain "scion init: created .scion/"
+    And the output should contain "scion init: created .scion"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "opencode"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "vertex-ai"
     And the file ".scion-taskforce/scion-taskforce.yaml" should contain "my-proj-123"

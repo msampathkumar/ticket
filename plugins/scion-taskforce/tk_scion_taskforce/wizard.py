@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import subprocess
@@ -10,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
-from tk_scion_taskforce.config import load_yaml_file
+from tk_scion_taskforce.config import load_yaml_file, scion_home
 from tk_scion_taskforce.roles import DEFAULT_ROLES
 from tk_scion_taskforce.tickets import find_tk_binary
 
@@ -244,11 +243,6 @@ def run_wizard(defaults: dict, installed: list[str]) -> dict:
 # --- Scion discovery --------------------------------------------------------------------------
 
 
-def scion_home() -> Path:
-    """Scion's config dir (always ~/.scion for Scion; the env override exists for tests)."""
-    return Path(os.environ.get("TK_SCION_TASKFORCE_SCION_HOME") or Path.home() / ".scion")
-
-
 def _read_yaml(path: Path) -> dict:
     """Read a Scion YAML file; {} when missing or unparsable (it is outside our control)."""
     try:
@@ -341,8 +335,8 @@ def ensure_project_initialized(project_dir: Path, scion_binary: str = "scion") -
             res = subprocess.run([tk_bin, "super", "init", str(project_dir)], capture_output=True, text=True)
             print(f"{'✓' if res.returncode == 0 else '⚠️ '} tk init: {(res.stdout or res.stderr).strip()}")
 
-    if (project_dir / ".scion").is_dir():
-        print("✓ scion: .scion/ already initialized")
+    if (project_dir / ".scion").exists():
+        print("✓ scion: .scion already initialized")
     elif not shutil.which(scion_binary):
         print(f"⚠️  scion: `{scion_binary}` not found on PATH; install Scion, then run `scion init`.")
         return
@@ -360,8 +354,8 @@ def ensure_project_initialized(project_dir: Path, scion_binary: str = "scion") -
             return
         if res.returncode != 0:
             print(f"⚠️  scion init failed: {(res.stderr or res.stdout).strip()[:300]}")
-        elif (project_dir / ".scion").is_dir():
-            print("✓ scion init: created .scion/")
+        elif (project_dir / ".scion").exists():
+            print("✓ scion init: created .scion")
         else:
             print(f"⚠️  scion init ran, but {project_dir}/.scion/ is missing (Scion initializes the git root).")
     fixed = ensure_scion_agents_ignored(project_dir)

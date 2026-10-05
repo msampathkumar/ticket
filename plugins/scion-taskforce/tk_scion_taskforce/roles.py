@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tk_scion_taskforce.config import project_scion_dir
+
 UPSTREAM_REPO = "scion-frontiers/agent-team"
 UPSTREAM_REF = "3650f1b03411116fcbf37852bfec6911db64b569"  # pinned; `skills install --ref <sha>` overrides
 ROLE_TAG = "role:"
@@ -120,7 +122,7 @@ def select_roles(project_dir: Path, tags: Iterable[str]) -> RoleSelection:
         if valid and (skills_root(project_dir) / skill_name(role) / "SKILL.md").is_file():
             sel.skills.append(role)
         # deprecated: old per-role templates keep working until removed; remove after 2027-04-01
-        elif valid and not sel.template and (Path(project_dir) / ".scion" / "templates" / template_name(role)).is_dir():
+        elif valid and not sel.template and (project_scion_dir(Path(project_dir)) / "templates" / template_name(role)).is_dir():
             sel.template = template_name(role)
         else:
             sel.missing.append(role)
@@ -161,7 +163,7 @@ def selectable_skills(project_dir: Path) -> list[tuple[str, str]]:
 
 def installed_roles(project_dir: Path) -> list[tuple[str, str]]:
     """``(role, source line)`` for every generated (deprecated) role template in the project."""
-    root = project_dir / ".scion" / "templates"
+    root = project_scion_dir(project_dir) / "templates"
     found = []
     for marker in sorted(root.glob(f"{TEMPLATE_PREFIX}*/{MARKER}")):
         source = next((ln for ln in marker.read_text(encoding="utf-8").splitlines() if ln.startswith("| Source")), "")

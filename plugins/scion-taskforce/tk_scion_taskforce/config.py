@@ -383,10 +383,36 @@ changes over broad rewrites, state assumptions explicitly, and report honestly w
 }
 
 
+def scion_home() -> Path:
+    """Scion's config dir (always ~/.scion for Scion; the env override exists for tests)."""
+    return Path(os.environ.get("TK_SCION_TASKFORCE_SCION_HOME") or Path.home() / ".scion")
+
+
+def project_scion_dir(project_dir: Path) -> Path:
+    """Scion's directory for this project (templates live in ``<it>/templates``).
+
+    Usually ``<project>/.scion/``. Outside a git repo, Scion writes ``.scion`` as a marker file
+    (``project-id``, ``project-slug``) and keeps the config in ``~/.scion/project-configs/<slug>__<id8>/.scion/``.
+    """
+    marker = Path(project_dir) / ".scion"
+    if not marker.is_file():
+        return marker
+    meta = load_yaml_file(marker)
+    pid, slug = str(meta.get("project-id", "") or ""), str(meta.get("project-slug", "") or "")
+    if not pid:
+        raise ValueError(f"{marker} is a file without a project-id; re-run `scion init` there")
+    root = scion_home() / "project-configs"
+    exact = root / f"{slug}__{pid[:8]}" / ".scion"
+    if exact.is_dir():
+        return exact
+    found = sorted(root.glob(f"*__{pid[:8]}/.scion"))
+    return found[0] if found else exact
+
+
 def seed_project_scion_template(project_dir: Path, force: bool = False) -> Path:
     """Seed <project>/.scion/templates/<WORKER_TEMPLATE>/. Existing files are kept unless ``force``,
     except that the pre-2026-10 git and report sections of agents.md are replaced in place (other edits are kept)."""
-    tmpl_dir = project_dir / ".scion" / "templates" / WORKER_TEMPLATE
+    tmpl_dir = project_scion_dir(project_dir) / "templates" / WORKER_TEMPLATE
     tmpl_dir.mkdir(parents=True, exist_ok=True)
     for name, content in WORKER_TEMPLATE_FILES.items():
         target = tmpl_dir / name
@@ -511,7 +537,7 @@ def uninit_config(
     if scion_dir.is_dir():
         shutil.rmtree(scion_dir)
         removed_any = True
-    tmpl_root = base_dir / ".scion" / "templates"
+    tmpl_root = project_scion_dir(base_dir) / "templates"
     # Generated role templates carry an UPSTREAM.md marker; hand-made templates are left alone.
     role_dirs = [m.parent for m in tmpl_root.glob("tk-*/UPSTREAM.md")]
     for tmpl_dir in [tmpl_root / n for n in (WORKER_TEMPLATE, *LEGACY_TEMPLATES)] + role_dirs:
