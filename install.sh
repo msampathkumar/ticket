@@ -45,34 +45,147 @@ install_core() {
     INSTALLED+=("tk help              # Core CLI")
 }
 
-install_webui() {
-    echo "📦 Installing tk-webui plugin..."
-    if [ ! -d ".venv" ]; then
-        if command -v uv &> /dev/null; then
-            uv venv
-            uv pip install -e .
-        else
-            python3 -m venv .venv
-            .venv/bin/pip install -e .
-        fi
-    else
-        if command -v uv &> /dev/null; then
-            uv pip install -e .
-        else
-            .venv/bin/pip install -e .
+find_python_interpreter() {
+    # 1. Explicit PYTHON environment variable override
+    if [ -n "${PYTHON:-}" ] && [ -x "$PYTHON" ]; then
+        if "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+            echo "$PYTHON"
+            return 0
         fi
     fi
 
-    # Create tk-webui launcher with metadata
-    rm -f "$BIN_DIR/tk-webui"
-    cat << EOF > "$BIN_DIR/tk-webui"
-#!/usr/bin/env bash
-# tk-plugin: Interactive Kanban Web UI & PR review dashboard
-# tk-plugin-version: 0.4.0
+    # 2. Pyenv active python (if pyenv is installed and managing Python)
+    if command -v pyenv &>/dev/null; then
+        local pyenv_py
+        pyenv_py="$(pyenv which python3 2>/dev/null || true)"
+        if [ -n "$pyenv_py" ] && [ -x "$pyenv_py" ]; then
+            if "$pyenv_py" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+                echo "$pyenv_py"
+                return 0
+            fi
+        fi
+    fi
 
-exec "$DIR/.venv/bin/python3" -m tk_webui.main "\$@"
-EOF
-    chmod +x "$BIN_DIR/tk-webui"
+    # 3. Standard python3 in PATH
+    if command -v python3 &>/dev/null; then
+        local p3
+        p3="$(command -v python3)"
+        if "$p3" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+            echo "$p3"
+            return 0
+        fi
+    fi
+
+    # 4. Common macOS (Homebrew / Xcode Command Line Tools) and Linux standard paths
+    local candidates=(
+        "/opt/homebrew/bin/python3"
+        "/usr/local/bin/python3"
+        "/usr/bin/python3"
+        "$HOME/.pyenv/shims/python3"
+    )
+    for candidate in "${candidates[@]}"; do
+        if [ -x "$candidate" ]; then
+            if "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+                echo "$candidate"
+                return 0
+            fi
+        fi
+    done
+
+    # 5. Fallback: python in PATH (if symlinked to python3 >= 3.9)
+    if command -v python &>/dev/null; then
+        local p
+        p="$(command -v python)"
+        if "$p" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+            echo "$p"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+install_webui() {
+    echo "📦 Installing tk-webui plugin..."
+
+    local python_bin
+    if ! python_bin="$(find_python_interpreter)"; then
+        local detected=""
+        if command -v python3 &>/dev/null; then
+            detected="$(python3 --version 2>&1 || true)"
+        fi
+        echo "❌ No suitable Python 3 (>= 3.9) found." >&2
+        if [ -n "$detected" ]; then
+            echo "   Detected: $detected, but tk-webui requires Python >= 3.9" >&2
+        fi
+        echo "💡 Installation options:" >&2
+        echo "   • macOS: brew install python  (or 'xcode-select --install')" >&2
+        echo "   • Linux: sudo apt install python3 python3-venv python3-pip" >&2
+        echo "   • Pyenv: pyenv install 3.12 && pyenv global 3.12" >&2
+        return 1
+    fi
+
+    # Validate existing .venv health; rebuild if broken or pointing to missing interpreter
+    if [ -d "$DIR/.venv" ]; then
+        if [ ! -x "$DIR/.venv/bin/python3" ] || ! "$DIR/.venv/bin/python3" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+            echo "⚠️  Existing .venv is broken or uses a missing Python interpreter. Rebuilding..."
+            rm -rf "$DIR/.venv"
+        fi
+    fi
+
+    if command -v uv &> /dev/null && uv --version &> /dev/null; then
+        echo "⚡ Using uv for environment setup..."
+        if [ ! -d "$DIR/.venv" ]; then
+            uv venv "$DIR/.venv" --python "$python_bin" || uv venv "$DIR/.venv"
+        fi
+        VIRTUAL_ENV="$DIR/.venv" uv pip install -e "$DIR"
+    else
+        echo "🐍 Using Python: $python_bin ($("$python_bin" --version 2>&1))"
+        if [ ! -d "$DIR/.venv" ]; then
+            echo "🔨 Creating virtual environment at $DIR/.venv..."
+            unset PYTHONHOME
+            if ! "$python_bin" -m venv "$DIR/.venv"; then
+                echo "❌ Failed to create virtual environment with $python_bin." >&2
+                echo "💡 On Debian/Ubuntu: sudo apt install python3-venv python3-pip" >&2
+                echo "💡 On macOS: xcode-select --install" >&2
+                return 1
+            fi
+        fi
+
+        # Ensure pip is present inside the virtual environment
+        if ! "$DIR/.venv/bin/python3" -m pip --version &>/dev/null; then
+            echo "🔧 Bootstrapping pip inside .venv..."
+            "$DIR/.venv/bin/python3" -m ensurepip --upgrade 2>/dev/null || \
+            "$DIR/.venv/bin/python3" -m ensurepip --default-pip 2>/dev/null || true
+        fi
+
+        if ! "$DIR/.venv/bin/python3" -m pip --version &>/dev/null; then
+            echo "❌ 'pip' is not available in $DIR/.venv." >&2
+            echo "💡 Please ensure 'ensurepip' or 'python3-pip' is available." >&2
+            return 1
+        fi
+
+        echo "📥 Installing tk-webui dependencies into .venv..."
+        unset PYTHONHOME
+        VIRTUAL_ENV="$DIR/.venv" "$DIR/.venv/bin/python3" -m pip install -e "$DIR"
+    fi
+
+    # Verify installation
+    if ! "$DIR/.venv/bin/python3" -c "import tk_webui" &>/dev/null; then
+        echo "❌ Verification failed: tk_webui could not be imported from $DIR/.venv." >&2
+        return 1
+    fi
+
+    # Ensure plugin script exists and has executable permissions
+    mkdir -p "$DIR/plugins/webui"
+    chmod +x "$DIR/plugins/webui/ticket-webui"
+    ln -sf "ticket-webui" "$DIR/plugins/webui/tk-webui"
+
+    # Link launcher into BIN_DIR
+    rm -f "$BIN_DIR/tk-webui" "$BIN_DIR/ticket-webui"
+    ln -sf "$DIR/plugins/webui/ticket-webui" "$BIN_DIR/tk-webui"
+    ln -sf "$BIN_DIR/tk-webui" "$BIN_DIR/ticket-webui"
+
     echo "✅ Web UI plugin installed to $BIN_DIR/tk-webui"
     INSTALLED+=("tk webui             # Launch Web UI (port 8475)")
 }
