@@ -3,7 +3,7 @@ title: Installation
 description: How to install ticket (tk) and its modular plugins.
 ---
 
-`ticket` (`tk`) is designed with a zero-dependency POSIX Bash core and modular optional plugins. You can install only what you need.
+`ticket` (`tk`) has a single-file Bash core with no runtime dependencies. Plugins are optional; install only what you need.
 
 ## Quick Install
 
@@ -17,33 +17,45 @@ cd ticket
 ./install.sh --full
 ```
 
-Binaries are installed to `~/.local/bin/` (`tk`, `tk-webui`, plus optional plugin binaries). Ensure `~/.local/bin` is in your `$PATH`.
+Binaries are installed to `~/.local/bin/` (override with `BIN_DIR`). Ensure that directory is on your `$PATH`.
+
+---
+
+## Requirements
+
+**Core CLI**: Bash 3.2+ and standard Unix tools (`awk`, `sed`, `grep`, `find`, `mkdir`, `date`) on macOS or Linux. Python and Node are not used.
+
+| Optional tool | Used for |
+| :--- | :--- |
+| `jq` | `tk query <filter>` (unfiltered `tk query` works without it) |
+| `rg` (ripgrep) | Faster `tk find`; `grep` is used otherwise |
+| `git` | Sharing tickets; default assignee from `git config user.name` |
 
 ---
 
 ## Installation Flags
 
-The installer supports composable flags so you can install precisely the components you require:
+Flags accumulate, so any combination works (e.g. `./install.sh --core --github`):
 
-| Flag | Description | Mandatory Dependencies |
+| Flag | Installs | Requires |
 | :--- | :--- | :--- |
-| `--core` | Installs only the core `tk` POSIX Bash CLI | **Zero** (Pure Bash) |
-| `--webui` | Installs the interactive Kanban & DAG Web UI (`tk-webui`) | Python 3.9+, FastAPI |
-| `--skill` | Installs the AI agent skill (`tk-agent-skill`) | None |
-| `--github` | Installs the optional GitHub sync plugin (`tk-github`) | Python / Bash |
-| `--scion-taskforce` | Installs the autonomous SCION Task Force worker orchestrator (`tk-scion-taskforce`) | Python 3.9+, `scion` CLI |
-| `--full` | **(Default)** Installs Core CLI, Web UI, and Agent Skill | Python 3.9+ (for Web UI) |
-| `--all` | Installs everything, including optional plugins | Python 3.9+, `scion` CLI |
+| `--core`, `-c` | Core `tk` CLI | Bash 3.2+ |
+| `--webui`, `-w` | Web UI plugin (`tk webui`) in a local `.venv` | Python 3.9+ with `uv` or `pip` |
+| `--skill`, `-s` | Agent skill to `~/.agents/skills/tk/SKILL.md` | None |
+| `--github`, `-g` | GitHub import plugin (`tk github`) | `gh` (authenticated), `jq` |
+| `--scion-taskforce`, `-t` | SCION Task Force plugin (`tk scion-taskforce`) | Python 3.9+, `scion` CLI |
+| `--full`, `-f` | **(Default)** Core, Web UI and Agent Skill | Python 3.9+ (for the Web UI) |
+| `--all` | Everything above | All of the above |
 
 ### Examples
 
 ```bash
-# Install only the lightweight core CLI (no Python/Node required)
+# Core CLI only (no Python required)
 ./install.sh --core
 
-# Install Core CLI + GitHub sync plugin
+# Core CLI + GitHub import plugin
 ./install.sh --core --github
 
-# Install everything including optional plugins
+# Everything, including the GitHub and SCION Task Force plugins
 ./install.sh --all
 ```

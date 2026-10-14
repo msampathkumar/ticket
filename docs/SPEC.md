@@ -54,7 +54,7 @@ Each ticket file begins with a YAML header delimited by `---`:
 
 ```yaml
 ---
-id: string          # Unique ticket identifier, e.g. tic-6mex (Required)
+id: string          # Unique ticket identifier, e.g. tic-6mex2q (Required)
 status: enum        # open | in_progress | closed (Required)
 deps: list[string]  # Array of ticket IDs this ticket depends on (Required)
 links: list[string] # Array of related ticket IDs (symmetric) (Optional)
@@ -62,33 +62,57 @@ created: ISO-8601   # Timestamp of ticket creation (e.g. 2026-09-25T10:01:06Z) (
 type: enum          # bug | feature | task | epic | chore (Default: task)
 priority: integer   # 0 (Critical) to 4 (Trivial) (Default: 2)
 assignee: string    # Assignee name or git username (Optional)
-tags: list[string]  # Array of tag strings (Optional)
+external-ref: string # External issue/PR reference, e.g. gh-123 (Optional)
 parent: string      # Parent ticket ID if this ticket is a subtask (Optional)
-external_ref: string# External issue/PR reference, e.g. gh-123 (Optional)
+tags: list[string]  # Array of tag strings (Optional)
 ---
 ```
 
+The external reference key is `external-ref` (hyphen). Readers should also accept the legacy `external_ref` spelling.
+
 ### 2.3 Markdown Body Structure
 
-Following the frontmatter, the Markdown body contains:
+Following the frontmatter, the Markdown body contains (sections are omitted when empty):
 
 ```markdown
 # <Title>
 
 <Description text...>
 
-## Design Notes
+## Design
+
 <Architecture or design thoughts...>
 
 ## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
 
-## Review Notes / Audit Trail
-<!-- Timestamped review comments appended by tk add-note -->
-### Note (2026-09-25T10:30:00Z)
-<Comment content>
+<Criteria...>
+
+## Notes
+
+**2026-09-25T10:30:00Z**
+
+<Note text appended by tk add-note>
 ```
+
+`tk add-note` creates the `## Notes` section on first use and appends each note as a bold UTC timestamp line, a blank line, then the note text.
+
+### 2.4 Field Values
+
+- **Verbatim**: values are stored exactly as given, including `/`, `&`, `\` and `|`.
+- **Quoting**: a scalar is YAML-quoted (single quotes) only when plain YAML would read it differently: a leading indicator character (`[`, `]`, `{`, `}`, `#`, `&`, `*`, `!`, `|`, `>`, `'`, `"`, `%`, `@`, backtick, `,`), a leading `-`, `?` or `:` that stands alone or is followed by a space, an embedded `: ` or ` #`, a trailing `:`, or leading/trailing spaces. Other values are written unchanged.
+- **Single line**: frontmatter values must not contain a newline or carriage return. `tk` rejects them with `Error: <field> must be a single line (newlines are not allowed)` and exit code `1`; the value is not written. The title, description, design, acceptance and notes live in the body and may span lines.
+- **Write failures**: if a ticket file cannot be written (read-only directory, invalid path), `tk` prints `Error: cannot write ticket file '<path>'`, exits `1`, prints no ID, and fires no hooks.
+
+### 2.5 Repository Files
+
+| Path | Purpose | In Git |
+| :--- | :--- | :--- |
+| `.tickets/*.md` | Tickets | Yes |
+| `.tickets/.gitignore` | Written by `tk init`: `.locks/` and `.hooks/hooks.log` (missing lines appended only) | Yes |
+| `.tickets/.locks/` | Per-ticket lock directories (Section 4.2); contains a self-ignoring `.gitignore` | No |
+| `.tickets/.hooks/post-write.d/` | Executable post-write hooks (Section 5.1) | Optional |
+| `.tickets/.hooks/hooks.log` | Hook output | No |
+| `~/.local/state/tk/projects.json` | Projects registered by `tk init`, used by the Web UI project list | Outside the repo |
 
 ---
 
@@ -110,8 +134,9 @@ Following the frontmatter, the Markdown body contains:
 
 | Command | Description |
 | :--- | :--- |
-| `tk init [path]` | Initializes `.tickets/` tracking repository |
-| `tk create <title> [options]` | Creates ticket, prints generated ID to stdout |
+| `tk init [dir]` | Initializes `.tickets/` with a closed setup ticket and `.tickets/.gitignore`; safe to re-run |
+| `tk uninit [dir]` | Deletes the `.tickets/` directory (no confirmation) |
+| `tk create [title] [options]` | Creates ticket, prints generated ID to stdout. Options: `-d/--description`, `--design`, `--acceptance`, `-t/--type`, `-p/--priority`, `-a/--assignee`, `--external-ref`, `--parent`, `--tags` |
 | `tk start <id>` | Sets status to `in_progress` |
 | `tk start <id> --claim [--assignee X]` | Atomically sets status `in_progress` and `assignee` (default: `git config user.name`, else `$USER`); fails with exit code `3` if already `in_progress` for a different assignee |
 | `tk close <id>` | Sets status to `closed` |
@@ -119,30 +144,33 @@ Following the frontmatter, the Markdown body contains:
 | `tk status <id> <status>` | Updates status directly (`open`, `in_progress`, `closed`) |
 | `tk dep <id> <dep-id>` | Adds dependency relationship |
 | `tk undep <id> <dep-id>` | Removes dependency relationship |
-| `tk link <id> <link-id>` | Adds symmetric relational link between tickets |
-| `tk unlink <id> <link-id>` | Removes symmetric relational link between tickets |
-| `tk dep tree <id>` | Prints hierarchical ASCII dependency tree |
+| `tk link <id> <id> [id...]` | Adds symmetric relational links between tickets |
+| `tk unlink <id> <target-id>` | Removes symmetric relational link between tickets |
+| `tk dep tree [--full] <id>` | Prints hierarchical ASCII dependency tree (`--full` disables deduplication) |
 | `tk dep cycle` | Traverses graph and outputs detected cycles |
-| `tk ready` | Lists unblocked, actionable tickets |
-| `tk blocked` | Lists blocked tickets with unresolved blockers |
-| `tk closed [--limit=N]` | Lists recently closed tickets |
-| `tk ls` / `tk list [options]` | Lists tickets (default: hides closed, limit 10, with filters) |
+| `tk ready [-a X] [-T X]` | Lists unblocked, actionable tickets (filter by assignee or tag) |
+| `tk blocked [-a X] [-T X]` | Lists blocked tickets with unresolved blockers |
+| `tk closed [--limit=N] [-a X] [-T X]` | Lists recently closed tickets by file mtime (default 20) |
+| `tk ls` / `tk list [options]` | Lists tickets (default: hides closed, limit 10). Options: `-s/--status`, `-a/--assignee`, `-t/--type`, `-p/--priority`, `-T/--tag`, `-n/--limit`, `--full`, `--all` |
 | `tk edit <id>` | Opens ticket in `$EDITOR` |
-| `tk query [jq-filter]` | Outputs tickets as JSON lines, with optional jq filter |
+| `tk query [jq-filter]` | Outputs tickets as JSON lines; the optional filter requires `jq` |
 | `tk find <search-term>` | Case-insensitive text search across tickets |
-| `tk show <id>` | Displays ticket metadata and full markdown body |
-| `tk update <id> [options]` | Updates fields (title, desc, priority, tags, etc.) |
-| `tk add-note <id> [text]` | Appends timestamped note |
-| `tk agent-skill [--install]` | Displays or installs agent skill to `~/.agents/skills/tk/` |
-| `tk version` / `--version` | Prints version, description, and license information |
-| `tk help` | Displays available built-in commands and discovered plugins |
+| `tk show <id>` | Displays ticket metadata and full markdown body (paged via `$TICKET_PAGER`/`$PAGER` on a terminal) |
+| `tk update <id> [options]` | Updates fields. Options: `--title`, `-d/--description`, `-p/--priority`, `-t/--type`, `-a/--assignee`, `--tags`, `--design`, `--acceptance`, `--parent`, `--external-ref` |
+| `tk add-note <id> [text]` | Appends timestamped note (reads stdin when `text` is omitted) |
+| `tk agent-skill [--install] [--path]` | Displays the agent skill, installs it to `~/.agents/skills/tk/` (or `$AGENTS_SKILLS_DIR`), or prints its installed path |
+| `tk version` / `--version` / `-v` | Prints version, description, and license information |
+| `tk help` / `--help` / `-h` | Displays available built-in commands and discovered plugins |
+| `tk super <cmd> [args]` | Runs a built-in command, bypassing a plugin with the same name |
+
+All commands accept full or partial ticket IDs.
 
 ### 4.1 Exit Codes
 
 | Code | Meaning |
 | :--- | :--- |
 | `0` | Success |
-| `1` | Error (usage, ticket not found, invalid value) |
+| `1` | Error (usage, ticket not found, invalid or multi-line value, ticket file not writable) |
 | `3` | Claim lost: `tk start --claim` found the ticket `in_progress` for another assignee |
 | `4` | Lock timeout: another `tk` process held the ticket lock for longer than `TK_LOCK_TIMEOUT` |
 
