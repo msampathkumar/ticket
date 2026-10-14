@@ -6,8 +6,8 @@
   <title>tk • Ticket Suite & Web UI</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS (vendored Play CDN runtime, pinned; see static/vendor/README.md) -->
+  <script src="/static/vendor/tailwindcss-play-3.4.17.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -27,12 +27,12 @@
     }
   </script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- SortableJS for Drag & Drop -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-  <!-- Marked for Markdown Rendering -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Lucide Icons (vendored, pinned) -->
+  <script src="/static/vendor/lucide-1.57.0.min.js"></script>
+  <!-- SortableJS for Drag & Drop (vendored, pinned) -->
+  <script src="/static/vendor/sortable-1.15.2.min.js"></script>
+  <!-- Marked for Markdown Rendering (vendored, pinned) -->
+  <script src="/static/vendor/marked-15.0.12.min.js"></script>
   <!-- DOMPurify (vendored, pinned): sanitises rendered markdown -->
   <script src="/static/vendor/purify-3.4.17.min.js"></script>
 
