@@ -8,9 +8,10 @@ Operational guide for autonomous AI coding agents and engineers working in `tick
 
 `tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
 
-- **Zero Database / Pure Plain Text**: State resides in `.tickets/*.md` files with YAML frontmatter, versioned by Git.
+- **Zero Database / Pure Plain Text**: State resides in `.tickets/*.md` files with YAML frontmatter, versioned by Git. IDs are `<prefix>-<6-char hash>` (e.g. `tic-a1b2c3`); older 4-char IDs and partial IDs still resolve.
 - **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, and cycle detection. Agents compute actionable next steps deterministically.
-- **Unix Speed**: Core CLI runs on portable POSIX Bash with `awk` and `sed`—zero Python/Node runtime required for base operations.
+- **Unix Speed**: Core CLI is portable Bash (3.2+) with `awk` and `sed`; no Python or Node. `jq` is optional, only for `tk query <filter>`.
+- **Minimal Core, Optional Plugins**: Core is the shared task queue (tickets, DAG deps, ready queue, atomic claim, hooks). Orchestration, sync, and UI live in plugins. See [SPEC Section 1: Scope and Non-goals](docs/SPEC.md#non-goals).
 - **Decoupled Extensions**: Web UI and GitHub Sync live as modular plugins discovered via `$PATH`.
 - **Machine-Readable Documentation**: Built-in `llms.txt` and `llms-full.txt` endpoints generated via `make docs-build`.
 
@@ -20,15 +21,15 @@ Operational guide for autonomous AI coding agents and engineers working in `tick
 
 ```
 ticket/
-├── ticket                   # Core POSIX Bash CLI (create, show, ls, edit, query, find, dep, ready, etc.)
+├── ticket                   # Core portable Bash CLI (create, show, ls, edit, query, find, dep, ready, start --claim, etc.)
 ├── tk_webui/                # Web UI plugin (FastAPI + Tailwind Kanban & DAG Mind Map on port 8475)
 │   ├── main.py              # REST API & static file server
 │   ├── server.py            # Background daemon manager ('tk webui server start|status|stop')
 │   ├── static/              # Single-page app (Kanban, DAG Graph, Table, Timeline, Theme engine)
 │   └── WEBUI-SPEC.md        # Web UI specification
 ├── plugins/                 # Modular extension directory
-│   ├── github/              # Bi-directional GitHub issue & PR sync ('tk github')
-│   ├── scion-taskforce/     # Optional autonomous worker orchestration plugin ('tk scion-taskforce')
+│   ├── github/              # One-way GitHub issue & PR import ('tk github')
+│   ├── scion-taskforce/     # Optional agent dispatch plugin: ticket save hook -> Scion worker ('tk scion-taskforce')
 │   └── README.md            # Plugin catalog and integration standard
 ├── docs/                    # Specifications, guides, and Zensical documentation source
 │   ├── SPEC.md              # Core system & data model specification
@@ -45,13 +46,14 @@ ticket/
 
 ### Component Breakdown
 1. **Core CLI (`ticket` / `tk`)**:
-   - Manages ticket CRUD, dependencies (`tk dep`), ready queue (`tk ready`), blockers (`tk blocked`), and listings (`tk ls`).
+   - Manages ticket CRUD, dependencies (`tk dep`), ready queue (`tk ready`), atomic claims (`tk start --claim`), blockers (`tk blocked`), and listings (`tk ls`).
    - Discovers optional plugins named `tk-<cmd>` or `ticket-<cmd>` in `$PATH` and `plugins/<cmd>/`.
 2. **Interactive Web UI (`tk_webui` / `tk-webui`)**:
    - Browser-based visual dashboard on default **port `8475`** (ASCII for **T** = 84, **K** = 75).
    - Features: 4-lane drag-and-drop Kanban, DAG Dependency & Mind Map canvas, multi-project switcher, theme customization (default: Indigo), and background daemon management (`tk webui server start|status|stop`).
-3. **GitHub Sync Plugin (`plugins/github`)**:
-   - Syncs GitHub issues and pull requests into local `.tickets/` markdown files.
+3. **GitHub Import Plugin (`plugins/github`)**:
+   - Imports GitHub issues and pull requests into local `.tickets/` markdown files (one-way; nothing is written to GitHub).
+   - Imported text is untrusted input: review `github-sync` tickets before handing them to an agent.
 4. **Scion Task Force Plugin (`plugins/scion-taskforce`, standalone optional plugin)**:
    - Hands tickets tagged `taskforce` to SCION coding agents, one worker per ticket. A per-project `tk` post-write hook runs `tk scion-taskforce on-save <id>` on every save; no daemon runs.
    - Setup: `./install.sh --scion-taskforce`, then `tk scion-taskforce init` (wizard, worker template, Hub link, save hook) and `tk scion-taskforce test`. Usage and troubleshooting: [docs/plugins/scion-taskforce.md](docs/plugins/scion-taskforce.md); design: [SCION-TASKFORCE-SPEC.md](plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md).
@@ -64,7 +66,7 @@ When operating inside repositories tracked by `tk`, autonomous agents follow thi
 
 ```mermaid
 flowchart LR
-    A["1. Query Actionable Work<br/>`tk ready`"] --> B["2. Claim Ticket<br/>`tk start <id>`"]
+    A["1. Query Actionable Work<br/>`tk ready`"] --> B["2. Claim Ticket<br/>`tk start <id> --claim`"]
     B --> C["3. Inspect & Decompose<br/>`tk show <id>`"]
     C --> D["4. Execute & Audit<br/>`tk add-note <id> '...'`"]
     D --> E["5. Close & Unblock<br/>`tk close <id>`"]
@@ -73,7 +75,10 @@ flowchart LR
 1. **Discover Actionable Tasks**:
    Run `tk ready` to list unblocked tickets whose dependencies have all been satisfied.
 2. **Claim the Task**:
-   Run `tk start <id>` to transition status to `in_progress`.
+   Run `tk start <id> --claim [--assignee <agent-name>]`. It atomically sets `in_progress` and the assignee (default: `git config user.name`, else `$USER`). Agents sharing one identity must pass distinct `--assignee` values.
+   - Exit `0`: claimed (re-claiming your own ticket also succeeds).
+   - Exit `3`: lost claim; the ticket is `in_progress` for another assignee. Pick another ticket from `tk ready`.
+   - Exit `4`: lock timeout; another `tk` process holds the ticket lock. Retry shortly.
 3. **Inspect Requirements & Subtasks**:
    Run `tk show <id>` to inspect design notes, acceptance criteria, and child tickets. Decompose complex tasks using `tk create "<title>" --parent <id>` and `tk dep <child> <dependency>`.
 4. **Implement, Verify & Record Notes**:
@@ -85,7 +90,7 @@ flowchart LR
 
 ## 4. Agent Guidelines & Rules of Engagement
 
-- **Preserve Zero-Dependency Core**: The root `ticket` executable must remain a pure Bash script with zero mandatory third-party dependencies.
+- **Preserve Zero-Dependency Core**: The root `ticket` executable must remain a pure Bash script with zero mandatory third-party dependencies (no `python3`; `jq` stays optional for `tk query` filters). New core features must respect the [SPEC Non-goals](docs/SPEC.md#non-goals).
 - **Default Standards**:
   - Web UI default port: **`8475`** (ASCII `T=84`, `K=75`).
   - Web UI default theme: **Indigo** (`#6366f1`).
@@ -109,7 +114,7 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 
 - **High Quality & Depth (`quillscore`)**:
   - Write clear, grammatically sound, authoritative technical prose.
-  - Use accurate domain terminology (e.g., "DAG dependency tracking", "singleton daemon", "POSIX Bash core").
+  - Use accurate domain terminology (e.g., "DAG dependency tracking", "singleton daemon", "portable Bash core").
   - Maintain absolute consistency between CLI help strings, specifications, and documentation pages.
 
 - **Anti-Slop / AI Slop Cleanup**:
