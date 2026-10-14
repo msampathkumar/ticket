@@ -812,7 +812,7 @@ tk scion-taskforce skills list             # Installed tk-scion-* skills
 tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 ```
 
-- `directory`: Initial directory containing `.tickets/` (default: current working directory).
+- `directory`: Initial directory containing `.tickets/` (default: current working directory). The browser opens the `?dir=` URL parameter if present, else this directory. The last opened project is used only when the server was started without the CLI.
 - `--host`: Host IP to bind (default: `127.0.0.1`).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
 - `--version` / `-v`: Displays version and project details (`tk-webui 0.4.0`).
@@ -840,6 +840,7 @@ State files and logs are managed under `~/.local/state/tk/`:
 
 ## 4. Backend REST API Endpoints
 
+- `GET /api/config`: Returns `{"initial_dir": <path|null>}`, the directory the CLI was launched for (`null` without the CLI).
 - `GET /api/check-directory?path=<path>`: Validates folder and checks for `.tickets/`.
 - `GET /api/browse?path=<path>`: Returns subfolders with `.tickets` badges for repository browsing.
 - `GET /api/tickets?directory=<path>`: Returns array of ticket JSON objects parsed from `.tickets/*.md`.
