@@ -449,6 +449,8 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-14
+
 ### Security
 - Web UI: stored XSS fixed; ticket fields are HTML-escaped and markdown is sanitised with DOMPurify (#3).
 - Web UI: permissive CORS removed; a Host-header allowlist blocks DNS rebinding and cross-origin writes get 403 (#4).
@@ -501,6 +503,8 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 - Web UI: reads the `external-ref` key core writes, with the legacy `external_ref` as fallback (#21).
 - Web UI: version comes from one source (0.4.0, was 0.1.0) (#23).
 - Web UI: blocked/ready state matches `tk ready` / `tk blocked` (#24).
+- Core: `tk dep`, `undep` and `unlink` match IDs exactly; a short ID inside a longer one (`tic-1` vs `tic-12`) no longer gives wrong results or corrupts the list (#37).
+- Core: `tk agent-skill` from an installed copy printed a stale embedded skill; it now matches `agent-skill/tk/SKILL.md`, guarded by `make skill-check` and a test (#38).
 - Web UI: the Tree Graph fits and centres in the viewport on open and reset (#34).
 - SCION Task Force: `tk reopen` on a reviewed ticket removes `waiting-for-review` (with a note) so a new worker starts; before, the tag blocked dispatch.
 - SCION Task Force: a note for a paused gemini-cli worker no longer stalls it. The worker template now ships `home/.gemini/tk-system-settings.json` (topic narration off, next-speaker check on), loaded through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` so Scion's own settings stay intact. Re-run `tk scion-taskforce init` in existing projects to add it.
@@ -819,7 +823,7 @@ tk scion-taskforce skills list             # Installed tk-scion-* skills
 
 - **Plugin Name**: `tk-webui`
 - **Command**: `tk webui`
-- **Version**: `0.4.0`
+- **Version**: `0.5.0`
 - **Installation**: Included in Full Installation (`./install.sh --full` or `./install.sh --webui`)
 
 ---
@@ -872,7 +876,7 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `--host`: Host IP to bind (default: `127.0.0.1`). The value is added to the Host allowlist; `0.0.0.0` / `::` allow any Host (see 5.1).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
 - `--reload`: Reload on code change (development only).
-- `--version` / `-v`: Displays version and project details (`tk-webui 0.4.0`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.5.0`).
 
 ### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash
@@ -953,7 +957,7 @@ Computed in `tk_cli.get_all_tickets`, matching core `cmd_ready` / `cmd_blocked`:
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
-- **Version**: `0.4.0`
+- **Version**: `0.5.0`
 - **Installation**: Optional (`./install.sh --github`)
 
 ---
@@ -2241,7 +2245,7 @@ Include a comment in the first 10 lines:
 ```bash
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban, DAG and review-notes Web UI
-# tk-plugin-version: 0.4.0
+# tk-plugin-version: 0.5.0
 ```
 
 **Compiled Binaries**:
@@ -2255,7 +2259,7 @@ tk-plugin: Interactive Kanban, DAG and review-notes Web UI
 All plugins should implement `--version` or `-v` flag to output their version:
 ```bash
 $ tk-webui --version
-tk-webui 0.4.0
+tk-webui 0.5.0
 ```
 
 ---

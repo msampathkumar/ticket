@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-14
+
 ### Security
 - Web UI: stored XSS fixed; ticket fields are HTML-escaped and markdown is sanitised with DOMPurify (#3).
 - Web UI: permissive CORS removed; a Host-header allowlist blocks DNS rebinding and cross-origin writes get 403 (#4).
@@ -54,6 +56,8 @@
 - Web UI: reads the `external-ref` key core writes, with the legacy `external_ref` as fallback (#21).
 - Web UI: version comes from one source (0.4.0, was 0.1.0) (#23).
 - Web UI: blocked/ready state matches `tk ready` / `tk blocked` (#24).
+- Core: `tk dep`, `undep` and `unlink` match IDs exactly; a short ID inside a longer one (`tic-1` vs `tic-12`) no longer gives wrong results or corrupts the list (#37).
+- Core: `tk agent-skill` from an installed copy printed a stale embedded skill; it now matches `agent-skill/tk/SKILL.md`, guarded by `make skill-check` and a test (#38).
 - Web UI: the Tree Graph fits and centres in the viewport on open and reset (#34).
 - SCION Task Force: `tk reopen` on a reviewed ticket removes `waiting-for-review` (with a note) so a new worker starts; before, the tag blocked dispatch.
 - SCION Task Force: a note for a paused gemini-cli worker no longer stalls it. The worker template now ships `home/.gemini/tk-system-settings.json` (topic narration off, next-speaker check on), loaded through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` so Scion's own settings stay intact. Re-run `tk scion-taskforce init` in existing projects to add it.
