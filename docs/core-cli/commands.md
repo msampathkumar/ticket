@@ -68,7 +68,7 @@ Status writes and claims run under a per-ticket lock in `.tickets/.locks/`. If a
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `tk dep <id> <dep-id>` | `id` depends on `dep-id` | `tk dep tic-2 tic-1` |
+| `tk dep <id> <dep-id>` | `id` depends on `dep-id`; rejects self-dependencies and cycles (exit `1`) | `tk dep tic-2 tic-1` |
 | `tk undep <id> <dep-id>` | Remove a dependency | `tk undep tic-2 tic-1` |
 | `tk dep tree [--full] <id>` | Print the dependency tree; `--full` disables deduplication | `tk dep tree tic-1` |
 | `tk dep cycle` | Report dependency cycles among open tickets | `tk dep cycle` |

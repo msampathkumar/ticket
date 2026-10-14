@@ -32,7 +32,14 @@ Both IDs must exist; `tk dep` exits `1` if either is not found.
 
 ### Cycle Detection
 
-`tk dep` does not reject a dependency that closes a loop. Run `tk dep cycle` to report cycles among open tickets; tickets in a cycle never become ready until one edge is removed with `tk undep`.
+`tk dep` rejects a self-dependency and any dependency that would close a loop, printing the cycle and exiting `1` without writing. The check covers closed tickets too.
+
+```bash
+tk dep api-7f2c1d web-ui3k9a
+# Error: api-7f2c1d -> web-ui3k9a would create a cycle: api-7f2c1d -> web-ui3k9a -> api-7f2c1d
+```
+
+Cycles can still appear through hand edits or Git merges. Run `tk dep cycle` to report them among open tickets; tickets in a cycle never become ready until one edge is removed with `tk undep`.
 
 ```bash
 tk dep cycle
