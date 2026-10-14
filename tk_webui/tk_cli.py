@@ -209,6 +209,10 @@ def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
     )
 
 
+# Statuses core `tk ready` / `tk blocked` consider; others are neither ready nor blocked.
+ACTIVE_STATUSES = ("open", "in_progress")
+
+
 def get_all_tickets(directory: str) -> List[Ticket]:
     """Retrieve all tickets in a directory and calculate blocked statuses."""
     tickets_dir = find_tickets_dir(directory)
@@ -226,8 +230,12 @@ def get_all_tickets(directory: str) -> List[Ticket]:
             tickets.append(ticket)
             ticket_map[ticket.id] = ticket
 
-    # Calculate blocked status: if any dep is not 'closed', the ticket is blocked
+    # Blocked status, matching core `tk blocked` / `tk ready` exactly:
+    # only open/in_progress tickets can be blocked, and a dep blocks unless its
+    # status is exactly "closed" (missing dep IDs block too).
     for ticket in tickets:
+        if ticket.status not in ACTIVE_STATUSES:
+            continue
         blocked_by = []
         for dep_id in ticket.deps:
             dep_ticket = ticket_map.get(dep_id)
