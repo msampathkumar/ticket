@@ -81,13 +81,21 @@ _sed_i() {
 generate_id() {
     local dir_name
     dir_name=$(basename "$(pwd)")
+    # Keep only ASCII letters, digits, '.', '_', '-' and spaces. BSD awk/sed work on bytes, so
+    # a non-ASCII first letter used to be cut mid-UTF-8 sequence, producing an invalid file
+    # name ("Illegal byte sequence") and no ticket file. LC_ALL=C makes the filter byte-exact.
+    dir_name=$(printf '%s' "$dir_name" | LC_ALL=C tr -cd 'A-Za-z0-9._ -')
 
-    # Extract first letter of each hyphenated/underscored segment
+    # Extract first letter of each hyphenated/underscored/space-separated segment
     local prefix
-    prefix=$(echo "$dir_name" | sed 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++) printf substr($i,1,1)}')
+    prefix=$(printf '%s\n' "$dir_name" | LC_ALL=C sed 's/[-_]/ /g' | LC_ALL=C awk '{for(i=1;i<=NF;i++) printf substr($i,1,1)}')
 
-    # Fallback to first 3 chars if single segment (prefix too short)
-    [[ ${#prefix} -lt 2 ]] && prefix="${dir_name:0:3}"
+    # Fallback to first 3 chars if single segment (prefix too short), then to "tk"
+    # (starting at the first letter/digit, so "ü-proj" gives "pro", not "-pr").
+    local trimmed="${dir_name#"${dir_name%%[A-Za-z0-9]*}"}"
+    [[ ${#prefix} -lt 2 ]] && prefix="${trimmed:0:3}"
+    prefix="${prefix// /}"
+    [[ -z "$prefix" ]] && prefix="tk"
 
     # Random lowercase alphanumeric hash, 6 chars by default (TK_ID_HASH_LENGTH, 4-32).
     # Lowercase only, so IDs stay distinct on case-insensitive filesystems (macOS, Windows).
