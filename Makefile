@@ -1,4 +1,4 @@
-.PHONY: test docs-dev docs-build docs-llms skill-sync skill-check
+.PHONY: test docs-dev docs-build docs-llms skill-sync skill-check webui-css webui-css-check
 
 test:
 	uv run --with behave behave
@@ -18,3 +18,11 @@ skill-sync:
 
 skill-check:
 	./scripts/sync_skill.sh --check
+
+# Prebuilt Web UI CSS must match tk_webui/static (pinned Tailwind CLI, see scripts/build-webui-css.sh)
+webui-css:
+	./scripts/build-webui-css.sh
+
+webui-css-check: webui-css
+	@git diff --exit-code tk_webui/static/css/tailwind.css || \
+		{ echo "tk_webui/static/css/tailwind.css is stale: run 'make webui-css' and commit the result." >&2; exit 1; }

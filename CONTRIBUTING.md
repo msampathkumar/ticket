@@ -44,6 +44,7 @@ make test
 2. **Follow Code Standards**:
    - Keep Bash scripts portable to Bash 3.2 and `shellcheck -S warning` clean (as in CI).
    - After editing `agent-skill/tk/SKILL.md`, run `make skill-sync` (CI fails if the embedded copy in `ticket` drifts).
+   - After adding or changing Tailwind classes in `tk_webui/static/`, run `make webui-css` and commit `tk_webui/static/css/tailwind.css` (CI fails if it is stale).
    - Use Python type hints and clean formatting (`ruff check`) for `tk_webui/`.
 3. **Verify Tests**: Ensure all BDD test scenarios pass before submitting:
    ```bash

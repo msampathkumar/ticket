@@ -34,3 +34,13 @@ jobs:
       - name: Run Ruff Linter
         run: |
           uvx ruff check tk_webui/ plugins/scion-taskforce/
+
+  webui-css:
+    name: Web UI CSS is fresh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rebuild tailwind.css and check for drift
+        run: make webui-css-check
