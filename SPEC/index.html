@@ -1257,6 +1257,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="4. CLI Interface &amp; Exit Codes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4.1 Exit Codes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-ticket-locks-claiming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4.2 Ticket Locks &amp; Claiming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1524,6 +1552,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="4. CLI Interface &amp; Exit Codes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4.1 Exit Codes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-ticket-locks-claiming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4.2 Ticket Locks &amp; Claiming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1731,6 +1787,10 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <td style="text-align: left;">Sets status to <code>in_progress</code></td>
 </tr>
 <tr>
+<td style="text-align: left;"><code>tk start &lt;id&gt; --claim [--assignee X]</code></td>
+<td style="text-align: left;">Atomically sets status <code>in_progress</code> and <code>assignee</code> (default: <code>git config user.name</code>, else <code>$USER</code>); fails with exit code <code>3</code> if already <code>in_progress</code> for a different assignee</td>
+</tr>
+<tr>
 <td style="text-align: left;"><code>tk close &lt;id&gt;</code></td>
 <td style="text-align: left;">Sets status to <code>closed</code></td>
 </tr>
@@ -1820,6 +1880,43 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </tr>
 </tbody>
 </table>
+<h3 id="41-exit-codes">4.1 Exit Codes<a class="headerlink" href="#41-exit-codes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Code</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>0</code></td>
+<td style="text-align: left;">Success</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>1</code></td>
+<td style="text-align: left;">Error (usage, ticket not found, invalid value)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>3</code></td>
+<td style="text-align: left;">Claim lost: <code>tk start --claim</code> found the ticket <code>in_progress</code> for another assignee</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>4</code></td>
+<td style="text-align: left;">Lock timeout: another <code>tk</code> process held the ticket lock for longer than <code>TK_LOCK_TIMEOUT</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-ticket-locks-claiming">4.2 Ticket Locks &amp; Claiming<a class="headerlink" href="#42-ticket-locks-claiming" title="Permanent link">&para;</a></h3>
+<p>Status writes (<code>start</code>, <code>close</code>, <code>reopen</code>, <code>status</code>) and claims run under a per-ticket lock, so concurrent agents cannot interleave a read-check-write on the same ticket.</p>
+<ul>
+<li><strong>Mechanism</strong>: <code>mkdir $TICKETS_DIR/.locks/&lt;id&gt;.lock</code> (atomic on POSIX filesystems; no <code>flock</code> dependency). The lock holds an <code>owner</code> file: <code>&lt;pid&gt; &lt;host&gt; &lt;epoch&gt;</code>. It is removed on exit, including on error or <code>SIGINT</code>/<code>SIGTERM</code>.</li>
+<li><strong>Waiting</strong>: a busy lock is retried every 0.1s for up to <code>TK_LOCK_TIMEOUT</code> seconds (default <code>10</code>), then the command exits <code>4</code>.</li>
+<li><strong>Stale locks</strong>: a lock is stale when its owner pid no longer runs on the same host, or it is older than <code>TK_LOCK_STALE_SECONDS</code> (default <code>60</code>). A waiter renames a stale lock aside (only one waiter wins the rename) and deletes it. Locks from crashed processes on other hosts (shared network filesystems) expire by age only. To clear one manually: <code>rm -rf .tickets/.locks/&lt;id&gt;.lock</code>.</li>
+<li><strong>Claim rule</strong>: <code>--claim</code> succeeds if the ticket is not <code>in_progress</code>, has no assignee, or is already assigned to the claimant (re-claiming is idempotent). Agents sharing one identity must pass distinct <code>--assignee</code> values.</li>
+<li><strong>Scope</strong>: locks coordinate <code>tk</code> processes sharing one <code>.tickets/</code> directory. Claims across separate Git clones are reconciled through Git, not by this lock.</li>
+<li>Plain <code>tk start &lt;id&gt;</code> is unchanged: it sets <code>in_progress</code> without checking or changing the assignee.</li>
+</ul>
 <hr />
 <h2 id="5-plugin-extension-protocol">5. Plugin &amp; Extension Protocol<a class="headerlink" href="#5-plugin-extension-protocol" title="Permanent link">&para;</a></h2>
 <ol>
