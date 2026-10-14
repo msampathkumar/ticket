@@ -89,6 +89,16 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+@app.get("/api/config")
+def get_config():
+    """Startup settings for the frontend.
+
+    initial_dir is the directory the CLI was launched for (given directory or cwd),
+    or null when the app runs without the CLI (e.g. uvicorn directly).
+    """
+    return {"initial_dir": os.environ.get("INITIAL_PROJECT_DIR") or None}
+
+
 @app.get("/api/check-directory", response_model=DirectoryCheckResponse)
 def check_directory(path: str = Query(..., description="Directory path to inspect")):
     p = Path(os.path.expanduser(path)).resolve()
