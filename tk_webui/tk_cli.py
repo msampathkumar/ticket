@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -34,36 +35,57 @@ STATE_DIR = Path.home() / ".local" / "state" / "tk"
 PROJECTS_FILE = STATE_DIR / "projects.json"
 
 
-def get_global_projects() -> List[str]:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    if not PROJECTS_FILE.exists():
-        return []
+def _read_projects_file() -> List[str]:
+    """Return the raw project entries. Accepts the {"projects": [...]} schema and the
+    legacy top-level list, like _read_projects_json in the core `ticket` script."""
     try:
         data = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
-        projs = data.get("projects", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-        valid = []
-        for p in projs:
+    except (OSError, ValueError):
+        return []
+    projs = data.get("projects", []) if isinstance(data, dict) else data
+    if not isinstance(projs, list):
+        return []
+    return [p for p in projs if isinstance(p, str)]
+
+
+def _write_projects_file(projs: List[str]) -> None:
+    """Atomically write the same schema and layout as register_global_project in core."""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=STATE_DIR, prefix="projects.json.tmp.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"projects": projs}, indent=2, ensure_ascii=False))
+        os.replace(tmp, PROJECTS_FILE)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def get_global_projects() -> List[str]:
+    """Registered projects that currently have a .tickets directory (display only)."""
+    valid = []
+    for p in _read_projects_file():
+        try:
             p_path = Path(os.path.expanduser(p)).resolve()
+            if str(p_path) in valid:
+                continue
             if (p_path / ".tickets").is_dir() or find_tickets_dir(str(p_path)):
                 valid.append(str(p_path))
-        return valid
-    except Exception:
-        return []
+        except (OSError, RuntimeError):
+            continue
+    return valid
 
 
 def add_global_project(path: str) -> List[str]:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
     abs_p = str(Path(os.path.expanduser(path)).resolve())
-    projs = get_global_projects()
-    if abs_p in projs:
-        projs.remove(abs_p)
-    projs.insert(0, abs_p)
+    # Keep entries whose .tickets is currently missing (unmounted drive, other branch);
+    # previously the filtered list from get_global_projects() was persisted, dropping them.
+    projs = [abs_p] + [p for p in _read_projects_file() if p != abs_p]
     try:
-        PROJECTS_FILE.write_text(json.dumps({"projects": projs}, indent=2), encoding="utf-8")
-    except Exception:
+        _write_projects_file(projs)
+    except OSError:
         pass
-    return projs
-
+    return [abs_p] + [p for p in get_global_projects() if p != abs_p]
 
 
 def find_tickets_dir(base_dir: str) -> Optional[Path]:
