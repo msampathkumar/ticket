@@ -2201,7 +2201,7 @@ cmd_help() {
     local cmd
     cmd=$(basename "$0")
     cat << EOF
-$cmd (v0.5.0) — Dependency-aware, Git-friendly task queue for humans and coding agents.
+$cmd (v0.5.1) — Dependency-aware, Git-friendly task queue for humans and coding agents.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -2285,7 +2285,7 @@ EOF
 
 cmd_version() {
     cat << 'EOF'
-tk version 0.5.0
+tk version 0.5.1
 
 Dependency-aware, Git-friendly task queue for humans and coding agents.
 Created by Sampath Kumar & wedow contributors
