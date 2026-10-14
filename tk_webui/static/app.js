@@ -156,8 +156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Failed to load global projects', e);
   }
 
-  // Initial project priority (tic-qiet): ?dir= URL param, then the directory
-  // given on the command line (/api/config), then the last opened project, then '.'.
+  // Initial project priority (tic-qiet): ?dir= URL param (keeps the user's switch on
+  // reload), then the CLI launch directory (/api/config), then the last opened project, then '.'.
   let serverInitialDir = null;
   try {
     const res = await fetch('/api/config');

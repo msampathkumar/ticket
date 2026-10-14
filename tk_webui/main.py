@@ -93,8 +93,8 @@ STATIC_DIR = Path(__file__).parent / "static"
 def get_config():
     """Startup settings for the frontend.
 
-    initial_dir is the directory given on the command line ('tk webui <dir>' or
-    'tk webui server start [dir]'), or null when none was given.
+    initial_dir is the directory the CLI was launched for (given directory or cwd),
+    or null when the app runs without the CLI (e.g. uvicorn directly).
     """
     return {"initial_dir": os.environ.get("INITIAL_PROJECT_DIR") or None}
 
@@ -333,13 +333,10 @@ def main():
 
     args = sys.argv[1:]
     if not args:
-        # Default: run foreground server; the browser reopens the last project
-        # (localStorage) and falls back to the current directory (tic-qiet).
-        # Replaced: forcing cwd here would override the last-used project.
-        # os.environ["INITIAL_PROJECT_DIR"] = os.path.abspath(os.getcwd())
-        os.environ.pop("INITIAL_PROJECT_DIR", None)
+        # Default: run foreground server on current directory
+        os.environ["INITIAL_PROJECT_DIR"] = os.path.abspath(os.getcwd())
         print(f"🚀 Starting tk-webui on http://127.0.0.1:{DEFAULT_PORT} (ASCII: T=84, K=75)")
-        print(f"📁 Initial directory: last opened project, else {os.path.abspath(os.getcwd())}")
+        print(f"📁 Initial directory: {os.environ['INITIAL_PROJECT_DIR']}")
         uvicorn.run("tk_webui.main:app", host="127.0.0.1", port=DEFAULT_PORT, reload=False)
         return
 
@@ -386,8 +383,7 @@ def main():
     # Foreground server with options or directory
     if first.startswith("-") or os.path.exists(first) or len(args) > 0:
         parser = argparse.ArgumentParser(prog=prog_name, add_help=False)
-        # default=None (was os.getcwd()) so an explicit directory can be told apart (tic-qiet).
-        parser.add_argument("directory", nargs="?", default=None, help="Initial directory to open")
+        parser.add_argument("directory", nargs="?", default=os.getcwd(), help="Initial directory to open")
         parser.add_argument("--host", default="127.0.0.1", help="Host address")
         parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port number")
         parser.add_argument("--reload", action="store_true", help="Auto-reload on code change")
@@ -407,17 +403,11 @@ def main():
             print_version()
             return
 
-        # Exported for GET /api/config; inherited by --reload workers.
-        if parsed_args.directory is not None:
-            target_dir = os.path.abspath(os.path.expanduser(parsed_args.directory))
-            os.environ["INITIAL_PROJECT_DIR"] = target_dir
-            initial_label = target_dir
-        else:
-            os.environ.pop("INITIAL_PROJECT_DIR", None)
-            initial_label = f"last opened project, else {os.path.abspath(os.getcwd())}"
+        target_dir = os.path.abspath(os.path.expanduser(parsed_args.directory))
+        os.environ["INITIAL_PROJECT_DIR"] = target_dir
         register_host(parsed_args.host)
         print(f"🚀 Starting tk-webui on http://{parsed_args.host}:{parsed_args.port} (ASCII: T=84, K=75)")
-        print(f"📁 Initial directory: {initial_label}")
+        print(f"📁 Initial directory: {os.environ['INITIAL_PROJECT_DIR']}")
         uvicorn.run("tk_webui.main:app", host=parsed_args.host, port=parsed_args.port, reload=parsed_args.reload)
         return
 
