@@ -1,6 +1,6 @@
 {
   "name": "ticket",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Dependency-aware, Git-friendly task queue for humans and coding agents.",
   "bin": {
     "tk": "./ticket",

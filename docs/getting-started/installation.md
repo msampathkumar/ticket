@@ -36,6 +36,15 @@ tk version
 | [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) | `ticket`, `LICENSE`, `INSTALL.md` |
 | [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) | Checksums for `tk` and `tk-core.zip` |
 
+To install from the zip instead:
+
+```bash
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip -o /tmp/tk-core.zip
+unzip -o /tmp/tk-core.zip -d /tmp/tk-core
+mkdir -p ~/.local/bin && cp /tmp/tk-core/ticket ~/.local/bin/tk && chmod +x ~/.local/bin/tk
+tk version
+```
+
 Verify downloads in the download directory with `sha256sum -c --ignore-missing SHA256SUMS` (macOS: `shasum -a 256 -c --ignore-missing SHA256SUMS`). Release assets contain the core only; use `./install.sh` for the Web UI and plugins.
 
 ---

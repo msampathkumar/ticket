@@ -47,7 +47,13 @@ curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk -
 chmod +x ~/.local/bin/tk
 ```
 
-Also available: [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) (`ticket`, `LICENSE`, `INSTALL.md`) and [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) for verification.
+Also available: [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) (`ticket`, `LICENSE`, `INSTALL.md`) and [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) for verification. To install from the zip:
+
+```bash
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip -o /tmp/tk-core.zip
+unzip -o /tmp/tk-core.zip -d /tmp/tk-core
+mkdir -p ~/.local/bin && cp /tmp/tk-core/ticket ~/.local/bin/tk && chmod +x ~/.local/bin/tk
+```
 
 ### Install Agent Skill via NPX
 

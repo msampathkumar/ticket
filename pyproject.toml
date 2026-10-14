@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tk-webui"
-version = "0.5.1"
+version = "0.5.2"
 description = "Interactive Kanban, DAG and review-notes Web UI for tk"
 readme = "README.md"
 license = { text = "MIT" }
