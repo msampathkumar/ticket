@@ -50,6 +50,7 @@ tk github <command> [options]
   - `github-sync` (always attached to imported tickets)
   - `issue` or `pr`
   - GitHub labels (e.g. `bug`, `enhancement`, `documentation`). Characters other than letters, digits and `_ . # + -` become `-`, and leading/trailing `-` are stripped (`good first issue` becomes `good-first-issue`).
+  - Re-sync re-applies missing sync tags, replaces legacy variants of the item's labels (raw label text such as `autorelease: pending`, or its space-stripped form `autorelease:pending`) with the sanitised tag, and drops duplicates. Tags not derived from the item's labels are kept.
 - **Title**: Stored verbatim. A title starting with `-` is created with a placeholder (`GitHub issue #<n>` / `GitHub PR #<n>`) and then set with `tk update --title`, because `tk create` would parse it as an option.
 - **Body Content**:
   - Markdown body contains the issue/PR description and a direct link: `**GitHub URL:** <url>`.
