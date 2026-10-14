@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Minimal, dependency-aware task tracker. Built to scale agentic workflows.">
+        <meta name="description" content="Dependency-aware, Git-friendly task queue for humans and coding agents.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
@@ -809,7 +809,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  GitHub Import
 
     
   </span>
@@ -1786,7 +1786,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </blockquote>
 <hr />
 <h2 id="1-system-goals-philosophy">1. System Goals &amp; Philosophy<a class="headerlink" href="#1-system-goals-philosophy" title="Permanent link">&para;</a></h2>
-<p><code>tk</code> is a <strong>minimal, dependency-aware task tracker. Built to scale agentic workflows.</strong></p>
+<p><code>tk</code> is a <strong>dependency-aware, Git-friendly task queue for humans and coding agents.</strong></p>
 <h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
 <p><code>tk</code> core is a minimal task queue that many agents and humans can share through plain files. It provides:</p>
 <ul>
@@ -1795,7 +1795,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <li>Atomic claiming (<code>tk start --claim</code>) and per-ticket locks for concurrent agents.</li>
 <li>Post-write hooks (<code>.tickets/.hooks/post-write.d/</code>) as the single extension point for reacting to changes.</li>
 </ul>
-<p>Everything else lives in optional plugins, discovered on <code>$PATH</code> as <code>tk-&lt;cmd&gt;</code> (see Section 5): the Web UI (<code>tk webui</code>), GitHub sync (<code>tk github</code>), and agent dispatch (<code>tk scion-taskforce</code>, an event-driven bridge from ticket hooks to Scion, which runs the agents).</p>
+<p>Everything else lives in optional plugins, discovered on <code>$PATH</code> as <code>tk-&lt;cmd&gt;</code> (see Section 5): the Web UI (<code>tk webui</code>), GitHub import (<code>tk github</code>), and agent dispatch (<code>tk scion-taskforce</code>, an event-driven bridge from ticket hooks to Scion, which runs the agents).</p>
 <h3 id="core-principles">Core Principles<a class="headerlink" href="#core-principles" title="Permanent link">&para;</a></h3>
 <ol>
 <li><strong>Zero Database</strong>: State is stored locally in <code>.tickets/*.md</code>.</li>

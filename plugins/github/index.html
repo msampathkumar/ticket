@@ -818,7 +818,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  GitHub Import
 
     
   </span>
@@ -835,7 +835,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  GitHub Import
 
     
   </span>
@@ -1427,7 +1427,7 @@
   
 
 
-  <h1>GitHub Sync</h1>
+  <h1>GitHub Import</h1>
 
 <p>The optional GitHub plugin (<code>tk-github</code>) imports GitHub issues and pull requests into your local <code>.tickets/</code> markdown files. The import is one-way: <code>tk github sync</code> only reads from GitHub (<code>gh issue list</code>, <code>gh pr list</code>). Local edits, notes and status changes are never written back to GitHub.</p>
 <div class="admonition warning">
@@ -1486,7 +1486,7 @@
 <hr />
 <h2 id="data-model-tags">Data Model &amp; Tags<a class="headerlink" href="#data-model-tags" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>External Reference</strong>: Tickets imported from GitHub carry <code>external_ref: gh-issue-&lt;number&gt;</code> or <code>external_ref: gh-pr-&lt;number&gt;</code>.</li>
+<li><strong>External Reference</strong>: Tickets imported from GitHub carry <code>external-ref: gh-issue-&lt;number&gt;</code> or <code>external-ref: gh-pr-&lt;number&gt;</code> (the legacy <code>external_ref</code> spelling is still matched on re-sync).</li>
 <li><strong>Tags</strong>: Imported tickets automatically include the <code>github-sync</code> tag along with any GitHub labels (e.g. <code>bug</code>, <code>enhancement</code>).</li>
 </ul>
 <hr />

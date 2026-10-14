@@ -57,7 +57,7 @@ note() {
 
 clear 2>/dev/null || true
 
-note "tk: minimal, dependency-aware task tracker. Built to scale agentic workflows."
+note "tk: dependency-aware, Git-friendly task queue for humans and coding agents."
 run "tk init"
 
 note "Create tasks with priorities, types, and tags"
@@ -99,5 +99,5 @@ run "tk close $ID_DB"
 note "Verify ready queue -- API endpoint task is now automatically unblocked!"
 run "tk ready"
 
-note "Pure POSIX Bash, zero databases, 100% Git versioned. Enjoy tk!"
+note "Portable Bash, zero databases, 100% Git versioned. Enjoy tk!"
 sleep 1.5

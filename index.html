@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Minimal, dependency-aware task tracker. Built to scale agentic workflows.">
+        <meta name="description" content="Dependency-aware, Git-friendly task queue for humans and coding agents.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
@@ -931,7 +931,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  GitHub Import
 
     
   </span>
@@ -1422,7 +1422,7 @@
 
 <h1 id="ticket-tk"><img src="images/logo.svg" width="36" height="36" alt="tk logo" style="vertical-align: -6px; display: inline-block;" /> ticket (tk)<a class="headerlink" href="#ticket-tk" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p>Minimal, dependency-aware task tracker. Built to scale agentic workflows.</p>
+<p>Dependency-aware, Git-friendly task queue for humans and coding agents.</p>
 </blockquote>
 <hr />
 <h2 id="terminal-demo">Terminal Demo<a class="headerlink" href="#terminal-demo" title="Permanent link">&para;</a></h2>
@@ -1452,8 +1452,8 @@
 <p>Extend <code>ticket</code> with optional plugins discovered automatically via <code>$PATH</code>:</p>
 <ul>
 <li><strong><a href="plugins/webui/">Web UI (<code>tk webui</code>)</a></strong>: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.</li>
-<li><strong><a href="plugins/github/">GitHub Sync (<code>tk github</code>)</a></strong>: One-way import of GitHub issues and pull requests into local tickets.</li>
-<li><strong><a href="plugins/scion-taskforce/">SCION Task Force (<code>tk scion-taskforce</code>)</a></strong>: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.</li>
+<li><strong><a href="plugins/github/">GitHub Import (<code>tk github</code>)</a></strong>: One-way import of GitHub issues and pull requests into local tickets.</li>
+<li><strong><a href="plugins/scion-taskforce/">SCION Task Force (<code>tk scion-taskforce</code>)</a></strong>: Event-driven bridge from tickets to SCION coding agents: saving a <code>taskforce</code> ticket starts its SCION worker; humans review and close.</li>
 </ul>
 <p>Learn how to write custom plugins in pure Bash or Python in the <a href="plugins/architecture/">Plugin Architecture Guide</a>.</p>
 <hr />

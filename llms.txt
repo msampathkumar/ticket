@@ -1,6 +1,6 @@
 # ticket (tk) — LLM Knowledge Base & Documentation Index
 
-> Minimal, dependency-aware task tracker. Built to scale agentic workflows.
+> Dependency-aware, Git-friendly task queue for humans and coding agents.
 > Repository: https://github.com/msampathkumar/ticket
 
 ---
@@ -12,8 +12,9 @@
 ### Key Tenets
 1. **Zero Database / Pure Plain Text**: State resides in human-readable Markdown files with YAML frontmatter inside `.tickets/*.md`. Versioned directly alongside code in Git.
 2. **DAG Dependency Intelligence**: Native support for parent-child hierarchies, blockers, cycle detection, and automatic unblocking of ready tasks.
-3. **Unix Speed**: Core CLI is implemented in portable POSIX Bash with `awk` and `sed`—zero Python, Node.js, or runtime dependencies required for base operations.
-4. **Decoupled Extensions**: Web UI (FastAPI + Tailwind Kanban & Mind Map) and GitHub Sync operate as modular plugins discovered via `$PATH`.
+3. **Unix Speed**: Core CLI is a single portable Bash script (Bash 3.2+) using `awk` and `sed`; no Python or Node. `jq` is optional, only for `tk query <filter>`.
+4. **Safe Concurrent Claims**: `tk start <id> --claim` lets exactly one agent win a ticket (exit `3` for the others).
+5. **Decoupled Extensions**: Web UI (FastAPI + Tailwind Kanban & Mind Map), GitHub import, and SCION agent dispatch operate as optional plugins discovered via `$PATH`. Core scope and non-goals: [SPEC Section 1](SPEC.md#non-goals).
 
 ---
 
@@ -28,9 +29,9 @@ Autonomous AI coding agents operating inside repositories tracked by `tk` must f
    Lists open/in-progress tickets whose dependencies have all been satisfied (`closed`).
 2. **Claim the Task**:
    ```bash
-   tk start <id>
+   tk start <id> --claim --assignee <agent-name>
    ```
-   Transitions status to `in_progress`.
+   Atomically sets `in_progress` and the assignee. Exit `3`: another assignee holds it, pick another ticket from `tk ready`. Exit `4`: lock timeout, retry.
 3. **Inspect Requirements & Subtasks**:
    ```bash
    tk show <id>
@@ -66,7 +67,7 @@ Autonomous AI coding agents operating inside repositories tracked by `tk` must f
   - `-a, --assignee <name>`: Assignee name or handle.
   - `--tags <tag1,tag2>`: Comma-separated tags.
   - `--parent <id>`: Parent ticket ID (hierarchy).
-- `tk start <id>`: Set status to `in_progress`.
+- `tk start <id> [--claim [--assignee <name>]]`: Set status to `in_progress`; `--claim` is atomic and fails with exit `3` if another assignee holds it.
 - `tk close <id>`: Set status to `closed`.
 - `tk reopen <id>`: Set status to `open`.
 - `tk status <id> <status>`: Update status (`open`|`in_progress`|`closed`).
@@ -76,7 +77,7 @@ Autonomous AI coding agents operating inside repositories tracked by `tk` must f
 - `tk add-note <id> [text]`: Append timestamped review/audit note (or pipe via stdin).
 
 ### Dependency & DAG Intelligence
-- `tk dep <id> <dep-id>`: Add dependency (`id` depends on `dep-id`).
+- `tk dep <id> <dep-id>`: Add dependency (`id` depends on `dep-id`); rejected with exit `1` if it would create a cycle.
 - `tk undep <id> <dep-id>`: Remove dependency.
 - `tk dep tree <id>`: Display recursive dependency tree.
 - `tk dep cycle`: Detect dependency cycles across open tickets.
@@ -91,7 +92,8 @@ Autonomous AI coding agents operating inside repositories tracked by `tk` must f
   - `-t, --type <type>`: Filter type.
   - `-T, --tag <tag>`: Filter tag.
   - `-a, --assignee <name>`: Filter assignee.
-  - `--all`: Show all tickets without limit.
+  - `-n, --limit <N>`: Limit results (default 10); `--full`: no limit.
+  - `--all`: Show all statuses without limit.
 - `tk find <term>`: Full-text search across all ticket titles, descriptions, and notes.
 - `tk query [jq-filter]`: Output tickets as structured JSON, optionally filtered with `jq`.
 
@@ -121,7 +123,7 @@ Plugins can invoke core built-in commands using:
 
 ### Official Plugins
 - `tk webui`: FastAPI + Tailwind 4-lane Kanban, Table View, and DAG Mind Map.
-- `tk github`: Bi-directional GitHub issues and PR sync (`tk github sync`).
+- `tk github`: One-way import of GitHub issues and PRs (`tk github sync`); imported text is untrusted input.
 - `tk scion-taskforce`: Event-driven SCION worker per opted-in ticket, triggered by a `tk` save hook; local OpenTelemetry logs.
 
 ---
@@ -141,12 +143,12 @@ For complete and in-depth details, refer to the individual Markdown guides:
 - [Core CLI Configuration](core-cli/configuration.md): Environment variables, directory discovery logic, and schema.
 - [Plugin Architecture](plugins/architecture.md): Writing custom Bash or Python plugins with `TICKETS_DIR` and `TK_SCRIPT`.
 - [Interactive Web UI Plugin](plugins/webui.md): 4-lane Kanban board, DAG Mind Map, daemon management, and configuration.
-- [GitHub Sync Plugin](plugins/github.md): Bi-directional GitHub issue/PR sync, prerequisites, and configuration.
-- [SCION Task Force Plugin](plugins/scion-taskforce.md): Save-hook worker orchestration: setup, lifecycle, commands, configuration and troubleshooting.
+- [GitHub Import Plugin](plugins/github.md): One-way GitHub issue/PR import, untrusted-input warning, prerequisites, and configuration.
+- [SCION Task Force Plugin](plugins/scion-taskforce.md): Save-hook bridge to SCION workers: setup, lifecycle, commands, configuration and troubleshooting.
 - [Agent Execution Loop](agents/workflow.md): The deterministic 5-step operational loop for AI coding agents.
 - [Agent Skill](agents/agent-skill.md): Reusable agent skill definition and `npx` install instructions.
 - [LLM & Agent Context Guide](agents/llms-txt.md): Machine-readable documentation standards and endpoints.
-- [System Specification](SPEC.md): Core system data model and DAG semantics.
+- [System Specification](SPEC.md): Scope and non-goals, data model, DAG semantics, CLI exit codes, locks and claims.
 - [Agent Integration Guide](AGENTS.md): 10,000-foot architecture and operational guide for agents.
 - [Plugin Specification](PLUGIN_SPEC.md): Official plugin standard and metadata contract.
 - [Plugin Catalog](PLUGINS.md): Overview and development guide for plugins.

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Minimal, dependency-aware task tracker. Built to scale agentic workflows.">
+        <meta name="description" content="Dependency-aware, Git-friendly task queue for humans and coding agents.">
       
       
         <meta name="author" content="Sampath Kumar & contributors">
@@ -805,7 +805,7 @@
   <span class="md-ellipsis">
     
   
-  GitHub Sync
+  GitHub Import
 
     
   </span>
@@ -1338,13 +1338,13 @@ The <code>tk</code> dispatcher first looks for an executable named <code>tk-&lt;
 <p><strong>Shell / Python Scripts</strong>:
 Include a comment in the first 10 lines:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="ch">#!/usr/bin/env bash</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># tk-plugin: Interactive Kanban Web UI &amp; PR review dashboard</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># tk-plugin: Interactive Kanban, DAG and review-notes Web UI</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># tk-plugin-version: 0.4.0</span>
 </span></code></pre></div></p>
 <p><strong>Compiled Binaries</strong>:
 Implement the <code>--tk-describe</code> flag:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$<span class="w"> </span>my-plugin<span class="w"> </span>--tk-describe
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk-plugin:<span class="w"> </span>Interactive<span class="w"> </span>Kanban<span class="w"> </span>Web<span class="w"> </span>UI<span class="w"> </span><span class="p">&amp;</span><span class="w"> </span>PR<span class="w"> </span>review<span class="w"> </span>dashboard
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk-plugin:<span class="w"> </span>Interactive<span class="w"> </span>Kanban,<span class="w"> </span>DAG<span class="w"> </span>and<span class="w"> </span>review-notes<span class="w"> </span>Web<span class="w"> </span>UI
 </span></code></pre></div></p>
 <h3 id="32-version-flag">3.2 Version Flag<a class="headerlink" href="#32-version-flag" title="Permanent link">&para;</a></h3>
 <p>All plugins should implement <code>--version</code> or <code>-v</code> flag to output their version:
@@ -1359,7 +1359,7 @@ Implement the <code>--tk-describe</code> flag:
 - <code>--webui</code>: Installs only the Web UI plugin.
 - <code>--skill</code>: Installs the agent skill.
 - <code>--github</code>: Installs the optional GitHub import plugin (<code>tk-github</code>).
-- <code>--scion-taskforce</code>: Installs the optional SCION Task Force orchestrator (<code>tk-scion-taskforce</code>).
+- <code>--scion-taskforce</code>: Installs the optional SCION Task Force plugin (<code>tk-scion-taskforce</code>), an event-driven bridge to SCION workers.
 - <code>--full</code> (default): Installs CLI, Web UI, and Agent Skill. Other plugins are <strong>not</strong> included; the installer prints how to add them.
 - <code>--all</code>: Installs everything, including the GitHub and SCION Task Force plugins.
 - <code>--help</code>: Lists all targets.</p>
