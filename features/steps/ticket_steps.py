@@ -1276,3 +1276,60 @@ def step_agent_team_mirror(context, rel_path):
     for path, text in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
+
+
+# ============================================================================
+# Ticket claiming (tk start --claim) and per-ticket locks
+# ============================================================================
+
+@when(r'(?P<count>\d+) agents concurrently claim ticket "(?P<ticket_id>[^"]+)"')
+def step_concurrent_claim(context, count, ticket_id):
+    """Start N `ticket start <id> --claim --assignee agent-<i>` processes at once."""
+    ticket_script = get_ticket_script(context)
+    env = os.environ.copy()
+    env['TICKETS_DIR'] = str(Path(context.test_dir) / '.tickets')
+    procs = [
+        subprocess.Popen(
+            [ticket_script, 'start', ticket_id, '--claim', '--assignee', f'agent-{i}'],
+            cwd=context.test_dir, env=env, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        for i in range(1, int(count) + 1)
+    ]
+    context.claim_results = []
+    for i, p in enumerate(procs, start=1):
+        out, err = p.communicate(timeout=60)
+        context.claim_results.append((f'agent-{i}', p.returncode, out + err))
+
+
+@then(r'exactly one claim should succeed and the others should exit with code (?P<code>\d+)')
+def step_one_claim_wins(context, code):
+    winners = [r for r in context.claim_results if r[1] == 0]
+    losers = [r for r in context.claim_results if r[1] != 0]
+    assert len(winners) == 1, f"expected 1 winner, got {context.claim_results}"
+    assert all(r[1] == int(code) for r in losers), f"unexpected exit codes: {context.claim_results}"
+    context.claim_winner = winners[0][0]
+
+
+@then(r'ticket "(?P<ticket_id>[^"]+)" should be assigned to the winning agent')
+def step_assigned_to_winner(context, ticket_id):
+    content = (Path(context.test_dir) / '.tickets' / f'{ticket_id}.md').read_text()
+    assert f'assignee: {context.claim_winner}\n' in content, content
+    assert 'status: in_progress\n' in content, content
+
+
+@given(r'ticket "(?P<ticket_id>[^"]+)" has a (?P<kind>stale|live) lock')
+def step_ticket_lock(context, ticket_id, kind):
+    """Create a lock dir as another tk process would. Stale: owner pid is dead and the lock is
+    old. Live: owner is this (running) test process with a fresh timestamp."""
+    import time
+    lock = Path(context.test_dir) / '.tickets' / '.locks' / f'{ticket_id}.lock'
+    lock.mkdir(parents=True)
+    host = subprocess.run(['hostname'], capture_output=True, text=True).stdout.strip()
+    if kind == 'stale':
+        dead = subprocess.Popen(['true'])
+        dead.wait()
+        owner = f'{dead.pid} {host} 0'
+    else:
+        owner = f'{os.getpid()} {host} {int(time.time())}'
+    (lock / 'owner').write_text(owner + '\n')
