@@ -142,7 +142,10 @@ def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
     created_val = meta.get("created")
     created = str(created_val.isoformat()) if hasattr(created_val, "isoformat") else (str(created_val) if created_val else None)
     parent = meta.get("parent")
-    external_ref = meta.get("external_ref")
+    # Core writes `external-ref`; `external_ref` is the older Web UI/SPEC spelling.
+    # external_ref = meta.get("external_ref")
+    ext_val = meta.get("external-ref", meta.get("external_ref"))
+    external_ref = str(ext_val) if ext_val not in (None, "") else None
 
     # Extract title from first # Title
     title = ticket_id
