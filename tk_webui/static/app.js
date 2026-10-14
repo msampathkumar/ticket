@@ -196,13 +196,33 @@ function toggleTheme() {
   initTheme();
 }
 
+// Escape a value for safe interpolation into HTML text or quoted attributes.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Render untrusted markdown to sanitised HTML. Falls back to escaped text if DOMPurify is unavailable.
+function renderMarkdown(text) {
+  const raw = text || '';
+  if (typeof DOMPurify === 'undefined' || typeof marked === 'undefined') {
+    return `<p>${escapeHtml(raw)}</p>`;
+  }
+  return DOMPurify.sanitize(marked.parse(raw));
+}
+
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   const bg = type === 'error' ? 'bg-rose-600 text-white' : type === 'success' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900';
   toast.className = `${bg} px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 animate-fade-in pointer-events-auto transition duration-200`;
   
   const icon = type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info';
-  toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4"></i> <span>${message}</span>`;
+  toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4"></i> <span>${escapeHtml(message)}</span>`;
   elements.toastContainer.appendChild(toast);
   lucide.createIcons();
 
@@ -234,7 +254,7 @@ function renderRecentDirs() {
   state.recentDirs.forEach(dir => {
     const item = document.createElement('button');
     item.className = 'w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 truncate font-mono text-slate-700 dark:text-slate-300 flex items-center gap-2';
-    item.innerHTML = `<i data-lucide="folder" class="w-3.5 h-3.5 shrink-0 text-slate-400"></i> <span class="truncate">${dir}</span>`;
+    item.innerHTML = `<i data-lucide="folder" class="w-3.5 h-3.5 shrink-0 text-slate-400"></i> <span class="truncate">${escapeHtml(dir)}</span>`;
     item.onclick = () => {
       elements.recentDirsPopover.classList.add('hidden');
       elements.dirInput.value = dir;
@@ -401,7 +421,7 @@ function getTypeBadge(type) {
     chore: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   };
   const cls = styles[t] || styles.task;
-  return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${cls}">${t}</span>`;
+  return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${cls}">${escapeHtml(t)}</span>`;
 }
 
 function getStatusBadge(status, isBlocked = false) {
@@ -464,7 +484,7 @@ function createTicketCardElement(ticket) {
   card.className = `group bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-brand-500/50 dark:hover:border-brand-500/40 transition duration-150 cursor-pointer select-none`;
 
   const tagsHtml = (ticket.tags || []).map(tag => 
-    `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">#${tag}</span>`
+    `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">#${escapeHtml(tag)}</span>`
   ).join('');
 
   const notesCount = (ticket.notes || []).length;
@@ -475,14 +495,14 @@ function createTicketCardElement(ticket) {
   const blockedBadge = ticket.is_blocked
     ? `<div class="mt-2 text-[11px] flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-md border border-rose-200/60 dark:border-rose-900/60 truncate">
         <i data-lucide="shield-alert" class="w-3 h-3 shrink-0"></i>
-        <span class="truncate">Blocked: ${ticket.blocked_by.join(', ')}</span>
+        <span class="truncate">Blocked: ${escapeHtml(ticket.blocked_by.join(', '))}</span>
        </div>`
     : '';
 
   card.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-2">
       <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${ticket.id}</span>
+        <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${escapeHtml(ticket.id)}</span>
         ${getTypeBadge(ticket.type)}
         ${getPriorityBadge(ticket.priority)}
       </div>
@@ -491,7 +511,7 @@ function createTicketCardElement(ticket) {
       </div>
     </div>
 
-    <h3 class="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition leading-snug line-clamp-2 mb-2">${ticket.title}</h3>
+    <h3 class="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition leading-snug line-clamp-2 mb-2">${escapeHtml(ticket.title)}</h3>
 
     ${blockedBadge}
 
@@ -499,9 +519,9 @@ function createTicketCardElement(ticket) {
       <div class="flex items-center gap-1 flex-wrap overflow-hidden">
         ${tagsHtml}
       </div>
-      <div class="flex items-center gap-1 text-slate-400 text-[11px] font-medium shrink-0" title="Assignee: ${ticket.assignee || 'Unassigned'}">
+      <div class="flex items-center gap-1 text-slate-400 text-[11px] font-medium shrink-0" title="Assignee: ${escapeHtml(ticket.assignee || 'Unassigned')}">
         <i data-lucide="user" class="w-3 h-3"></i>
-        <span class="truncate max-w-[80px]">${ticket.assignee || '—'}</span>
+        <span class="truncate max-w-[80px]">${escapeHtml(ticket.assignee || '—')}</span>
       </div>
     </div>
   `;
@@ -525,24 +545,28 @@ function renderTableView() {
     tr.className = 'group hover:bg-slate-50/90 dark:hover:bg-slate-800/60 transition duration-150 cursor-pointer select-none border-b border-slate-100 dark:border-slate-800/60 last:border-b-0';
     
     const tagsHtml = (t.tags || []).map(tag => 
-      `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mr-1">#${tag}</span>`
+      `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mr-1">#${escapeHtml(tag)}</span>`
     ).join('');
 
     tr.innerHTML = `
-      <td class="p-3.5 font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</td>
-      <td class="p-3.5 font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition max-w-xs truncate">${t.title}</td>
+      <td class="p-3.5 font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${escapeHtml(t.id)}</td>
+      <td class="p-3.5 font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition max-w-xs truncate">${escapeHtml(t.title)}</td>
       <td class="p-3.5">${getStatusBadge(t.status, t.is_blocked)}</td>
       <td class="p-3.5">${getTypeBadge(t.type)}</td>
       <td class="p-3.5">${getPriorityBadge(t.priority)}</td>
-      <td class="p-3.5 text-xs text-slate-600 dark:text-slate-300 font-medium">${t.assignee || '—'}</td>
+      <td class="p-3.5 text-xs text-slate-600 dark:text-slate-300 font-medium">${escapeHtml(t.assignee || '—')}</td>
       <td class="p-3.5">${tagsHtml || '<span class="text-slate-400 text-xs">—</span>'}</td>
       <td class="p-3.5 text-xs text-slate-400 font-mono">${t.created ? new Date(t.created).toLocaleDateString() : '—'}</td>
       <td class="p-3.5 text-right">
-        <button class="p-1 text-slate-400 group-hover:text-brand-600 dark:group-hover:text-brand-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 rounded transition" onclick="event.stopPropagation(); openDetailModal(state.tickets.find(x => x.id === '${t.id}'))">
+        <button class="table-view-btn p-1 text-slate-400 group-hover:text-brand-600 dark:group-hover:text-brand-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 rounded transition">
           <i data-lucide="eye" class="w-4 h-4"></i>
         </button>
       </td>
     `;
+    tr.querySelector('.table-view-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDetailModal(t);
+    });
     tr.addEventListener('click', () => openDetailModal(t));
     elements.tableBody.appendChild(tr);
   });
@@ -607,7 +631,7 @@ function renderTreeView() {
     rootNode.innerHTML = `
       <div class="flex items-center gap-2 min-w-0 flex-1 mr-1">
         <span class="p-1 bg-white/20 rounded-lg shrink-0"><i data-lucide="folder-git-2" class="w-4 h-4"></i></span>
-        <span class="truncate font-bold text-sm tracking-wide" title="${projectName}">${projectName}</span>
+        <span class="truncate font-bold text-sm tracking-wide" title="${escapeHtml(projectName)}">${escapeHtml(projectName)}</span>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <button class="root-add-task-btn p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition shrink-0" title="Create new task">
@@ -713,7 +737,7 @@ function renderTreeView() {
       emptyHint.style.transform = 'translate(-50%, 0)';
       emptyHint.innerHTML = `
         <p class="font-medium text-slate-500 dark:text-slate-400">No tasks match current filters</p>
-        <p class="text-[11px] text-slate-400">Click <span class="font-semibold text-brand-600 dark:text-brand-400">+</span> on <span class="font-semibold text-slate-700 dark:text-slate-300">${projectName}</span> to create a task</p>
+        <p class="text-[11px] text-slate-400">Click <span class="font-semibold text-brand-600 dark:text-brand-400">+</span> on <span class="font-semibold text-slate-700 dark:text-slate-300">${escapeHtml(projectName)}</span> to create a task</p>
       `;
       elements.treeContainer.appendChild(emptyHint);
     }
@@ -813,7 +837,7 @@ function renderTreeView() {
       emptyHint.style.transform = 'translate(0, -50%)';
       emptyHint.innerHTML = `
         <p class="font-medium text-slate-500 dark:text-slate-400">No tasks match current filters</p>
-        <p class="text-[11px] text-slate-400">Click <span class="font-semibold text-brand-600 dark:text-brand-400">+</span> on <span class="font-semibold text-slate-700 dark:text-slate-300">${projectName}</span> to create a task</p>
+        <p class="text-[11px] text-slate-400">Click <span class="font-semibold text-brand-600 dark:text-brand-400">+</span> on <span class="font-semibold text-slate-700 dark:text-slate-300">${escapeHtml(projectName)}</span> to create a task</p>
       `;
       elements.treeContainer.appendChild(emptyHint);
     }
@@ -885,17 +909,17 @@ function renderTreeView() {
     card.style.top = `${pos.y}px`;
 
     const depsBadge = (t.deps && t.deps.length > 0)
-      ? `<div class="text-[10px] text-rose-500 dark:text-rose-400 font-semibold flex items-center gap-1 truncate"><i data-lucide="link" class="w-3 h-3 shrink-0"></i><span class="truncate">Depends: ${t.deps.join(', ')}</span></div>`
+      ? `<div class="text-[10px] text-rose-500 dark:text-rose-400 font-semibold flex items-center gap-1 truncate"><i data-lucide="link" class="w-3 h-3 shrink-0"></i><span class="truncate">Depends: ${escapeHtml(t.deps.join(', '))}</span></div>`
       : '';
 
     let collapseBadge = '';
     if (hasChildren) {
       collapseBadge = isCollapsed
-        ? `<button data-toggle-id="${t.id}" title="Expand subtasks" class="tree-toggle-collapse flex items-center gap-1 px-2 py-0.5 rounded-md bg-brand-50 dark:bg-slate-800 text-brand-600 dark:text-brand-400 text-[10px] font-bold border border-brand-200 dark:border-slate-700 hover:bg-brand-100 transition">
+        ? `<button data-toggle-id="${escapeHtml(t.id)}" title="Expand subtasks" class="tree-toggle-collapse flex items-center gap-1 px-2 py-0.5 rounded-md bg-brand-50 dark:bg-slate-800 text-brand-600 dark:text-brand-400 text-[10px] font-bold border border-brand-200 dark:border-slate-700 hover:bg-brand-100 transition">
              <i data-lucide="plus-circle" class="w-3 h-3"></i>
              <span>+${children.length} subtask${children.length === 1 ? '' : 's'}</span>
            </button>`
-        : `<button data-toggle-id="${t.id}" title="Collapse subtasks" class="tree-toggle-collapse flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+        : `<button data-toggle-id="${escapeHtml(t.id)}" title="Collapse subtasks" class="tree-toggle-collapse flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition">
              <i data-lucide="minus-circle" class="w-3 h-3"></i>
              <span>${children.length}</span>
            </button>`;
@@ -904,7 +928,7 @@ function renderTreeView() {
     card.innerHTML = `
       <div class="flex items-center justify-between gap-1">
         <div class="flex items-center gap-1.5">
-          <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</span>
+          <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${escapeHtml(t.id)}</span>
           ${collapseBadge}
         </div>
         <div class="flex items-center gap-1">
@@ -912,12 +936,12 @@ function renderTreeView() {
           ${getPriorityBadge(t.priority)}
         </div>
       </div>
-      <h4 class="font-semibold text-xs text-slate-800 dark:text-slate-100 line-clamp-2 leading-snug">${t.title}</h4>
+      <h4 class="font-semibold text-xs text-slate-800 dark:text-slate-100 line-clamp-2 leading-snug">${escapeHtml(t.title)}</h4>
       <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px]">
         ${getStatusBadge(t.status, t.is_blocked)}
         <div class="flex items-center gap-1.5">
-          <span class="text-slate-400 truncate max-w-[80px] font-mono">${t.assignee || 'Unassigned'}</span>
-          <button data-add-child-id="${t.id}" title="Add Subtask under this ticket" class="tree-add-subtask p-0.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
+          <span class="text-slate-400 truncate max-w-[80px] font-mono">${escapeHtml(t.assignee || 'Unassigned')}</span>
+          <button data-add-child-id="${escapeHtml(t.id)}" title="Add Subtask under this ticket" class="tree-add-subtask p-0.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
             <i data-lucide="plus" class="w-3 h-3"></i>
           </button>
         </div>
@@ -990,15 +1014,15 @@ function renderTimelineView() {
       <div class="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-300 dark:border-slate-800/80 group-hover:border-brand-500 transition">
         <div class="flex items-center justify-between text-xs text-slate-400 mb-1 font-mono">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${t.id}</span>
+            <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${escapeHtml(t.id)}</span>
             ${getStatusBadge(t.status, t.is_blocked)}
             ${getTypeBadge(t.type)}
             ${getPriorityBadge(t.priority)}
           </div>
           <span>${t.created ? new Date(t.created).toLocaleString() : 'Recently'}</span>
         </div>
-        <h4 class="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition">${t.title}</h4>
-        <p class="text-xs text-slate-500 mt-1 line-clamp-2">${t.description || 'No description provided'}</p>
+        <h4 class="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition">${escapeHtml(t.title)}</h4>
+        <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHtml(t.description || 'No description provided')}</p>
       </div>
     `;
 
@@ -1105,27 +1129,30 @@ function openDetailModal(ticket) {
   const tagsContainer = document.getElementById('detailTagsContainer');
   tagsContainer.innerHTML = (ticket.tags || []).map(t => 
     `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-       <span>#${t}</span>
-       <button onclick="removeTagFromDetail('${t}')" class="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-0.5 rounded" title="Remove tag">
+       <span>#${escapeHtml(t)}</span>
+       <button data-remove-tag="${escapeHtml(t)}" class="detail-remove-tag text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-0.5 rounded" title="Remove tag">
          <i data-lucide="x" class="w-3 h-3"></i>
        </button>
      </span>`
   ).join('');
+  tagsContainer.querySelectorAll('.detail-remove-tag').forEach(btn => {
+    btn.addEventListener('click', () => removeTagFromDetail(btn.dataset.removeTag));
+  });
 
   const blockedAlert = document.getElementById('detailBlockedAlert');
   const blockedList = document.getElementById('detailBlockedList');
   if (ticket.is_blocked && ticket.blocked_by.length > 0) {
     blockedAlert.classList.remove('hidden');
-    blockedList.innerHTML = ticket.blocked_by.map(b => `<span class="px-2 py-0.5 bg-rose-200/80 dark:bg-rose-900 rounded">${b}</span>`).join('');
+    blockedList.innerHTML = ticket.blocked_by.map(b => `<span class="px-2 py-0.5 bg-rose-200/80 dark:bg-rose-900 rounded">${escapeHtml(b)}</span>`).join('');
   } else {
     blockedAlert.classList.add('hidden');
   }
 
   const descEl = document.getElementById('detailDescription');
-  descEl.innerHTML = ticket.description ? marked.parse(ticket.description) : '<p class="text-slate-400 italic">No description provided.</p>';
+  descEl.innerHTML = ticket.description ? renderMarkdown(ticket.description) : '<p class="text-slate-400 italic">No description provided.</p>';
 
   if (ticket.design) {
-    document.getElementById('detailDesign').innerHTML = marked.parse(ticket.design);
+    document.getElementById('detailDesign').innerHTML = renderMarkdown(ticket.design);
     setSectionState('detailDesignContent', true);
   } else {
     document.getElementById('detailDesign').innerHTML = '';
@@ -1133,7 +1160,7 @@ function openDetailModal(ticket) {
   }
 
   if (ticket.acceptance) {
-    document.getElementById('detailAcceptance').innerHTML = marked.parse(ticket.acceptance);
+    document.getElementById('detailAcceptance').innerHTML = renderMarkdown(ticket.acceptance);
     setSectionState('detailAcceptanceContent', true);
   } else {
     document.getElementById('detailAcceptance').innerHTML = '';
@@ -1199,7 +1226,7 @@ function renderDetailParent(ticket) {
   
   if (parentSelect) {
     parentSelect.innerHTML = '<option value="">-- Select Parent Ticket --</option>' +
-      availableParents.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+      availableParents.map(t => `<option value="${escapeHtml(t.id)}">[${escapeHtml(t.id)}] ${escapeHtml(t.title)} (${escapeHtml(t.status)})</option>`).join('');
   }
 
   if (ticket.parent) {
@@ -1207,14 +1234,14 @@ function renderDetailParent(ticket) {
     if (toggleBtnLabel) toggleBtnLabel.textContent = 'Change Parent';
     if (parentTicket) {
       parentDisplay.innerHTML = `
-        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-brand-500 transition group cursor-pointer" onclick="openDetailModal(state.tickets.find(x => x.id === '${parentTicket.id}'))">
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-brand-500 transition group cursor-pointer detail-open-parent">
           <div class="flex items-center gap-2 truncate">
-            <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${parentTicket.id}</span>
-            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${parentTicket.title}</span>
+            <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${escapeHtml(parentTicket.id)}</span>
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(parentTicket.title)}</span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
             ${getStatusBadge(parentTicket.status, parentTicket.is_blocked)}
-            <button title="Unlink Parent" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition" onclick="event.stopPropagation(); setTicketParent('${ticket.id}', '');">
+            <button title="Unlink Parent" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition detail-unlink-parent">
               <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -1223,12 +1250,23 @@ function renderDetailParent(ticket) {
     } else {
       parentDisplay.innerHTML = `
         <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80">
-          <span class="font-mono text-xs text-slate-500">${ticket.parent} (unresolved parent)</span>
-          <button title="Unlink Parent" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition" onclick="setTicketParent('${ticket.id}', '');">
+          <span class="font-mono text-xs text-slate-500">${escapeHtml(ticket.parent)} (unresolved parent)</span>
+          <button title="Unlink Parent" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition detail-unlink-parent">
             <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
           </button>
         </div>
       `;
+    }
+    const openParentEl = parentDisplay.querySelector('.detail-open-parent');
+    if (openParentEl) {
+      openParentEl.addEventListener('click', () => openDetailModal(parentTicket));
+    }
+    const unlinkParentBtn = parentDisplay.querySelector('.detail-unlink-parent');
+    if (unlinkParentBtn) {
+      unlinkParentBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setTicketParent(ticket.id, '');
+      });
     }
   } else {
     if (toggleBtnLabel) toggleBtnLabel.textContent = 'Set Parent';
@@ -1251,7 +1289,7 @@ function renderDetailSubtasks(ticket) {
   const candidateChildren = state.tickets.filter(t => t.id !== ticket.id && !ancestors.has(t.id) && t.parent !== ticket.id);
   if (linkChildSelect) {
     linkChildSelect.innerHTML = '<option value="">-- Select Existing Ticket to Link as Child --</option>' +
-      candidateChildren.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+      candidateChildren.map(t => `<option value="${escapeHtml(t.id)}">[${escapeHtml(t.id)}] ${escapeHtml(t.title)} (${escapeHtml(t.status)})</option>`).join('');
   }
 
   const subtasks = state.tickets.filter(t => t.parent === ticket.id);
@@ -1266,17 +1304,21 @@ function renderDetailSubtasks(ticket) {
     item.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-brand-500 cursor-pointer transition';
     item.innerHTML = `
       <div class="flex items-center gap-2 truncate">
-        <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${st.id}</span>
-        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${st.title}</span>
+        <span class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">${escapeHtml(st.id)}</span>
+        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(st.title)}</span>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         ${getStatusBadge(st.status, st.is_blocked)}
         ${getPriorityBadge(st.priority)}
-        <button title="Unlink Child" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition ml-1" onclick="event.stopPropagation(); setTicketParent('${st.id}', '');">
+        <button title="Unlink Child" class="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition ml-1 detail-unlink-child">
           <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
         </button>
       </div>
     `;
+    item.querySelector('.detail-unlink-child').addEventListener('click', (e) => {
+      e.stopPropagation();
+      setTicketParent(st.id, '');
+    });
     item.onclick = () => {
       openDetailModal(st);
     };
@@ -1298,7 +1340,7 @@ function renderDetailDependencies(ticket) {
   const candidateDeps = state.tickets.filter(t => t.id !== ticket.id && !currentDeps.has(t.id));
   if (depSelect) {
     depSelect.innerHTML = '<option value="">-- Select Blocker / Dependency Ticket --</option>' +
-      candidateDeps.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+      candidateDeps.map(t => `<option value="${escapeHtml(t.id)}">[${escapeHtml(t.id)}] ${escapeHtml(t.title)} (${escapeHtml(t.status)})</option>`).join('');
   }
 
   if (ticket.deps && ticket.deps.length > 0) {
@@ -1307,11 +1349,12 @@ function renderDetailDependencies(ticket) {
       depBadge.className = 'flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700';
       depBadge.innerHTML = `
         <i data-lucide="git-commit" class="w-3 h-3 text-slate-400"></i>
-        <span>${depId}</span>
-        <button title="Remove dependency" class="text-slate-400 hover:text-rose-500 ml-1 p-0.5" onclick="removeDependency('${ticket.id}', '${depId}')">
+        <span>${escapeHtml(depId)}</span>
+        <button title="Remove dependency" class="detail-remove-dep text-slate-400 hover:text-rose-500 ml-1 p-0.5">
           <i data-lucide="x" class="w-3 h-3"></i>
         </button>
       `;
+      depBadge.querySelector('.detail-remove-dep').addEventListener('click', () => removeDependency(ticket.id, depId));
       depsList.appendChild(depBadge);
     });
   } else {
@@ -1333,7 +1376,7 @@ function renderDetailLinks(ticket) {
   const candidateLinks = state.tickets.filter(t => t.id !== ticket.id && !currentLinks.has(t.id));
   if (linkSelect) {
     linkSelect.innerHTML = '<option value="">-- Select Related Ticket --</option>' +
-      candidateLinks.map(t => `<option value="${t.id}">[${t.id}] ${t.title} (${t.status})</option>`).join('');
+      candidateLinks.map(t => `<option value="${escapeHtml(t.id)}">[${escapeHtml(t.id)}] ${escapeHtml(t.title)} (${escapeHtml(t.status)})</option>`).join('');
   }
 
   if (ticket.links && ticket.links.length > 0) {
@@ -1342,11 +1385,12 @@ function renderDetailLinks(ticket) {
       linkBadge.className = 'flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700';
       linkBadge.innerHTML = `
         <i data-lucide="link-2" class="w-3 h-3 text-indigo-500"></i>
-        <span>${linkId}</span>
-        <button title="Remove link" class="text-slate-400 hover:text-rose-500 ml-1 p-0.5" onclick="removeTicketLink('${ticket.id}', '${linkId}')">
+        <span>${escapeHtml(linkId)}</span>
+        <button title="Remove link" class="detail-remove-link text-slate-400 hover:text-rose-500 ml-1 p-0.5">
           <i data-lucide="x" class="w-3 h-3"></i>
         </button>
       `;
+      linkBadge.querySelector('.detail-remove-link').addEventListener('click', () => removeTicketLink(ticket.id, linkId));
       linksList.appendChild(linkBadge);
     });
   } else {
@@ -1381,10 +1425,10 @@ function renderDetailNotes(ticket) {
           <i data-lucide="user-check" class="w-3.5 h-3.5 text-brand-500"></i>
           <span>Note #${idx + 1}</span>
         </span>
-        <span class="font-mono text-[11px]">${formattedTime}</span>
+        <span class="font-mono text-[11px]">${escapeHtml(formattedTime)}</span>
       </div>
       <div class="prose dark:prose-invert text-xs text-slate-800 dark:text-slate-200 pt-1">
-        ${marked.parse(n.text)}
+        ${renderMarkdown(n.text)}
       </div>
     `;
     notesFeed.appendChild(item);
@@ -1786,7 +1830,7 @@ async function openFolderBrowser(path = '~') {
       row.innerHTML = `
         <div class="flex items-center gap-2 truncate">
           <i data-lucide="folder" class="w-4 h-4 text-brand-500 shrink-0"></i>
-          <span class="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">${item.name}</span>
+          <span class="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">${escapeHtml(item.name)}</span>
         </div>
         <div class="flex items-center gap-2">
           ${badge}
