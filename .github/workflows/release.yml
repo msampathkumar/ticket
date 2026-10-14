@@ -96,11 +96,3 @@ jobs:
         run: |
           chmod +x scripts/publish-homebrew.sh
           ./scripts/publish-homebrew.sh "${{ steps.sha.outputs.version }}" "${{ steps.sha.outputs.sha256 }}"
-
-      - name: Update AUR packages
-        if: steps.check_version.outputs.should_release == 'true' && env.AUR_SSH_KEY != ''
-        env:
-          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
-        run: |
-          chmod +x scripts/publish-aur.sh
-          ./scripts/publish-aur.sh "${{ steps.sha.outputs.version }}" "${{ steps.sha.outputs.sha256 }}"
