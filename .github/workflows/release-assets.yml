@@ -1,0 +1,39 @@
+name: Release Assets (backfill)
+
+# Build tk core assets (tk, tk-core.zip, SHA256SUMS) from `ticket` at an existing tag
+# and attach them to that tag's GitHub release. New releases get assets from release.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, e.g. v0.5.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      # Scripts come from the default branch; `ticket` and LICENSE come from the tag.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Build assets from tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null || { echo "Unknown tag: $TAG" >&2; exit 1; }
+          ./scripts/build-dist.sh "$TAG"
+          ./scripts/check-dist.sh
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" dist/tk dist/tk-core.zip dist/SHA256SUMS --clobber

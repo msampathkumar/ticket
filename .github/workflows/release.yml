@@ -79,6 +79,18 @@ jobs:
           body: ${{ steps.changelog.outputs.body }}
           generate_release_notes: false
 
+      # Upload here rather than in a `release: published` workflow: releases created with
+      # GITHUB_TOKEN do not trigger other workflows. Backfill old tags with release-assets.yml.
+      - name: Build and upload core release assets
+        if: steps.check_version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.check_version.outputs.tag }}
+        run: |
+          ./scripts/build-dist.sh "$TAG"
+          ./scripts/check-dist.sh
+          gh release upload "$TAG" dist/tk dist/tk-core.zip dist/SHA256SUMS --clobber
+
       - name: Get tarball SHA256
         if: steps.check_version.outputs.should_release == 'true'
         id: sha

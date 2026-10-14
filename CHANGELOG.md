@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Release assets: every GitHub release ships `tk`, `tk-core.zip` and `SHA256SUMS` for install without cloning (`make dist`, `scripts/build-dist.sh`; `release-assets.yml` backfills an existing tag). Documented in the agent skill, README and installation guide.
+
 ### Removed
 - Packaging: AUR PKGBUILDs (`pkg/aur/`), `scripts/publish-aur.sh` and the release workflow AUR step; they pointed at upstream `wedow/ticket`.
 

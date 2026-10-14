@@ -44,3 +44,16 @@ jobs:
 
       - name: Rebuild tailwind.css and check for drift
         run: make webui-css-check
+
+  dist:
+    name: Release assets (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build dist/ and install tk from tk-core.zip in a clean dir
+        run: make dist-check

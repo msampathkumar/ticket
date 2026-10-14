@@ -19,6 +19,25 @@ cd ticket
 
 Binaries are installed to `~/.local/bin/` (override with `BIN_DIR`). Ensure that directory is on your `$PATH`.
 
+## Download a release
+
+The core CLI is attached to every [GitHub release](https://github.com/msampathkumar/ticket/releases/latest) as a single file, so no clone is needed:
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk -o ~/.local/bin/tk
+chmod +x ~/.local/bin/tk
+tk version
+```
+
+| Asset | Contents |
+| :--- | :--- |
+| [`tk`](https://github.com/msampathkumar/ticket/releases/latest/download/tk) | The core CLI script |
+| [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) | `ticket`, `LICENSE`, `INSTALL.md` |
+| [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) | Checksums for `tk` and `tk-core.zip` |
+
+Verify downloads in the download directory with `sha256sum -c --ignore-missing SHA256SUMS` (macOS: `shasum -a 256 -c --ignore-missing SHA256SUMS`). Release assets contain the core only; use `./install.sh` for the Web UI and plugins.
+
 ---
 
 ## Requirements

@@ -37,6 +37,18 @@ cd ticket
 
 Binaries install to `~/.local/bin/` (`tk`, `tk-webui`, plus any optional `tk-<plugin>`). Ensure `~/.local/bin` is in `$PATH`.
 
+### Download a release
+
+The core CLI is attached to every [release](https://github.com/msampathkumar/ticket/releases/latest) as a single file:
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk -o ~/.local/bin/tk
+chmod +x ~/.local/bin/tk
+```
+
+Also available: [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) (`ticket`, `LICENSE`, `INSTALL.md`) and [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) for verification.
+
 ### Install Agent Skill via NPX
 
 Install the agent skill for your AI coding assistant without cloning:

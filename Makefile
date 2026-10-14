@@ -1,7 +1,15 @@
-.PHONY: test docs-dev docs-build docs-llms skill-sync skill-check webui-css webui-css-check
+.PHONY: test docs-dev docs-build docs-llms skill-sync skill-check webui-css webui-css-check dist dist-check
 
 test:
 	uv run --with behave behave
+
+# Release assets in dist/: tk, tk-core.zip, SHA256SUMS (REF defaults to HEAD)
+dist:
+	./scripts/build-dist.sh $(REF)
+
+# Install from dist/tk-core.zip into a clean temp dir and smoke-test it
+dist-check: dist
+	./scripts/check-dist.sh
 
 docs-llms:
 	./scripts/build_llms_full.sh

@@ -17,6 +17,17 @@ description: Dependency-aware, Git-friendly task queue for humans and coding age
 
 Any coding agent or developer can install `tk` directly:
 
+### Install without cloning (release download)
+The core CLI is one Bash file attached to every GitHub release:
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk -o ~/.local/bin/tk && chmod +x ~/.local/bin/tk
+tk version
+```
+- Zip alternative (`ticket`, `LICENSE`, `INSTALL.md`): https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip
+- Release page: https://github.com/msampathkumar/ticket/releases/latest
+- Verify: download `SHA256SUMS` from the same release, then run `sha256sum -c --ignore-missing SHA256SUMS` (macOS: `shasum -a 256 -c --ignore-missing SHA256SUMS`) in the download directory.
+
 ### Option A: Install from GitHub (Zero Clone via NPX or Curl)
 ```bash
 # Direct agent skill installation
