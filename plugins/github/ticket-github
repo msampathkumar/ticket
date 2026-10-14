@@ -226,14 +226,14 @@ cmd_sync() {
                 # Always (re)apply sync tags + labels so edited/stripped tickets are repaired on re-sync.
                 if [[ -n "$(ensure_ticket_tags "$local_id" "$tags")" ]]; then
                     echo "  🏷️  Re-tagged local ticket $local_id (Issue #$num) with $tags"
-                    ((retagged_count++))
+                    retagged_count=$((retagged_count + 1))
                 fi
                 if [[ "$state" == "CLOSED" && "$local_status" != "closed" ]]; then
                     "$TK_SCRIPT" super close "$local_id" >/dev/null
                     echo "  ✅ Closed local ticket $local_id (Issue #$num closed on GitHub)"
-                    ((closed_count++))
+                    closed_count=$((closed_count + 1))
                 else
-                    ((existing_count++))
+                    existing_count=$((existing_count + 1))
                 fi
             else
                 if [[ "$state" == "OPEN" ]]; then
@@ -245,7 +245,7 @@ cmd_sync() {
                     local new_id
                     new_id=$(create_imported_ticket "$title" "GitHub issue #$num" bug "$ext_ref" "$tags" "$full_desc")
                     echo "  ✨ Created local ticket $new_id for Issue #$num ($title)"
-                    ((created_count++))
+                    created_count=$((created_count + 1))
                 fi
             fi
         done
@@ -279,14 +279,14 @@ cmd_sync() {
                 # Always (re)apply sync tags + labels so edited/stripped tickets are repaired on re-sync.
                 if [[ -n "$(ensure_ticket_tags "$local_id" "$tags")" ]]; then
                     echo "  🏷️  Re-tagged local ticket $local_id (PR #$num) with $tags"
-                    ((retagged_count++))
+                    retagged_count=$((retagged_count + 1))
                 fi
                 if [[ ("$state" == "MERGED" || "$state" == "CLOSED") && "$local_status" != "closed" ]]; then
                     "$TK_SCRIPT" super close "$local_id" >/dev/null
                     echo "  ✅ Closed local ticket $local_id (PR #$num $state on GitHub)"
-                    ((closed_count++))
+                    closed_count=$((closed_count + 1))
                 else
-                    ((existing_count++))
+                    existing_count=$((existing_count + 1))
                 fi
             else
                 if [[ "$state" == "OPEN" ]]; then
@@ -298,7 +298,7 @@ cmd_sync() {
                     local new_id
                     new_id=$(create_imported_ticket "$title" "GitHub PR #$num" task "$ext_ref" "$tags" "$full_desc")
                     echo "  ✨ Created local ticket $new_id for PR #$num ($title)"
-                    ((created_count++))
+                    created_count=$((created_count + 1))
                 fi
             fi
         done
