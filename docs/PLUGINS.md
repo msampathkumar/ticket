@@ -10,7 +10,7 @@ When you execute:
 ```bash
 tk <command> [args...]
 ```
-The `tk` dispatcher first checks for an executable named `tk-<command>` or `ticket-<command>` in your system `$PATH`. If found, `tk` delegates execution directly to that plugin binary or script.
+The `tk` dispatcher first looks for an executable named `tk-<command>` or `ticket-<command>` on `$PATH`, then in the repository's `plugins/<command>/` directory. If found, `tk` replaces itself with that plugin (`exec`). A plugin takes precedence over a built-in command of the same name.
 
 To bypass plugins and run a built-in command directly, use `tk super <command>`.
 
@@ -20,13 +20,15 @@ To bypass plugins and run a built-in command directly, use `tk super <command>`.
 
 When `tk` launches a plugin, it automatically exports two environment variables:
 
-- `TICKETS_DIR`: The absolute path to the active `.tickets` directory.
+- `TICKETS_DIR`: The path to the active `.tickets` directory. Exported only when one is set or found; plugins must handle it being unset.
 - `TK_SCRIPT`: The absolute path to the root `tk` executable.
 
 Plugins can call built-in commands by executing:
 ```bash
 "$TK_SCRIPT" super <command> [args...]
 ```
+
+To react to ticket changes without polling, install an executable in `.tickets/.hooks/post-write.d/`. `tk` runs it after every successful write with `TK_EVENT`, `TK_TICKET_ID` and `TK_TICKET_FILE` set. See [SPEC §5.1](SPEC.md).
 
 ---
 
@@ -79,9 +81,9 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 
 ## 5. Official Plugins
 
-- **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
-- **`tk github` (`tk-github`)**: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. *(optional)*
-- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(optional; requires Python 3.9+ and the `scion` CLI)*
+- **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard. *(in the default `--full` bundle; requires Python 3.9+)*
+- **`tk github` (`tk-github`)**: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. *(install with `--github`; requires `gh` and `jq`)*
+- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(install with `--scion-taskforce`; requires Python 3.9+ and the `scion` CLI)*
 
 ---
 
@@ -108,12 +110,12 @@ fi
 TICKETS_DIR="${TICKETS_DIR:-.tickets}"
 
 total=$(ls -1 "$TICKETS_DIR"/*.md 2>/dev/null | wc -l || echo 0)
-open=$("$TK_SCRIPT" super ready | wc -l || echo 0)
+ready=$("$TK_SCRIPT" super ready | wc -l || echo 0)
 blocked=$("$TK_SCRIPT" super blocked | wc -l || echo 0)
 
-echo "📊 Total Tickets : $total"
-echo "🟢 Ready (Open)  : $open"
-echo "🔴 Blocked       : $blocked"
+echo "Total   : $total"
+echo "Ready   : $ready"
+echo "Blocked : $blocked"
 ```
 Make it executable:
 ```bash

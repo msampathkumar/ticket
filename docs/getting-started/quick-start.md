@@ -16,56 +16,73 @@ cd my-project
 tk init
 ```
 
-This creates a `.tickets/` directory where all tasks are stored as plain Markdown files with YAML frontmatter.
+This creates `.tickets/` with a closed setup ticket and a `.tickets/.gitignore` that keeps lock files and the hook log out of Git. Tickets are plain Markdown files with YAML frontmatter; commit them with your code. (`tk create` also initializes `.tickets/` if it is missing.)
 
-## Step 2: Create a Task
+## Step 2: Create Tasks
 
-Create your first task with priority and tags:
+Create tasks with priority and tags:
 
 ```bash
 tk create "Implement user authentication" \
   -d "Add JWT-based auth to FastAPI backend" \
   -p 1 \
   --tags backend,security
+# myp-a1b2c3
+
+tk create "Add login page" --tags frontend
+# myp-d4e5f6
 ```
 
-`tk` prints the generated task ID (e.g., `tic-abc1`).
+`tk` prints the generated ID: a prefix from the folder name plus a 6-character random hash. Commands accept partial IDs (`tk show a1b`).
 
-## Step 3: Check Actionable Work (`tk ready`)
+## Step 3: Add a Dependency
 
-Run `tk ready` to list unblocked tasks whose dependencies are fully satisfied:
+The login page needs the auth work first:
+
+```bash
+tk dep myp-d4e5f6 myp-a1b2c3
+```
+
+## Step 4: Check Actionable Work (`tk ready`)
+
+`tk ready` lists tickets whose dependencies are all closed:
 
 ```bash
 tk ready
 ```
 
-## Step 4: Claim & Work on the Task
+Only `myp-a1b2c3` is listed; `tk blocked` shows `myp-d4e5f6` waiting on it.
+
+## Step 5: Claim & Work on the Task
 
 Mark the task as in progress:
 
 ```bash
-tk start tic-abc1
+tk start myp-a1b2c3
 ```
 
-Add review notes or progress logs:
+When several agents or people share the queue, claim instead. The claim sets the assignee and status in one locked step and exits `3` if someone else already holds the ticket:
 
 ```bash
-tk add-note tic-abc1 "Completed token generation logic and unit tests."
+tk start myp-a1b2c3 --claim
 ```
 
-## Step 5: Close the Task & Unblock Dependents
-
-When finished, close the task:
+Add progress notes:
 
 ```bash
-tk close tic-abc1
+tk add-note myp-a1b2c3 "Completed token generation logic and unit tests."
 ```
 
-This automatically updates the status and unblocks any downstream dependent tasks.
+## Step 6: Close the Task & Unblock Dependents
 
-## Step 6: Launch the Interactive Web UI
+```bash
+tk close myp-a1b2c3
+tk ready    # myp-d4e5f6 is now ready
+```
 
-Launch the 4-lane Kanban board and DAG Mind Map:
+## Step 7: Launch the Web UI (Optional Plugin)
+
+If you installed the Web UI (`./install.sh --full` or `--webui`), open the Kanban board and DAG Mind Map:
 
 ```bash
 tk webui

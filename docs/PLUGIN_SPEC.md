@@ -66,17 +66,22 @@ Compiled binaries (Go, Rust, C) MUST implement:
 ## 4. Execution Protocol & Context
 
 When `tk <plugin-command> [args...]` is executed:
-1. `tk` resolves the target `.tickets/` folder.
-2. `tk` sets and exports environment variables:
-   - `TICKETS_DIR`: Absolute path to `.tickets/` directory.
+1. `tk` looks for `tk-<plugin-command>` or `ticket-<plugin-command>` on `$PATH`, then under `plugins/<plugin-command>/`. A plugin takes precedence over a built-in command of the same name.
+2. `tk` resolves the `.tickets/` folder (`TICKETS_DIR` if set, else upward discovery) and exports environment variables:
+   - `TICKETS_DIR`: Path to the `.tickets/` directory. Exported only when set or found; plugins MUST handle it being unset.
    - `TK_SCRIPT`: Absolute path to `tk` executable.
-3. `tk` invokes `tk-<plugin-command> "$@"` using `exec`.
+3. `tk` invokes the plugin with the remaining arguments using `exec`.
 
 ### 4.1 Calling Core Built-Ins
 Plugins can execute core `tk` routines without triggering recursion by using:
 ```bash
 "$TK_SCRIPT" super <built-in-command> [args...]
 ```
+
+Plugins SHOULD write tickets through `tk` rather than editing files directly, so that locks, value validation and post-write hooks apply.
+
+### 4.2 Reacting to Changes
+Plugins that react to ticket writes SHOULD install an executable in `.tickets/.hooks/post-write.d/` rather than polling or running a daemon. See [SPEC §5.1](SPEC.md) for events and environment.
 
 ---
 

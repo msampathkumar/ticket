@@ -19,7 +19,7 @@ description: Minimal, dependency-aware task tracker. Built to scale agentic work
 
 ```mermaid
 graph TD
-    A[".tickets/*.md<br/>(Plain Text & Git)"] --> B["Core POSIX CLI<br/>(tk ready, tk start, tk dep)"]
+    A[".tickets/*.md<br/>(Plain Text & Git)"] --> B["Core Bash CLI<br/>(tk ready, tk start, tk dep)"]
     B --> C["Interactive Web UI<br/>(Kanban & DAG Mind Map)"]
     B --> D["AI Agent Skill<br/>(Automated 5-Step Loop)"]
 
@@ -35,17 +35,18 @@ graph TD
 
 - **Plain Text Storage**: Tasks reside in `.tickets/*.md` files with YAML frontmatter, versioned directly in Git alongside the codebase.
 - **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, cycle detection, and automated downstream unblocking.
-- **Fast POSIX Core**: Core CLI runs on portable POSIX Bash with zero mandatory runtime dependencies (no Python or Node required for base operations).
+- **Portable Bash Core**: One Bash 3.2+ script using standard Unix tools; no Python or Node. `jq` is optional (only for `tk query` filters).
+- **Safe for Concurrent Agents**: `tk start --claim` claims a ticket atomically under a per-ticket lock, exiting `3` if another agent got there first.
 - **AI Agent Integration**: Deterministic 5-step operational loop, reusable agent skill (`agent-skill/tk/SKILL.md`), and machine-readable context endpoints.
 
 ---
 
 ## Official Plugins
 
-Extend `ticket` with modular plugins discovered automatically via `$PATH`:
+Extend `ticket` with optional plugins discovered automatically via `$PATH`:
 
 - **[Web UI (`tk webui`)](plugins/webui.md)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.
-- **[GitHub Sync (`tk github`)](plugins/github.md)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
+- **[GitHub Sync (`tk github`)](plugins/github.md)**: One-way import of GitHub issues and pull requests into local tickets.
 - **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.
 
 Learn how to write custom plugins in pure Bash or Python in the [Plugin Architecture Guide](plugins/architecture.md).
@@ -63,7 +64,7 @@ cd ticket
 # Full Suite (CLI + Web UI + Agent Skill) — default
 ./install.sh --full
 
-# Core CLI Only (Pure Bash, zero Python dependencies)
+# Core CLI only (pure Bash, no Python)
 ./install.sh --core
 ```
 
