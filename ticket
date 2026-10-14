@@ -291,6 +291,19 @@ _read_projects_json() {
 
 # Record a project in ~/.local/state/tk/projects.json (most recent first), the schema
 # read by tk_webui/tk_cli.py. Written atomically via temp file + mv. Never fails tk init.
+# Ensure .tickets/.gitignore lists tk's runtime files (lock dirs, hook log). Appends only
+# missing lines and keeps existing content, so re-running `tk init` is idempotent.
+ensure_tickets_gitignore() {
+    local gi="$1/.gitignore" line
+    for line in ".locks/" ".hooks/hooks.log"; do
+        if [[ ! -f "$gi" ]] || ! grep -qxF -- "$line" "$gi"; then
+            # Add a newline first if the file does not end with one.
+            [[ -s "$gi" && -n "$(tail -c 1 "$gi")" ]] && printf '\n' >> "$gi"
+            printf '%s\n' "$line" >> "$gi"
+        fi
+    done
+}
+
 register_global_project() {
     local proj_dir="$1"
     local state_dir="$HOME/.local/state/tk"
@@ -355,6 +368,7 @@ cmd_init() {
     fi
 
     TICKETS_DIR="$tickets_path"
+    ensure_tickets_gitignore "$tickets_path"
 
     # Check if any tickets already exist
     local ticket_count
@@ -565,6 +579,9 @@ ticket_lock() {
     local start now
     start=$(date +%s)
     mkdir -p "$lock_root"
+    # Self-ignoring lock dir: keeps lock files out of git even in repos initialized before
+    # `tk init` wrote .tickets/.gitignore.
+    [[ -f "$lock_root/.gitignore" ]] || printf '*\n' > "$lock_root/.gitignore" 2>/dev/null || true
     while ! mkdir "$lock" 2>/dev/null; do
         if _lock_is_stale "$lock"; then
             # Rename first so only one waiter removes a given stale lock.

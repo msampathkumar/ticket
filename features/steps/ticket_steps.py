@@ -1333,3 +1333,9 @@ def step_ticket_lock(context, ticket_id, kind):
     else:
         owner = f'{os.getpid()} {host} {int(time.time())}'
     (lock / 'owner').write_text(owner + '\n')
+
+
+@then(r'the file "(?P<rel_path>[^"]+)" should have the line "(?P<line>[^"]+)" (?P<times>\d+) time\(s\)')
+def step_file_line_count(context, rel_path, line, times):
+    lines = (Path(context.test_dir) / rel_path).read_text().splitlines()
+    assert lines.count(line) == int(times), f"{rel_path}: {lines}"
