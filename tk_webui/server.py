@@ -27,6 +27,36 @@ def _is_pid_alive(pid: int) -> bool:
         return False
 
 
+def _process_command(pid: int) -> str:
+    """Return the command line of pid, or "" if it cannot be read."""
+    proc_cmdline = Path(f"/proc/{pid}/cmdline")
+    try:
+        if proc_cmdline.exists():  # Linux
+            return proc_cmdline.read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        out = subprocess.run(  # macOS / BSD
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return out.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _is_webui_process(pid: int, port: Optional[int] = None) -> bool:
+    """Guard against PID reuse: pid must be alive and be our tk_webui server."""
+    if not _is_pid_alive(pid):
+        return False
+    cmd = _process_command(pid)
+    if "tk_webui" not in cmd:
+        return False
+    if port is None:
+        return True
+    args = cmd.split()
+    return any(a == "--port" and b == str(port) for a, b in zip(args, args[1:]))
+
+
 def _is_port_listening(host: str, port: int) -> bool:
     # A wildcard bind is reachable via loopback.
     probe_host = {"0.0.0.0": "127.0.0.1", "::": "::1", "": "127.0.0.1"}.get(host, host)
@@ -50,10 +80,10 @@ def get_server_info() -> Optional[Dict[str, Any]]:
         with open(PID_FILE, "r") as f:
             data = json.load(f)
         pid = data.get("pid")
-        if pid and _is_pid_alive(pid):
+        if pid and _is_webui_process(pid, data.get("port")):
             return data
         else:
-            # Stale PID file
+            # Stale PID file: process gone, or PID reused by another program
             PID_FILE.unlink(missing_ok=True)
             return None
     except Exception:
@@ -143,7 +173,8 @@ def stop_server() -> int:
             if not _is_pid_alive(pid):
                 break
             time.sleep(0.1)
-        if _is_pid_alive(pid):
+        # Re-check identity: the PID may have exited and been reused meanwhile.
+        if _is_webui_process(pid, info.get("port")):
             os.kill(pid, signal.SIGKILL)
     except (OSError, ProcessLookupError):
         pass
