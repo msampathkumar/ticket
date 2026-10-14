@@ -63,3 +63,7 @@ Verified: wizard menus/validation, tk/scion init pre-check and model question ar
 **2026-10-04T22:23:29Z**
 
 **Task Force:** ticket closed; could not stop worker `tic-cpji`: scion stop exited 1: Using hub: http://127.0.0.1:8080 (see `tk scion-taskforce logs tic-cpji`)
+
+**2026-10-14T19:07:34Z**
+
+**Task Force:** ticket closed; could not stop worker `tic-cpji`: scion stop exited 1: Error: hub at http://127.0.0.1:8080 is not responding: request failed: Get "http://127.0.0.1:808... (see `tk scion-taskforce logs tic-cpji`)
