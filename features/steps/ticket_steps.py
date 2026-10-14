@@ -252,6 +252,50 @@ Description
 # When Steps
 # ============================================================================
 
+# ============================================================================
+# No-python3 sandbox: the core CLI must not need python3
+# ============================================================================
+
+@given(r'python3 is not available on PATH')
+def step_no_python(context):
+    """Shadow python/python3 with stubs that record any call and fail; sandbox HOME."""
+    shim = Path(context.test_dir) / '.no-python-bin'
+    shim.mkdir(parents=True, exist_ok=True)
+    marker = Path(context.test_dir) / '.python-invoked'
+    for name in ('python3', 'python'):
+        stub = shim / name
+        stub.write_text(f'#!/bin/sh\necho "$0 $*" >> "{marker}"\nexit 127\n')
+        stub.chmod(0o755)
+    (Path(context.test_dir) / 'home').mkdir(exist_ok=True)
+    context.no_python_dir = str(shim)
+
+
+@then(r'python3 should not have been invoked')
+def step_python_not_invoked(context):
+    marker = Path(context.test_dir) / '.python-invoked'
+    assert not marker.exists(), f"python was invoked: {marker.read_text()}"
+
+
+def _projects_file(context):
+    return Path(context.test_dir) / 'home' / '.local' / 'state' / 'tk' / 'projects.json'
+
+
+@given(r'the global projects registry contains (?P<raw>.+)')
+def step_registry_contains(context, raw):
+    f = _projects_file(context)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(raw)
+
+
+@then(r'the global projects registry should be "(?P<csv>[^"]*)"')
+def step_registry_should_be(context, csv):
+    """Compare the registry list; "." stands for the (symlink-resolved) test directory."""
+    here = str(Path(context.test_dir).resolve())
+    expected = [here if p == '.' else p for p in csv.split(',')]
+    data = json.loads(_projects_file(context).read_text())
+    assert data == {'projects': expected}, f"got {data}, expected {expected}"
+
+
 @when(r'I run "(?P<command>(?:[^"\\]|\\.)+)" in non-TTY mode')
 def step_run_command_non_tty(context, command):
     """Run a command simulating non-TTY mode."""
@@ -346,6 +390,9 @@ def step_run_command(context, command):
     env['PATH'] = ticket_dir + ':' + env.get('PATH', '')
     if hasattr(context, 'plugin_dir'):
         env['PATH'] = context.plugin_dir + ':' + env['PATH']
+    if getattr(context, 'no_python_dir', None):
+        env['PATH'] = context.no_python_dir + ':' + env['PATH']
+        env['HOME'] = str(Path(context.test_dir) / 'home')
 
     result = subprocess.run(
         cmd,
