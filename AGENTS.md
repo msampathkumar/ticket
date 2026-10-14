@@ -83,6 +83,7 @@ flowchart LR
    Run `tk show <id>` to inspect design notes, acceptance criteria, and child tickets. Decompose complex tasks using `tk create "<title>" --parent <id>` and `tk dep <child> <dependency>`.
 4. **Implement, Verify & Record Notes**:
    Execute the code changes, run tests (`make test`), and append review audit notes via `tk add-note <id> "..."`.
+   Once all code changes are done, update the user-facing docs to match: `docs/` pages, `agent-skill/tk/SKILL.md` (then `make skill-sync`), and `README.md`.
 5. **Close the Ticket**:
    Run `tk close <id>` to mark complete and automatically unblock downstream dependent tickets.
 
@@ -97,6 +98,7 @@ flowchart LR
   - Default `tk ls`: Hides closed tickets and defaults to 10 items (unlimited with `--full` or `--all`).
 - **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu across Python 3.11 & 3.13.
 - **Documentation Maintenance**: Recompile documentation and LLM context files using `make docs-build` when adding or modifying documentation. Preview locally using `make docs-dev`.
+- **Docs After Code**: After all code changes for a task or release are done, update `docs/`, `agent-skill/tk/SKILL.md` (run `make skill-sync` so the copy embedded in `ticket` matches), and `README.md` before closing the ticket or cutting a release. Users and agents with only the skill rely on it being current.
 - **Automated Linting & Quality**: Ensure code satisfies linting checks (`uvx ruff check plugins/scion-taskforce/ tk_webui/`).
 - **Git Hygiene**: Do not mutate Git history or push commits without explicit confirmation.
 - **No Upstream Contributions**: This project started as a fork of [`wedow/ticket`](https://github.com/wedow/ticket) (credited in the README) and has since taken an independent direction. Do not open pull requests, issues, or sync branches against `wedow/ticket`. All work targets `msampathkumar/ticket` (`master`).

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-15
+
+### Changed
+- Docs: agent skill, installation guide and README give step-by-step install from `tk-core.zip`; the skill copy embedded in `tk` matches.
+- Docs: AGENTS.md workflow requires updating `docs/`, the agent skill (`make skill-sync`) and README after all code changes, before closing a ticket or cutting a release.
+
 ## [0.5.1] - 2026-10-14
 
 ### Added

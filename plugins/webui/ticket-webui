@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban, DAG and review-notes Web UI
-# tk-plugin-version: 0.5.1
+# tk-plugin-version: 0.5.2
 set -e
 
 resolve_script_dir() {
