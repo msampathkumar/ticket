@@ -480,6 +480,7 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 - Core and plugins: the scion-taskforce and Web UI help descriptions drop the "orchestrator" and "PR review" claims; the GitHub plugin is called an import.
 - Web UI: layout uses the full viewport width on large screens (#18).
 - Web UI: `app.js` split into ES modules under `static/js/`, no behaviour change (#26).
+- Web UI: Tailwind is a prebuilt, committed stylesheet (~45 KB) instead of the in-browser Play runtime (~400 KB) (#40).
 - GitHub: documented as a one-way import with an untrusted-input warning; nothing is written to GitHub (#9).
 - Docs: SPEC, README, agent guides, agent skill, core CLI and Web UI pages updated for claims, IDs, scope and security model; all plugins documented as optional (#29, #30, #31, #32, #33).
 - Tests: every Behave scenario runs with a sandboxed `HOME` and tk_cli state dir (#28).
