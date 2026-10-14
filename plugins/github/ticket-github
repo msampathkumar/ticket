@@ -116,26 +116,42 @@ find_local_ticket_status() {
 }
 
 # Ensure an existing synced ticket carries the sync tags (github-sync, pr|issue, GitHub labels).
-# Additive only: tags the user added locally (e.g. `taskforce`) are preserved.
+# Legacy variants of the item's labels written by older versions (raw label text, read here
+# space-stripped, e.g. `autorelease:pending`) are replaced by the sanitised tag ($3).
+# Duplicates are dropped. Other tags the user added locally (e.g. `taskforce`) are preserved.
 # Prints "updated" when the ticket was changed so callers can count it.
 ensure_ticket_tags() {
-    local tid="$1" wanted_csv="$2"
+    local tid="$1" wanted_csv="$2" legacy_csv="${3:-}"
     local file="$TICKETS_DIR/$tid.md"
     [[ -f "$file" ]] || return 0
     local current_csv
     current_csv=$(awk '/^---$/{c++; next} c==1 && /^tags:/{sub(/^tags:[ ]*\[/, ""); sub(/\][ ]*$/, ""); gsub(/ /, ""); print; exit}' "$file")
-    local merged="$current_csv" missing=0 t
+    local merged="" t
+    IFS=',' read -ra current <<< "$current_csv"
+    for t in "${current[@]}"; do
+        [[ -z "$t" ]] && continue
+        # Drop legacy label variants unless the variant is itself a wanted tag.
+        if [[ ",$legacy_csv," == *",$t,"* && ",$wanted_csv," != *",$t,"* ]]; then
+            continue
+        fi
+        [[ ",$merged," == *",$t,"* ]] || merged="${merged:+$merged,}$t"
+    done
     IFS=',' read -ra wanted <<< "$wanted_csv"
     for t in "${wanted[@]}"; do
         [[ -z "$t" ]] && continue
-        if [[ ",$merged," != *",$t,"* ]]; then
-            merged="${merged:+$merged,}$t"
-            missing=1
-        fi
+        [[ ",$merged," == *",$t,"* ]] || merged="${merged:+$merged,}$t"
     done
-    if [[ "$missing" == 1 ]]; then
+    if [[ "$merged" != "$current_csv" ]]; then
         "$TK_SCRIPT" super update "$tid" --tags "$merged" >/dev/null && echo "updated"
     fi
+}
+
+# Legacy tag variants of item $2's labels in JSON array $1, as older versions wrote them:
+# raw label text split on commas, with spaces removed (matching how ensure_ticket_tags reads tags).
+gh_labels_legacy_csv() {
+    echo "$1" | jq -r --argjson i "$2" \
+        '.[$i].labels[]?.name | split(",")[] | gsub(" "; "") | select(length > 0)' \
+        2>/dev/null | paste -sd, - || true
 }
 
 # GitHub label names -> comma-separated tk tags for item $2 of JSON array $1.
@@ -208,13 +224,14 @@ cmd_sync() {
         count=$(echo "$issues_json" | jq '. | length' 2>/dev/null || echo 0)
 
         for ((i=0; i<count; i++)); do
-            local num title body url state labels_str ext_ref
+            local num title body url state labels_str legacy_str ext_ref
             num=$(echo "$issues_json" | jq -r ".[$i].number")
             title=$(gh_title "$issues_json" "$i")
             body=$(echo "$issues_json" | jq -r ".[$i].body // \"\"")
             url=$(echo "$issues_json" | jq -r ".[$i].url")
             state=$(echo "$issues_json" | jq -r ".[$i].state")
             labels_str=$(gh_labels_csv "$issues_json" "$i")
+            legacy_str=$(gh_labels_legacy_csv "$issues_json" "$i")
 
             ext_ref="gh-issue-$num"
             local tags="github-sync,github,issue,issue#$num"
@@ -224,7 +241,7 @@ cmd_sync() {
                 local local_status
                 local_status=$(find_local_ticket_status "$local_id")
                 # Always (re)apply sync tags + labels so edited/stripped tickets are repaired on re-sync.
-                if [[ -n "$(ensure_ticket_tags "$local_id" "$tags")" ]]; then
+                if [[ -n "$(ensure_ticket_tags "$local_id" "$tags" "$legacy_str")" ]]; then
                     echo "  🏷️  Re-tagged local ticket $local_id (Issue #$num) with $tags"
                     retagged_count=$((retagged_count + 1))
                 fi
@@ -261,13 +278,14 @@ cmd_sync() {
         pr_count=$(echo "$prs_json" | jq '. | length' 2>/dev/null || echo 0)
 
         for ((i=0; i<pr_count; i++)); do
-            local num title body url state labels_str ext_ref
+            local num title body url state labels_str legacy_str ext_ref
             num=$(echo "$prs_json" | jq -r ".[$i].number")
             title=$(gh_title "$prs_json" "$i")
             body=$(echo "$prs_json" | jq -r ".[$i].body // \"\"")
             url=$(echo "$prs_json" | jq -r ".[$i].url")
             state=$(echo "$prs_json" | jq -r ".[$i].state")
             labels_str=$(gh_labels_csv "$prs_json" "$i")
+            legacy_str=$(gh_labels_legacy_csv "$prs_json" "$i")
 
             ext_ref="gh-pr-$num"
             local tags="github-sync,github,pr,pr#$num"
@@ -277,7 +295,7 @@ cmd_sync() {
                 local local_status
                 local_status=$(find_local_ticket_status "$local_id")
                 # Always (re)apply sync tags + labels so edited/stripped tickets are repaired on re-sync.
-                if [[ -n "$(ensure_ticket_tags "$local_id" "$tags")" ]]; then
+                if [[ -n "$(ensure_ticket_tags "$local_id" "$tags" "$legacy_str")" ]]; then
                     echo "  🏷️  Re-tagged local ticket $local_id (PR #$num) with $tags"
                     retagged_count=$((retagged_count + 1))
                 fi

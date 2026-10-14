@@ -40,3 +40,21 @@ Feature: GitHub import argument safety
     When I run "ticket github sync --issues"
     Then the command should succeed
     And the output should contain "0 created, 0 closed, 0 re-tagged, 1 up to date"
+
+  Scenario: Re-sync replaces legacy label tags and keeps other tags
+    Given ticket "seed-0001" has external ref "gh-issue-5"
+    And ticket "seed-0001" has tags "github-sync, taskforce, autorelease: pending, autorelease:pending, taskforce"
+    And a fake gh CLI that returns these issues:
+      """
+      [
+        {"number": 5, "title": "Release", "body": "", "url": "https://github.com/o/r/issues/5", "state": "OPEN",
+         "labels": [{"name": "autorelease: pending"}]}
+      ]
+      """
+    When I run "ticket github sync --issues"
+    Then the command should succeed
+    And the output should contain "0 created, 0 closed, 1 re-tagged, 1 up to date"
+    And the ticket imported from "gh-issue-5" should have field "tags" with value "[github-sync, taskforce, github, issue, issue#5, autorelease-pending]"
+    When I run "ticket github sync --issues"
+    Then the command should succeed
+    And the output should contain "0 created, 0 closed, 0 re-tagged, 1 up to date"
