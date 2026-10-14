@@ -1,6 +1,7 @@
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -11,6 +12,7 @@ STATE_DIR = Path.home() / ".local" / "state" / "tk"
 PID_FILE = STATE_DIR / "webui.json"
 LOG_FILE = STATE_DIR / "webui.log"
 DEFAULT_PORT = 8475  # ASCII T (84) & K (75) ;)
+START_TIMEOUT = 10.0  # seconds to wait for the server to accept connections
 
 
 def _ensure_state_dir():
@@ -23,6 +25,22 @@ def _is_pid_alive(pid: int) -> bool:
         return True
     except (OSError, ProcessLookupError):
         return False
+
+
+def _is_port_listening(host: str, port: int) -> bool:
+    # A wildcard bind is reachable via loopback.
+    probe_host = {"0.0.0.0": "127.0.0.1", "::": "::1", "": "127.0.0.1"}.get(host, host)
+    try:
+        with socket.create_connection((probe_host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def _start_failed(reason: str) -> int:
+    print(f"❌ Failed to start tk-webui server: {reason}")
+    print(f"📄 Log: {LOG_FILE}")
+    return 1
 
 
 def get_server_info() -> Optional[Dict[str, Any]]:
@@ -64,21 +82,32 @@ def start_server(directory: str, host: str = "127.0.0.1", port: int = DEFAULT_PO
         str(port),
     ]
 
-    log_fd = open(LOG_FILE, "a")
-    proc = subprocess.Popen(
-        cmd,
-        stdout=log_fd,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
+    if _is_port_listening(host, port):
+        return _start_failed(f"port {port} is already in use on {host}")
 
-    # Allow startup initialization
-    time.sleep(0.5)
+    # The child keeps its own copy of the log fd; close ours once it is spawned.
+    with open(LOG_FILE, "a") as log_fd:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=log_fd,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
 
-    if not _is_pid_alive(proc.pid):
-        print("❌ Failed to start tk-webui server. Check log for details:")
-        print(f"📄 Log: {LOG_FILE}")
-        return 1
+    # Replaced fixed 0.5s sleep + PID check: late failures (e.g. bind errors)
+    # were reported as success. Poll until the port accepts connections.
+    # time.sleep(0.5)
+    deadline = time.monotonic() + START_TIMEOUT
+    while True:
+        code = proc.poll()
+        if code is not None:
+            return _start_failed(f"process exited with code {code} (port conflict or startup error)")
+        if _is_port_listening(host, port):
+            break
+        if time.monotonic() >= deadline:
+            proc.terminate()
+            return _start_failed(f"not listening on {host}:{port} after {START_TIMEOUT:.0f}s")
+        time.sleep(0.1)
 
     server_data = {
         "pid": proc.pid,
