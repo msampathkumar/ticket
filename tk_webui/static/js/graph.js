@@ -19,11 +19,43 @@ export function updateTreeStatusSummary() {
   }
 }
 
+// Viewport fitting (tic-96c9). The canvas is sized to its content and centred in the
+// scroll wrapper; it is fitted to the width and centred on first render, project or
+// orientation change, view switch and Reset View, but not on data refreshes.
+const MIN_TREE_ZOOM = 0.4;
+const SUPPORTS_CSS_ZOOM = typeof CSS !== 'undefined' && CSS.supports('zoom', '2');
+const treeCanvas = { width: 0, height: 0, rootX: 0, rootHalfWidth: 0, minX: 0, maxX: 0, offset: 0, key: null };
+const CARD_HALF_WIDTH = 130; // .graph-node-card is 260px wide, centred on its x
+const ROOT_HALF_WIDTH = 150; // fallback; the root's width follows the project name
+let treeNeedsFit = true;
+
+function treeWrapper() {
+  return elements.treeContainer.parentElement;
+}
+
+// Refit when the view becomes visible (width 0 -> >0); recentre on resize.
+if (typeof ResizeObserver !== 'undefined') {
+  let lastWidth = 0;
+  new ResizeObserver(entries => {
+    const width = entries[0].contentRect.width;
+    if (width > 0 && state.activeView === 'tree') {
+      if (lastWidth === 0) fitTreeToViewport();
+      else applyTreeZoom();
+    }
+    lastWidth = width;
+  }).observe(treeWrapper());
+}
+
 export function renderTreeView() {
   elements.treeContainer.innerHTML = '';
   elements.treeSvgEdges.innerHTML = '';
 
   const isHorizontal = state.treeOrientation === 'horizontal';
+  const fitKey = `${state.currentDir}|${state.treeOrientation}`;
+  if (fitKey !== treeCanvas.key) {
+    treeCanvas.key = fitKey;
+    treeNeedsFit = true;
+  }
   elements.treeOrientationLabel.textContent = isHorizontal ? 'Left-to-Right' : 'Top-Down';
   updateTreeStatusSummary();
 
@@ -117,7 +149,8 @@ export function renderTreeView() {
     let totalTopWidth = 0;
     topLevel.forEach(t => { totalTopWidth += getSubtreeWidth(t); });
 
-    const canvasWidth = Math.max(1200, totalTopWidth + 200);
+    // Was Math.max(1200, ...): the fixed minimum left the tree off-centre (tic-96c9).
+    const canvasWidth = Math.max(600, totalTopWidth + 200);
     let currentX = (canvasWidth - totalTopWidth) / 2;
     const rootPos = { x: canvasWidth / 2, y: topLevel.length === 0 ? 140 : 55 };
 
@@ -154,10 +187,16 @@ export function renderTreeView() {
     elements.treeSvgLayer.style.height = `${canvasHeight}px`;
     elements.treeContainer.style.width = `${canvasWidth}px`;
     elements.treeContainer.style.height = `${canvasHeight}px`;
+    treeCanvas.width = canvasWidth;
+    treeCanvas.height = canvasHeight;
+    treeCanvas.rootX = rootPos.x;
+    // The inline min-width: 100% stretched the SVG past the canvas and the scroll extent.
+    elements.treeSvgLayer.style.minWidth = '0';
 
     // Root Node
     const rootNode = createRootNode(rootPos);
     elements.treeContainer.appendChild(rootNode);
+    treeCanvas.rootHalfWidth = rootNode.offsetWidth / 2 || ROOT_HALF_WIDTH;
 
     if (tickets.length === 0) {
       const emptyHint = document.createElement('div');
@@ -246,7 +285,7 @@ export function renderTreeView() {
       currentY += branchHeight;
     });
 
-    const canvasWidth = Math.max(1200, 120 + (maxDepth + 1) * HORIZONTAL_GAP + 150);
+    const canvasWidth = Math.max(600, 120 + (maxDepth + 1) * HORIZONTAL_GAP + 150);
 
     elements.treeSvgLayer.setAttribute('width', canvasWidth);
     elements.treeSvgLayer.setAttribute('height', canvasHeight);
@@ -254,10 +293,16 @@ export function renderTreeView() {
     elements.treeSvgLayer.style.height = `${canvasHeight}px`;
     elements.treeContainer.style.width = `${canvasWidth}px`;
     elements.treeContainer.style.height = `${canvasHeight}px`;
+    treeCanvas.width = canvasWidth;
+    treeCanvas.height = canvasHeight;
+    treeCanvas.rootX = rootPos.x;
+    // The inline min-width: 100% stretched the SVG past the canvas and the scroll extent.
+    elements.treeSvgLayer.style.minWidth = '0';
 
     // Root Node
     const rootNode = createRootNode(rootPos);
     elements.treeContainer.appendChild(rootNode);
+    treeCanvas.rootHalfWidth = rootNode.offsetWidth / 2 || ROOT_HALF_WIDTH;
 
     if (tickets.length === 0) {
       const emptyHint = document.createElement('div');
@@ -406,14 +451,80 @@ export function renderTreeView() {
     elements.treeContainer.appendChild(card);
   });
 
-  applyTreeZoom();
+  // Horizontal extent of the drawn nodes, in canvas coordinates.
+  treeCanvas.minX = treeCanvas.rootX - treeCanvas.rootHalfWidth;
+  treeCanvas.maxX = treeCanvas.rootX + treeCanvas.rootHalfWidth;
+  posMap.forEach(p => {
+    treeCanvas.minX = Math.min(treeCanvas.minX, p.x - CARD_HALF_WIDTH);
+    treeCanvas.maxX = Math.max(treeCanvas.maxX, p.x + CARD_HALF_WIDTH);
+  });
+
+  if (treeNeedsFit) fitTreeToViewport();
+  else applyTreeZoom();
   lucide.createIcons();
 }
 
-export function applyTreeZoom() {
-  const transform = `scale(${state.treeZoom})`;
-  elements.treeContainer.style.transform = transform;
-  elements.treeSvgLayer.style.transform = transform;
-  elements.treeContainer.style.transformOrigin = state.treeOrientation === 'horizontal' ? 'left center' : 'top center';
-  elements.treeSvgLayer.style.transformOrigin = state.treeOrientation === 'horizontal' ? 'left center' : 'top center';
+// Fit the tree to the viewport width (zoom 0.4-1.0) and centre it. Used for
+// first render, view switch and Reset View.
+export function fitTreeToViewport() {
+  const wrap = treeWrapper();
+  treeNeedsFit = true;
+  if (!wrap.clientWidth || !treeCanvas.width) return; // hidden: ResizeObserver retries
+  treeNeedsFit = false;
+  const fit = (wrap.clientWidth - 32) / (treeCanvas.maxX - treeCanvas.minX);
+  state.treeZoom = Math.max(MIN_TREE_ZOOM, Math.min(1, fit));
+  applyTreeZoom({ centre: true });
+}
+
+// Previous version scaled with transform around 'top center' / 'left center', which
+// does not change the scroll extent, so wide trees could not be scrolled into view.
+// export function applyTreeZoom() {
+//   const transform = `scale(${state.treeZoom})`;
+//   elements.treeContainer.style.transform = transform;
+//   elements.treeSvgLayer.style.transform = transform;
+//   elements.treeContainer.style.transformOrigin = state.treeOrientation === 'horizontal' ? 'left center' : 'top center';
+//   elements.treeSvgLayer.style.transformOrigin = state.treeOrientation === 'horizontal' ? 'left center' : 'top center';
+// }
+export function applyTreeZoom({ centre = false } = {}) {
+  const wrap = treeWrapper();
+  const zoom = state.treeZoom;
+  // Visible centre in canvas coordinates, kept in place when zooming with the buttons.
+  const prevZoom = parseFloat(elements.treeContainer.dataset.zoom) || zoom;
+  const visibleCentre = (wrap.scrollLeft + wrap.clientWidth / 2 - treeCanvas.offset) / prevZoom;
+  elements.treeContainer.dataset.zoom = String(zoom);
+
+  [elements.treeContainer, elements.treeSvgLayer].forEach(el => {
+    if (SUPPORTS_CSS_ZOOM) {
+      // CSS zoom scales layout too, so the scroll extent follows the zoom level.
+      el.style.zoom = zoom;
+      el.style.transform = '';
+    } else {
+      el.style.transform = `scale(${zoom})`;
+      el.style.transformOrigin = '0 0';
+    }
+  });
+
+  // Centre the drawn nodes when they fit; otherwise scroll to them.
+  const contentWidth = (treeCanvas.maxX - treeCanvas.minX) * zoom;
+  const contentCentre = ((treeCanvas.minX + treeCanvas.maxX) / 2) * zoom;
+  const fits = contentWidth <= wrap.clientWidth;
+  const offset = fits ? wrap.clientWidth / 2 - contentCentre : 0;
+  treeCanvas.offset = offset;
+  const offsetPx = `${SUPPORTS_CSS_ZOOM ? offset / zoom : offset}px`;
+  elements.treeContainer.style.marginLeft = offsetPx;
+  elements.treeSvgLayer.style.left = offsetPx;
+
+  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+  let target;
+  if (fits) {
+    target = 0;
+  } else if (centre) {
+    // Top-down trees grow from the centre; left-to-right trees from the root on the left.
+    target = state.treeOrientation === 'horizontal'
+      ? treeCanvas.minX * zoom - 16
+      : contentCentre - wrap.clientWidth / 2;
+  } else {
+    target = visibleCentre * zoom - wrap.clientWidth / 2;
+  }
+  wrap.scrollLeft = Math.min(maxScroll, Math.max(0, target));
 }
