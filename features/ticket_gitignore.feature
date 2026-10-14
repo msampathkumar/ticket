@@ -4,18 +4,18 @@ Feature: Runtime files stay out of git
   So that a commit during a tk write never captures runtime state
 
   Scenario: tk init writes .tickets/.gitignore and re-running it adds no duplicates
-    When I run "HOME=$PWD/home ticket init"
+    When I run "ticket init"
     Then the command should succeed
     And the file ".tickets/.gitignore" should have the line ".locks/" 1 time(s)
     And the file ".tickets/.gitignore" should have the line ".hooks/hooks.log" 1 time(s)
-    When I run "HOME=$PWD/home ticket init"
+    When I run "ticket init"
     Then the file ".tickets/.gitignore" should have the line ".locks/" 1 time(s)
     And the file ".tickets/.gitignore" should have the line ".hooks/hooks.log" 1 time(s)
 
   Scenario: tk init keeps an existing .tickets/.gitignore without a trailing newline
     Given a clean tickets directory
     When I run "printf '.scion-taskforce-logs' > .tickets/.gitignore"
-    And I run "HOME=$PWD/home ticket init"
+    And I run "ticket init"
     Then the file ".tickets/.gitignore" should have the line ".scion-taskforce-logs" 1 time(s)
     And the file ".tickets/.gitignore" should have the line ".locks/" 1 time(s)
 

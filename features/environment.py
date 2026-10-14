@@ -25,6 +25,17 @@ def before_all(context):
     guard.chmod(0o755)
     os.environ['PATH'] = context.scion_guard_dir + ':' + os.environ['PATH']
 
+    # HOME is sandboxed per scenario (see before_scenario); remember the real one to restore.
+    context.real_home = os.environ.get('HOME')
+    # tk_webui.tk_cli computes STATE_DIR from Path.home() at import; it is re-pointed per scenario.
+    try:
+        from tk_webui import tk_cli
+    except ImportError:
+        tk_cli = None
+    context.tk_cli = tk_cli
+    if tk_cli is not None:
+        context.tk_cli_saved = (tk_cli.TK_BIN, tk_cli.STATE_DIR, tk_cli.PROJECTS_FILE)
+
 
 def after_all(context):
     """Remove the scion guard directory."""
@@ -44,6 +55,14 @@ def before_scenario(context, scenario):
     os.environ['TK_SCION_TASKFORCE_SCION_HOME'] = str(Path(context.test_dir) / '.scion-home')
     # The fake scion harness is ready at once: no settle delay after resuming a paused worker.
     os.environ['TK_SCION_TASKFORCE_WAKE_SETTLE_SECONDS'] = '0'
+    # Sandbox HOME so tk init/create never register temp dirs in the developer's real
+    # ~/.local/state/tk/projects.json (tic-0ok7). Applies to every subprocess and to tk_cli.
+    home = Path(context.test_dir) / 'home'
+    home.mkdir()
+    os.environ['HOME'] = str(home)
+    if context.tk_cli is not None:
+        context.tk_cli.STATE_DIR = home / '.local' / 'state' / 'tk'
+        context.tk_cli.PROJECTS_FILE = context.tk_cli.STATE_DIR / 'projects.json'
 
     # Initialize tracking
     context.tickets = {}
@@ -55,6 +74,12 @@ def before_scenario(context, scenario):
 
 def after_scenario(context, scenario):
     """Clean up temporary directories after each scenario."""
+    if context.real_home is None:
+        os.environ.pop('HOME', None)
+    else:
+        os.environ['HOME'] = context.real_home
+    if context.tk_cli is not None:
+        context.tk_cli.TK_BIN, context.tk_cli.STATE_DIR, context.tk_cli.PROJECTS_FILE = context.tk_cli_saved
     if hasattr(context, 'test_dir') and os.path.exists(context.test_dir):
         shutil.rmtree(context.test_dir)
     if hasattr(context, 'plugin_dir') and os.path.exists(context.plugin_dir):
