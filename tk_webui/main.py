@@ -148,6 +148,31 @@ def list_tickets(directory: str = Query(..., description="Project directory")):
     return tickets
 
 
+@app.get("/api/tickets/version")
+def tickets_version(directory: str = Query(..., description="Project directory")):
+    """Cheap change fingerprint of .tickets/*.md for frontend polling (tic-da9d).
+
+    Uses stat() only: file count, newest mtime and mtime sum, so creates, edits
+    and deletes all change it. version is null when there is no .tickets dir.
+    """
+    p = Path(os.path.expanduser(directory)).resolve()
+    tickets_dir = find_tickets_dir(str(p)) if p.is_dir() else None
+    if tickets_dir is None:
+        return {"version": None}
+    count = 0
+    newest = 0
+    total = 0
+    for f in tickets_dir.glob("*.md"):
+        try:
+            mtime = f.stat().st_mtime_ns
+        except OSError:
+            continue  # deleted between glob and stat
+        count += 1
+        total += mtime
+        newest = max(newest, mtime)
+    return {"version": f"{count}-{newest}-{total}"}
+
+
 @app.post("/api/tickets")
 def create_ticket(req: TicketCreateRequest):
     success, result = create_ticket_cli(

@@ -19,7 +19,14 @@ const state = {
   treeOrientation: localStorage.getItem('tk_tree_orientation') || 'vertical', // 'vertical' (top-down) or 'horizontal' (left-to-right)
   collapsedNodes: new Set(JSON.parse(localStorage.getItem('tk_tree_collapsed') || '[]')),
   treeStatusFilter: new Set(JSON.parse(localStorage.getItem('tk_tree_status_filter') || '["ready", "in_progress", "blocked"]')),
+  // Auto-refresh (tic-da9d)
+  isDragging: false,
+  ticketsVersion: null,     // last seen /api/tickets/version fingerprint
+  ticketsVersionDir: null,  // directory that fingerprint belongs to
+  pollInFlight: false,
 };
+
+const POLL_INTERVAL_MS = 3000;
 
 // DOM elements
 const elements = {
@@ -140,6 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   setupEventListeners();
   setupDragAndDrop();
+  setupAutoRefresh();
 
   try {
     const res = await fetch('/api/projects');
@@ -293,6 +301,7 @@ async function loadDirectory(path) {
     const url = new URL(window.location);
     url.searchParams.set('dir', data.path);
     window.history.replaceState({}, '', url);
+    await recordTicketsVersion(data.path);
 
     if (!data.has_tickets) {
       elements.statusDot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500';
@@ -312,6 +321,67 @@ async function loadDirectory(path) {
   } catch (err) {
     showToast(err.message, 'error');
     elements.statusDot.className = 'inline-block w-2 h-2 rounded-full bg-rose-500';
+  }
+}
+
+// AUTO-REFRESH (tic-da9d): poll a cheap fingerprint of .tickets/*.md while the tab
+// is visible and refetch only when it changes, so CLI/agent edits appear live.
+function setupAutoRefresh() {
+  setInterval(pollTicketsVersion, POLL_INTERVAL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pollTicketsVersion();
+  });
+}
+
+// Defer refreshes while the user is mid-edit or mid-drag; retried on the next tick.
+function isUserBusy() {
+  return state.isDragging ||
+    !elements.editTicketModal.classList.contains('hidden') ||
+    !elements.newTicketModal.classList.contains('hidden');
+}
+
+async function fetchTicketsVersion(dir) {
+  const res = await fetch(`/api/tickets/version?directory=${encodeURIComponent(dir)}`);
+  if (!res.ok) throw new Error('Failed to read tickets version');
+  return (await res.json()).version;
+}
+
+// Called by loadDirectory() before it fetches tickets, so no change is missed in between.
+async function recordTicketsVersion(dir) {
+  try {
+    state.ticketsVersion = await fetchTicketsVersion(dir);
+    state.ticketsVersionDir = dir;
+  } catch (e) {
+    state.ticketsVersionDir = null; // the next poll records it
+  }
+}
+
+async function pollTicketsVersion() {
+  if (document.visibilityState !== 'visible' || !state.currentDir || state.pollInFlight) return;
+  state.pollInFlight = true;
+  try {
+    const dir = state.currentDir;
+    const version = await fetchTicketsVersion(dir);
+    if (dir !== state.currentDir) return;
+
+    if (state.ticketsVersionDir !== dir) {
+      state.ticketsVersionDir = dir;
+      state.ticketsVersion = version;
+      return;
+    }
+    if (version === state.ticketsVersion || isUserBusy()) return;
+
+    const hadTickets = state.ticketsVersion !== null;
+    state.ticketsVersion = version;
+    if (!hadTickets || version === null) {
+      await loadDirectory(dir); // .tickets appeared or vanished: refresh banner and views
+    } else {
+      await fetchTickets();
+    }
+  } catch (e) {
+    // Server unreachable: stay quiet and retry on the next tick.
+  } finally {
+    state.pollInFlight = false;
   }
 }
 
@@ -1061,7 +1131,9 @@ function setupDragAndDrop() {
       animation: 150,
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
+      onStart: () => { state.isDragging = true; },
       onEnd: async (evt) => {
+        state.isDragging = false;
         const ticketId = evt.item.dataset.id;
         const targetStatus = evt.to.dataset.status;
         const sourceStatus = evt.from.dataset.status;
