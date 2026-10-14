@@ -600,6 +600,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#4-sharing-with-a-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Sharing with a Team
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1373,6 +1384,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#4-sharing-with-a-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Sharing with a Team
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1499,9 +1521,10 @@
 <hr />
 <h2 id="step-by-step-walkthrough">Step-by-Step Walkthrough<a class="headerlink" href="#step-by-step-walkthrough" title="Permanent link">&para;</a></h2>
 <h3 id="1-launch-the-background-daemon">1. Launch the Background Daemon<a class="headerlink" href="#1-launch-the-background-daemon" title="Permanent link">&para;</a></h3>
-<p>Run the web dashboard persistently in the background:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>start
+<p>Run the web dashboard persistently in the background, for the current directory or a given project:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>start<span class="w">              </span><span class="c1"># or: tk webui server start /path/to/repo</span>
 </span></code></pre></div>
+<p>Start fails with the log path if port <code>8475</code> is already in use; pass <code>--port</code> to pick another.</p>
 <p>Check status or logs at any time:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>webui<span class="w"> </span>server<span class="w"> </span>status
 </span></code></pre></div>
@@ -1509,13 +1532,17 @@
 <p>Open <a href="http://localhost:8475">http://localhost:8475</a> in your browser:</p>
 <ul>
 <li>Switch to <strong>Mind Map View</strong> to inspect dependencies, parent-child task links, and critical paths.</li>
-<li>Switch to <strong>Kanban Board</strong> to drag tasks between Ready, In Progress, Blocked, and Closed lanes.</li>
+<li>Switch to <strong>Kanban Board</strong> to drag tasks between Ready, In Progress, Blocked, and Closed lanes. Blocked and Ready match <code>tk blocked</code> and <code>tk ready</code>.</li>
+<li>Leave the tab open while you or your agents work: changes made with <code>tk</code> appear within about 3 seconds. Refreshes wait while a ticket form is open or a card is being dragged.</li>
+<li>Open another project with <code>?dir=/path/to/repo</code> in the URL or the folder picker.</li>
 </ul>
 <h3 id="3-review-audit-notes">3. Review &amp; Audit Notes<a class="headerlink" href="#3-review-audit-notes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Open any task drawer to review design notes and acceptance criteria.</li>
 <li>Append chronological audit notes with <code>Cmd+Enter</code> (macOS) or <code>Ctrl+Enter</code> (Linux/Windows).</li>
 </ul>
+<h3 id="4-sharing-with-a-team">4. Sharing with a Team<a class="headerlink" href="#4-sharing-with-a-team" title="Permanent link">&para;</a></h3>
+<p>The Web UI is localhost-only and has no login. Each teammate runs it on their own machine against their own checkout; tickets are shared through Git. Binding to <code>0.0.0.0</code> exposes read/write access to anyone on the network. See the <a href="../../plugins/webui/#security-model">Security Model</a>.</p>
 
 
 
