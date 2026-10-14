@@ -1,6 +1,6 @@
 ---
 id: tic-wxig
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-14T21:02:09Z
@@ -19,3 +19,13 @@ Follow-up from PR #40 (tic-kyej). New Tailwind classes need scripts/build-webui-
 - [ ] CI fails when static/css/tailwind.css is stale
 - [ ] CONTRIBUTING documents the rebuild step
 
+
+## Notes
+
+**2026-10-14T21:30:59Z**
+
+PR https://github.com/msampathkumar/ticket/pull/47: lint.yml webui-css job (make webui-css-check), Makefile webui-css/webui-css-check, CONTRIBUTING line, regenerated tailwind.css (master copy was stale: +.inline/.grow/.resize, harmless). Linux x64 and macOS arm64 builds byte-identical (blob 7b9bf0b). make test 285 passed, ruff clean, all 5 CI checks green.
+
+**2026-10-14T21:31:26Z**
+
+Coordinator: reviewed and squash-merged PR #47. CI green incl. new 'Web UI CSS is fresh' job. make webui-css / webui-css-check; Linux and macOS builds byte-identical; CSS regenerated (+.inline/.grow/.resize, harmless).
