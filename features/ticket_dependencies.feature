@@ -43,6 +43,62 @@ Feature: Ticket Dependencies
     Then the command should fail
     And the output should contain "Error: ticket 'nonexistent' not found"
 
+  Scenario: Self-dependency is rejected
+    When I run "ticket dep task-0001 task-0001"
+    Then the command should fail
+    And the output should contain "Error: task-0001 cannot depend on itself"
+    And ticket "task-0001" should not have "task-0001" in deps
+
+  Scenario: Direct cycle is rejected
+    Given ticket "task-0002" depends on "task-0001"
+    When I run "ticket dep task-0001 task-0002"
+    Then the command should fail
+    And the output should contain "would create a cycle: task-0001 -> task-0002 -> task-0001"
+    And ticket "task-0001" should not have "task-0002" in deps
+
+  Scenario: Transitive cycle is rejected with the full path
+    Given ticket "task-0002" depends on "task-0003"
+    And ticket "task-0003" depends on "task-0001"
+    When I run "ticket dep task-0001 task-0002"
+    Then the command should fail
+    And the output should contain "task-0001 -> task-0002 -> task-0003 -> task-0001"
+    And ticket "task-0001" should not have "task-0002" in deps
+
+  Scenario: Cycle through a closed ticket is rejected
+    Given ticket "task-0002" depends on "task-0003"
+    And ticket "task-0003" depends on "task-0001"
+    And ticket "task-0003" has status "closed"
+    When I run "ticket dep task-0001 task-0002"
+    Then the command should fail
+    And the output should contain "would create a cycle"
+
+  Scenario: Cycle check accepts partial IDs
+    Given ticket "task-0002" depends on "task-0001"
+    When I run "ticket dep 0001 0002"
+    Then the command should fail
+    And the output should contain "task-0001 -> task-0002 -> task-0001"
+
+  Scenario: Dependency without a cycle is still accepted
+    Given ticket "task-0002" depends on "task-0003"
+    When I run "ticket dep task-0001 task-0002"
+    Then the command should succeed
+    And ticket "task-0001" should have "task-0002" in deps
+
+  Scenario: Pre-existing cycles are still reported by dep cycle
+    Given ticket "task-0001" depends on "task-0002"
+    And ticket "task-0002" depends on "task-0001"
+    When I run "ticket dep cycle"
+    Then the command should succeed
+    And the output should contain "task-0001"
+    And the output should contain "task-0002"
+
+  Scenario: Re-adding an existing dependency inside a pre-existing cycle stays a no-op
+    Given ticket "task-0001" depends on "task-0002"
+    And ticket "task-0002" depends on "task-0001"
+    When I run "ticket dep task-0001 task-0002"
+    Then the command should succeed
+    And the output should be "Dependency already exists"
+
   Scenario: View dependency tree
     Given ticket "task-0001" depends on "task-0002"
     And ticket "task-0002" depends on "task-0003"

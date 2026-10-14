@@ -35,6 +35,13 @@ Feature: Post-write hooks
     Then the command should fail
     And the hook log should be empty
 
+  Scenario: A rejected cyclic dependency does not fire the hook
+    Given a ticket exists with ID "hk-0002" and title "Blocker"
+    And ticket "hk-0002" depends on "hk-0001"
+    When I run "ticket dep hk-0001 hk-0002"
+    Then the command should fail
+    And the hook log should be empty
+
   Scenario: Nested calls from inside a hook do not fire hooks again
     Given the environment variable "TK_HOOK_DEPTH" is "1"
     When I run "ticket add-note hk-0001 'from a hook'"

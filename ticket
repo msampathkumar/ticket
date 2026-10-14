@@ -1174,6 +1174,48 @@ cmd_dep_cycle() {
     ' "$TICKETS_DIR"/*.md 2>/dev/null
 }
 
+# Print the shortest dependency path "<from> -> ... -> <to>" and return 0 if <to> is
+# reachable from <from> through deps; return 1 otherwise. Walks every ticket, closed ones
+# included: a cycle through a closed ticket comes back when that ticket is reopened.
+_dep_path() {
+    local from="$1" to="$2"
+    local files=("$TICKETS_DIR"/*.md)
+    [[ -e "${files[0]}" ]] || return 1
+    awk -v src="$from" -v dst="$to" '
+    FNR == 1 { fm = 0 }
+    /^---[ \t]*$/ { fm++; next }
+    fm == 1 && /^deps:/ {
+        d = $0
+        sub(/^deps:[ \t]*/, "", d)
+        gsub(/[][ \t"'\'']/, "", d)
+        gsub(/,/, " ", d)
+        # id may come after deps in hand-edited files; key by file and map at the end.
+        file_deps[FILENAME] = d
+    }
+    fm == 1 && /^id:/ { file_id[FILENAME] = $2 }
+    END {
+        for (f in file_id) deps[file_id[f]] = file_deps[f]
+        head = 1; tail = 1; q[1] = src; seen[src] = 1
+        while (head <= tail) {
+            cur = q[head++]
+            n = split(deps[cur], a, " ")
+            for (i = 1; i <= n; i++) {
+                nx = a[i]
+                if (nx == "" || (nx in seen)) continue
+                seen[nx] = 1; par[nx] = cur
+                if (nx == dst) {
+                    path = dst; c = dst
+                    while (c != src) { c = par[c]; path = c " -> " path }
+                    print path
+                    exit 0
+                }
+                q[++tail] = nx
+            }
+        }
+        exit 1
+    }' "${files[@]}"
+}
+
 cmd_dep() {
     # Handle subcommands
     if [[ "${1:-}" == "tree" ]]; then
@@ -1204,6 +1246,14 @@ cmd_dep() {
     dep_file=$(ticket_path "$dep_id") || return 1
     dep_id=$(basename "$dep_file" .md)
 
+    # Reject self-dependencies before writing anything (tic-i50j).
+    local src_id cycle_path
+    src_id=$(basename "$file" .md)
+    if [[ "$src_id" == "$dep_id" ]]; then
+        echo "Error: $src_id cannot depend on itself" >&2
+        return 1
+    fi
+
     # Get current deps
     local current_deps
     current_deps=$(yaml_field "$file" "deps")
@@ -1212,6 +1262,12 @@ cmd_dep() {
     if echo "$current_deps" | _grep -q "$dep_id"; then
         echo "Dependency already exists"
         return 0
+    fi
+
+    # Checked after the duplicate test so re-adding an existing dep stays a no-op.
+    if cycle_path=$(_dep_path "$dep_id" "$src_id"); then
+        echo "Error: $src_id -> $dep_id would create a cycle: $src_id -> $cycle_path" >&2
+        return 1
     fi
 
     # Update deps array

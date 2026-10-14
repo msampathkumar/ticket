@@ -122,11 +122,12 @@ Following the frontmatter, the Markdown body contains (sections are omitted when
 - A dependency `A -> B` (`deps: [B]`) means **Ticket A is blocked by Ticket B**.
 - Ticket A cannot be resolved or considered "Ready" until Ticket B is in `closed` status.
 - Symmetric links (`links: [B]`) denote relational associations without blocking semantics.
+- **Write-time cycle check**: `tk dep A B` is rejected when `A == B` or when `A` is already reachable from `B` through `deps`. The check walks all tickets, including closed ones (reopening a closed ticket would otherwise revive the cycle). It prints `Error: A -> B would create a cycle: A -> B -> ... -> A`, exits `1`, writes nothing, and fires no hook. Re-adding an existing dependency remains a no-op.
 
 ### 3.2 State Queries
 - **Ready Queue**: All non-closed tickets whose dependencies are either empty or completely satisfied by tickets in `status: closed`.
 - **Blocked Queue**: All non-closed tickets where at least one dependency in `deps` is in `status: open` or `status: in_progress`.
-- **Cycle Detection**: Depth-First Search (DFS) traversal identifying circular references (`A -> B -> A`) across open tickets.
+- **Cycle Detection**: Depth-First Search (DFS) traversal identifying circular references (`A -> B -> A`) across open tickets. `tk dep` prevents new cycles (Section 3.1); `tk dep cycle` reports cycles created by hand edits, merges, or older versions.
 
 ---
 
