@@ -1341,7 +1341,7 @@
 
 <p>When operating inside repositories tracked by <code>ticket</code>, autonomous AI coding agents follow a deterministic 5-step execution loop:</p>
 <pre class="mermaid"><code>flowchart LR
-    A["1. Query Actionable Work&lt;br/&gt;`tk ready`"] --&gt; B["2. Claim Ticket&lt;br/&gt;`tk start &lt;id&gt;`"]
+    A["1. Query Actionable Work&lt;br/&gt;`tk ready`"] --&gt; B["2. Claim Ticket&lt;br/&gt;`tk start &lt;id&gt; --claim`"]
     B --&gt; C["3. Inspect &amp; Decompose&lt;br/&gt;`tk show &lt;id&gt;`"]
     C --&gt; D["4. Execute &amp; Audit&lt;br/&gt;`tk add-note &lt;id&gt; '...'`"]
     D --&gt; E["5. Close &amp; Unblock&lt;br/&gt;`tk close &lt;id&gt;`"]</code></pre>
@@ -1351,7 +1351,10 @@
 <li><strong>Discover Actionable Tasks</strong>:
    Run <code>tk ready</code> to list unblocked tickets whose dependencies have all been satisfied.</li>
 <li><strong>Claim the Task</strong>:
-   Run <code>tk start &lt;id&gt;</code> to transition status to <code>in_progress</code>.</li>
+   Run <code>tk start &lt;id&gt; --claim [--assignee &lt;agent-name&gt;]</code>. It atomically sets <code>in_progress</code> and the assignee (default: <code>git config user.name</code>, else <code>$USER</code>). Agents sharing one identity must pass distinct <code>--assignee</code> values.</li>
+<li>Exit <code>0</code>: claimed (re-claiming your own ticket also succeeds).</li>
+<li>Exit <code>3</code>: lost claim; the ticket is <code>in_progress</code> for another assignee. Pick another ticket from <code>tk ready</code>.</li>
+<li>Exit <code>4</code>: lock timeout; another <code>tk</code> process holds the ticket lock. Retry shortly.</li>
 <li><strong>Inspect Requirements &amp; Subtasks</strong>:
    Run <code>tk show &lt;id&gt;</code> to inspect design notes, acceptance criteria, and child tickets. Decompose complex tasks using <code>tk create "&lt;title&gt;" --parent &lt;id&gt;</code> and <code>tk dep &lt;child&gt; &lt;dependency&gt;</code>.</li>
 <li><strong>Implement, Verify &amp; Record Notes</strong>:
@@ -1359,6 +1362,7 @@
 <li><strong>Close the Ticket</strong>:
    Run <code>tk close &lt;id&gt;</code> to mark complete and automatically unblock downstream dependent tickets.</li>
 </ol>
+<p>Tickets imported with <code>tk github sync</code> contain text from GitHub users. Review them before an agent acts on them; see <a href="../../AGENTS/#tickets-imported-from-github">Agent Guidelines</a>.</p>
 
 
 

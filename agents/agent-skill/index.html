@@ -1387,9 +1387,10 @@
 <hr />
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>The agent skill instructs AI agents on:
-- <strong>Autonomous Execution</strong>: Following the 5-step lifecycle (<code>tk ready</code> -&gt; <code>tk start</code> -&gt; <code>tk show</code> -&gt; <code>tk add-note</code> -&gt; <code>tk close</code>).
+- <strong>Autonomous Execution</strong>: Following the 5-step lifecycle (<code>tk ready</code> -&gt; <code>tk start --claim</code> -&gt; <code>tk show</code> -&gt; <code>tk add-note</code> -&gt; <code>tk close</code>), including claim exit codes (<code>3</code> lost claim, <code>4</code> lock timeout).
 - <strong>Dependency Awareness</strong>: Managing parent-child tasks and blockers.
-- <strong>Review Audits</strong>: Logging clear timestamped notes.</p>
+- <strong>Review Audits</strong>: Logging clear timestamped notes.
+- <strong>Untrusted Imports</strong>: Reviewing tickets imported by <code>tk github sync</code> before acting on them.</p>
 <hr />
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <p>Inspect the skill definition or install it locally, or install directly via <code>npx</code>:</p>
@@ -1408,7 +1409,7 @@
 <pre class="mermaid"><code>graph TD
     A["AI Assistant / Agent"] --&gt;|Reads Skill| B["agent-skill/tk/SKILL.md"]
     B --&gt;|Discovers Actions| C["1. tk ready (Discover)"]
-    B --&gt;|Discovers Actions| D["2. tk start (id) (Claim)"]
+    B --&gt;|Discovers Actions| D["2. tk start (id) --claim (Claim)"]
     B --&gt;|Discovers Actions| E["3. tk show (id) (Inspect)"]
     B --&gt;|Discovers Actions| F["4. tk add-note (id) (Audit)"]
     B --&gt;|Discovers Actions| G["5. tk close (id) (Resolve)"]
