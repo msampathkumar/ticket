@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from . import __version__
 from .models import (
     DirectoryBrowseItem,
     DirectoryCheckResponse,
@@ -40,7 +41,7 @@ from .tk_cli import (
     update_ticket_status_cli,
 )
 
-app = FastAPI(title="tk Web UI", version="0.1.0")
+app = FastAPI(title="tk Web UI", version=__version__)
 
 # Removed: permissive CORS let any website drive the local API (tic-2b85).
 # The UI is served from the same origin, so no CORS headers are needed.
@@ -293,7 +294,7 @@ def serve_index():
 
 
 def print_version():
-    print("""tk-webui version 0.4.0
+    print(f"""tk-webui version {__version__}
 
 Interactive Kanban Web UI & PR review dashboard for tk.
 Created by Sampath Kumar & wedow contributors
@@ -304,7 +305,7 @@ Thank you for using tk! If you find it helpful, please star the repo or contribu
 
 
 def print_help(prog="tk webui"):
-    print(f"""{prog} (v0.4.0) — Interactive Kanban Web UI & PR review dashboard.
+    print(f"""{prog} (v{__version__}) — Interactive Kanban Web UI & PR review dashboard.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -354,7 +355,8 @@ def main():
         print("tk-plugin: Interactive Kanban Web UI & PR review dashboard")
         return
 
-    prog_name = "tk webui" if (len(sys.argv) > 0 and "tk-webui" in sys.argv[0]) else "tk webui"
+    # Both branches of the former ternary were "tk webui" (tic-iafm).
+    prog_name = "tk webui"
 
     args = sys.argv[1:]
     if not args:
