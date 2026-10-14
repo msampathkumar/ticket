@@ -41,7 +41,7 @@ To enable `tk help` to automatically list and describe your plugin:
 Include a comment in the first 10 lines:
 ```bash
 #!/usr/bin/env bash
-# tk-plugin: Interactive Kanban Web UI & PR review dashboard
+# tk-plugin: Interactive Kanban, DAG and review-notes Web UI
 # tk-plugin-version: 0.4.0
 ```
 
@@ -49,7 +49,7 @@ Include a comment in the first 10 lines:
 Implement the `--tk-describe` flag:
 ```bash
 $ my-plugin --tk-describe
-tk-plugin: Interactive Kanban Web UI & PR review dashboard
+tk-plugin: Interactive Kanban, DAG and review-notes Web UI
 ```
 
 ### 3.2 Version Flag
@@ -70,7 +70,7 @@ Plugins must be **strictly optional**. Users who only need the zero-dependency B
 - `--webui`: Installs only the Web UI plugin.
 - `--skill`: Installs the agent skill.
 - `--github`: Installs the optional GitHub import plugin (`tk-github`).
-- `--scion-taskforce`: Installs the optional SCION Task Force orchestrator (`tk-scion-taskforce`).
+- `--scion-taskforce`: Installs the optional SCION Task Force plugin (`tk-scion-taskforce`), an event-driven bridge to SCION workers.
 - `--full` (default): Installs CLI, Web UI, and Agent Skill. Other plugins are **not** included; the installer prints how to add them.
 - `--all`: Installs everything, including the GitHub and SCION Task Force plugins.
 - `--help`: Lists all targets.

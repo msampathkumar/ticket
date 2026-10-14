@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tk-plugin: Autonomous SCION task force orchestrator
+# tk-plugin: Event-driven bridge from tickets to SCION coding agents
 # tk-plugin-version: 0.1.0
 set -e
 

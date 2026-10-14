@@ -7,7 +7,7 @@
 
 ## 1. System Goals & Philosophy
 
-`tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
+`tk` is a **dependency-aware, Git-friendly task queue for humans and coding agents.**
 
 ### Scope
 `tk` core is a minimal task queue that many agents and humans can share through plain files. It provides:
@@ -17,7 +17,7 @@
 - Atomic claiming (`tk start --claim`) and per-ticket locks for concurrent agents.
 - Post-write hooks (`.tickets/.hooks/post-write.d/`) as the single extension point for reacting to changes.
 
-Everything else lives in optional plugins, discovered on `$PATH` as `tk-<cmd>` (see Section 5): the Web UI (`tk webui`), GitHub sync (`tk github`), and agent dispatch (`tk scion-taskforce`, an event-driven bridge from ticket hooks to Scion, which runs the agents).
+Everything else lives in optional plugins, discovered on `$PATH` as `tk-<cmd>` (see Section 5): the Web UI (`tk webui`), GitHub import (`tk github`), and agent dispatch (`tk scion-taskforce`, an event-driven bridge from ticket hooks to Scion, which runs the agents).
 
 ### Core Principles
 1. **Zero Database**: State is stored locally in `.tickets/*.md`.

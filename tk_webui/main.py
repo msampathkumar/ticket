@@ -296,7 +296,7 @@ def serve_index():
 def print_version():
     print(f"""tk-webui version {__version__}
 
-Interactive Kanban Web UI & PR review dashboard for tk.
+Interactive Kanban, DAG and review-notes Web UI for tk.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -305,7 +305,7 @@ Thank you for using tk! If you find it helpful, please star the repo or contribu
 
 
 def print_help(prog="tk webui"):
-    print(f"""{prog} (v{__version__}) — Interactive Kanban Web UI & PR review dashboard.
+    print(f"""{prog} (v{__version__}) — Interactive Kanban, DAG and review-notes Web UI.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -352,7 +352,7 @@ def main():
     )
 
     if "--tk-describe" in sys.argv:
-        print("tk-plugin: Interactive Kanban Web UI & PR review dashboard")
+        print("tk-plugin: Interactive Kanban, DAG and review-notes Web UI")
         return
 
     # Both branches of the former ternary were "tk webui" (tic-iafm).

@@ -8,7 +8,7 @@ Feature: SCION Task Force Plugin
     When I run "ticket help"
     Then the command should succeed
     And the output should contain "scion-taskforce"
-    And the output should contain "Autonomous SCION task force orchestrator"
+    And the output should contain "Event-driven bridge from tickets to SCION coding agents"
 
   Scenario: The user guide lists every command from the help text
     When I run "ticket scion-taskforce help"

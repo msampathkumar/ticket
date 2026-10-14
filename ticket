@@ -2163,7 +2163,7 @@ cmd_help() {
     local cmd
     cmd=$(basename "$0")
     cat << EOF
-$cmd (v0.4.0) — Minimal, offline task tracker with dependency intelligence. Built to scale agentic workflows.
+$cmd (v0.4.0) — Dependency-aware, Git-friendly task queue for humans and coding agents.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -2185,7 +2185,8 @@ Commands:
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
   start <id> [--claim [--assignee X]]
                            Set status to in_progress; --claim also sets assignee and
-                           fails (exit 3) if in_progress for another assignee
+                           fails (exit 3) if in_progress for another assignee;
+                           exit 4 if another tk process holds the ticket lock
   close <id>               Set status to closed
   reopen <id>              Set status to open
   status <id> <status>     Update status (open|in_progress|closed)
@@ -2238,7 +2239,7 @@ env vars; use '\$TK_SCRIPT super <cmd>' to call built-ins.
 Plugin descriptions: comment '# tk-plugin: text' or --tk-describe flag
 
 Tickets stored as markdown files in .tickets/
-Supports partial ID matching (e.g., '$cmd show 5c4' matches 'nw-5c46')
+Supports partial ID matching (e.g., '$cmd show 5c4' matches 'nw-5c46ab')
 
 Thank you for using tk! If you find it helpful, please star the repo or contribute on GitHub.
 EOF
@@ -2248,7 +2249,7 @@ cmd_version() {
     cat << 'EOF'
 tk version 0.4.0
 
-Minimal, offline task tracker with dependency intelligence. Built to scale agentic workflows.
+Dependency-aware, Git-friendly task queue for humans and coding agents.
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT

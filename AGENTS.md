@@ -6,13 +6,13 @@ Operational guide for autonomous AI coding agents and engineers working in `tick
 
 ## 1. Project Goals & Philosophy
 
-`tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
+`tk` is a **dependency-aware, Git-friendly task queue for humans and coding agents.**
 
 - **Zero Database / Pure Plain Text**: State resides in `.tickets/*.md` files with YAML frontmatter, versioned by Git. IDs are `<prefix>-<6-char hash>` (e.g. `tic-a1b2c3`); older 4-char IDs and partial IDs still resolve.
 - **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, and cycle detection. Agents compute actionable next steps deterministically.
 - **Unix Speed**: Core CLI is portable Bash (3.2+) with `awk` and `sed`; no Python or Node. `jq` is optional, only for `tk query <filter>`.
 - **Minimal Core, Optional Plugins**: Core is the shared task queue (tickets, DAG deps, ready queue, atomic claim, hooks). Orchestration, sync, and UI live in plugins. See [SPEC Section 1: Scope and Non-goals](docs/SPEC.md#non-goals).
-- **Decoupled Extensions**: Web UI and GitHub Sync live as modular plugins discovered via `$PATH`.
+- **Decoupled Extensions**: Web UI, GitHub import, and SCION Task Force live as optional plugins discovered via `$PATH`.
 - **Machine-Readable Documentation**: Built-in `llms.txt` and `llms-full.txt` endpoints generated via `make docs-build`.
 
 ---

@@ -7,7 +7,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg?style=flat-square)](#)
 [![Zero Dependency Core](https://img.shields.io/badge/core-portable%20Bash%20(no%20Python)-10b981.svg?style=flat-square)](docs/SPEC.md#non-goals)
 
-Minimal, dependency-aware task tracker. Built to scale agentic workflows.
+Dependency-aware, Git-friendly task queue for humans and coding agents.
 
 - **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)
 - **LLM Context**: [`llms.txt`](https://msampathkumar.github.io/ticket/llms.txt) | [`llms-full.txt`](https://msampathkumar.github.io/ticket/llms-full.txt)

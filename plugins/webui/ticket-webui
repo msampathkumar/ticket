@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tk-plugin: Interactive Kanban Web UI & PR review dashboard
+# tk-plugin: Interactive Kanban, DAG and review-notes Web UI
 # tk-plugin-version: 0.4.0
 set -e
 

@@ -52,7 +52,7 @@ Feature: Modular installer keeps optional plugins optional
     When I run "PATH=bin:$PATH bin/tk help"
     Then the command should succeed
     And the output should contain "scion-taskforce"
-    And the output should contain "Autonomous SCION task force orchestrator"
+    And the output should contain "Event-driven bridge from tickets to SCION coding agents"
 
   Scenario: The scion-taskforce target delegates to the plugin's own installer
     When I run the installer with "--scion-taskforce"

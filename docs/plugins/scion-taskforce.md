@@ -5,7 +5,7 @@ description: Hand tk tickets to SCION coding agents through a save hook, then re
 
 Hand a ticket to an AI coding agent: tag it `taskforce`, and saving it starts a [SCION](https://github.com/GoogleCloudPlatform/scion) worker. You review the worker's report on the ticket, then close the ticket, which stops the worker. Ticket in, report out: the ticket is the only interface, and the project does not need to be a git repository.
 
-The plugin (`tk-scion-taskforce`) runs only when a ticket is saved. No daemon runs. For the narrative walkthrough, see the [SCION Task Force Workflow](../workflows/scion-taskforce.md). For design and internals, see [SCION-TASKFORCE-SPEC.md](https://github.com/msampathkumar/ticket/blob/main/plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md).
+The plugin (`tk-scion-taskforce`) runs only when a ticket is saved. No daemon runs. For the narrative walkthrough, see the [SCION Task Force Workflow](../workflows/scion-taskforce.md). For design and internals, see [SCION-TASKFORCE-SPEC.md](https://github.com/msampathkumar/ticket/blob/master/plugins/scion-taskforce/SCION-TASKFORCE-SPEC.md).
 
 ## Prerequisites
 

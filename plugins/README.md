@@ -6,7 +6,7 @@ All plugins follow the [Plugin Specification (PLUGIN_SPEC.md)](../docs/PLUGIN_SP
 
 ---
 
-## 📁 Plugin Directories & Specifications
+## Plugin Directories & Specifications
 
 | Plugin Folder | Command | Spec Document | Description |
 | :--- | :--- | :--- | :--- |
@@ -19,7 +19,7 @@ All plugins follow the [Plugin Specification (PLUGIN_SPEC.md)](../docs/PLUGIN_SP
 
 ---
 
-## 🔌 Writing Plugins
+## Writing Plugins
 
 Each plugin lives in its own folder under `plugins/<plugin-name>/` and includes:
 1. An executable named `ticket-<name>` and a symlink `tk-<name>`
@@ -38,7 +38,7 @@ Or for compiled binaries, implement `--tk-describe` and `--version`.
 
 ---
 
-## 🌐 Environment Variables
+## Environment Variables
 
 Plugins receive:
 - `TICKETS_DIR` — absolute path to `.tickets/` directory

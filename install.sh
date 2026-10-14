@@ -16,8 +16,8 @@ Targets (combine freely, e.g. './install.sh --core --github'):
   --core,            -c   Core tk CLI (pure Bash, zero runtime deps)
   --webui,           -w   Web UI plugin (tk webui; Python venv via uv/pip)
   --skill,           -s   Agent skill -> ~/.agents/skills/tk/SKILL.md
-  --github,          -g   Optional GitHub sync plugin (tk github)
-  --scion-taskforce, -t   Optional SCION Task Force orchestrator (tk scion-taskforce)
+  --github,          -g   Optional GitHub import plugin (tk github)
+  --scion-taskforce, -t   Optional SCION Task Force plugin (tk scion-taskforce)
 
 Bundles:
   --full,            -f   Core + Web UI + Agent Skill  [default]
@@ -203,7 +203,7 @@ install_github() {
     cp -f "$DIR/plugins/github/ticket-github" "$BIN_DIR/tk-github"
     chmod +x "$BIN_DIR/tk-github"
     ln -sf "$BIN_DIR/tk-github" "$BIN_DIR/ticket-github"
-    echo "✅ GitHub sync plugin installed to $BIN_DIR/tk-github"
+    echo "✅ GitHub import plugin installed to $BIN_DIR/tk-github"
     INSTALLED+=("tk github sync       # GitHub issue/PR sync (optional plugin)")
 }
 
@@ -211,7 +211,7 @@ install_scion_taskforce() {
     echo "🚀 Installing optional tk-scion-taskforce plugin to $BIN_DIR/tk-scion-taskforce..."
     # The plugin owns its install/uninstall logic; delegate to keep a single source of truth.
     BIN_DIR="$BIN_DIR" bash "$DIR/plugins/scion-taskforce/install.sh"
-    INSTALLED+=("tk scion-taskforce   # SCION worker orchestrator (optional plugin)")
+    INSTALLED+=("tk scion-taskforce   # SCION worker bridge (optional plugin)")
 }
 
 # --- Argument parsing: every flag is a target; they accumulate ----------------
@@ -247,7 +247,7 @@ done
 [ "$DO_SCION" -eq 1 ]  && install_scion_taskforce
 
 [ "$DO_GITHUB" -eq 0 ] && SKIPPED_OPTIONAL+=("./install.sh --github            # GitHub issue & PR sync (tk github)")
-[ "$DO_SCION" -eq 0 ]  && SKIPPED_OPTIONAL+=("./install.sh --scion-taskforce   # SCION Task Force orchestrator (tk scion-taskforce)")
+[ "$DO_SCION" -eq 0 ]  && SKIPPED_OPTIONAL+=("./install.sh --scion-taskforce   # SCION Task Force plugin (tk scion-taskforce)")
 
 # --- Summary -------------------------------------------------------------------
 echo ""
