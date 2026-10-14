@@ -7,7 +7,7 @@ import { setupAutoRefresh } from './autorefresh.js';
 import { fetchTickets, addDependency, setTicketParent, addTicketLink } from './api.js';
 import { filterTickets, switchView } from './views.js';
 import { renderKanban, setupDragAndDrop } from './kanban.js';
-import { updateTreeStatusSummary, renderTreeView, applyTreeZoom } from './graph.js';
+import { updateTreeStatusSummary, renderTreeView, applyTreeZoom, fitTreeToViewport } from './graph.js';
 import { toggleSection, openEditTicketModal, handleEditTicketSubmit, submitReviewNote, addTagToDetail } from './detail.js';
 import { openNewTicketModal, handleCreateTicket } from './create.js';
 
@@ -480,8 +480,8 @@ export function setupEventListeners() {
     applyTreeZoom();
   });
   elements.treeResetZoomBtn.addEventListener('click', () => {
-    state.treeZoom = 1.0;
-    applyTreeZoom();
+    // Reset View fits and centres the tree (tic-96c9); was: state.treeZoom = 1.0; applyTreeZoom();
+    fitTreeToViewport();
   });
 
   document.addEventListener('keydown', (e) => {
