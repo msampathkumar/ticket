@@ -1484,19 +1484,23 @@
 </span></code></pre></div>
 <p>Both IDs must exist; <code>tk dep</code> exits <code>1</code> if either is not found.</p>
 <h3 id="cycle-detection">Cycle Detection<a class="headerlink" href="#cycle-detection" title="Permanent link">&para;</a></h3>
-<p><code>tk dep</code> does not reject a dependency that closes a loop. Run <code>tk dep cycle</code> to report cycles among open tickets; tickets in a cycle never become ready until one edge is removed with <code>tk undep</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>cycle
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># Cycle 1: web-ui3k9a -&gt; api-7f2c1d -&gt; web-ui3k9a</span>
+<p><code>tk dep</code> rejects a self-dependency and any dependency that would close a loop, printing the cycle and exiting <code>1</code> without writing. The check covers closed tickets too.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>api-7f2c1d<span class="w"> </span>web-ui3k9a
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># Error: api-7f2c1d -&gt; web-ui3k9a would create a cycle: api-7f2c1d -&gt; web-ui3k9a -&gt; api-7f2c1d</span>
+</span></code></pre></div>
+<p>Cycles can still appear through hand edits or Git merges. Run <code>tk dep cycle</code> to report them among open tickets; tickets in a cycle never become ready until one edge is removed with <code>tk undep</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>cycle
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># Cycle 1: web-ui3k9a -&gt; api-7f2c1d -&gt; web-ui3k9a</span>
 </span></code></pre></div>
 <h3 id="viewing-dependency-trees">Viewing Dependency Trees<a class="headerlink" href="#viewing-dependency-trees" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>web-ui3k9a<span class="w">          </span><span class="c1"># repeated subtrees are shown once</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>--full<span class="w"> </span>web-ui3k9a<span class="w">   </span><span class="c1"># disable deduplication</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>web-ui3k9a<span class="w">          </span><span class="c1"># repeated subtrees are shown once</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>--full<span class="w"> </span>web-ui3k9a<span class="w">   </span><span class="c1"># disable deduplication</span>
 </span></code></pre></div>
 <hr />
 <h2 id="ready-queue-for-agents">Ready Queue for Agents<a class="headerlink" href="#ready-queue-for-agents" title="Permanent link">&para;</a></h2>
 <p>Many agents can share one queue. Each takes a ready ticket and claims it atomically:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>ready<span class="w"> </span>-T<span class="w"> </span>backend<span class="w">                              </span><span class="c1"># pick a candidate</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>start<span class="w"> </span>api-7f2c1d<span class="w"> </span>--claim<span class="w"> </span>--assignee<span class="w"> </span>agent-2<span class="w">   </span><span class="c1"># exit 3 if someone else claimed it first</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>ready<span class="w"> </span>-T<span class="w"> </span>backend<span class="w">                              </span><span class="c1"># pick a candidate</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tk<span class="w"> </span>start<span class="w"> </span>api-7f2c1d<span class="w"> </span>--claim<span class="w"> </span>--assignee<span class="w"> </span>agent-2<span class="w">   </span><span class="c1"># exit 3 if someone else claimed it first</span>
 </span></code></pre></div>
 <p>A claim that loses the race exits <code>3</code>; pick another ticket from <code>tk ready</code>. See <a href="../commands/#status-and-claiming">Command Reference</a>.</p>
 
