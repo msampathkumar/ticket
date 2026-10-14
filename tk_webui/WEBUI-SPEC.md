@@ -26,6 +26,7 @@
 4. **Timeline View**: Chronological audit feed of tickets sorted by creation and modification timestamps.
 5. **Settings & Preferences**: Theme accent color selector (Indigo, Emerald, Violet, Amber, Rose, Cyan), Typography preferences (Font Family: System Sans, Inter, Monospace, Serif; Font Size: Small 14px, Default 16px, Large 18px, Extra Large 20px), high-contrast border mode with hover preservation, start/end date range filtering, settings reset, and documentation link.
 6. **Task Detail Drawer**: Markdown renderer for descriptions, acceptance criteria, parent task selector & subtask hierarchy linking/unlinking, symmetric links manager, dependency manager, and timestamped review feedback feed.
+7. **Auto-Refresh**: While the tab is visible, the UI polls `GET /api/tickets/version` every 3s and refetches tickets when it changes, so CLI and agent edits appear without a manual refresh. Refreshes wait while the new/edit ticket form is open or a card is being dragged.
 
 ### Visual Interface Showcase
 
@@ -82,6 +83,7 @@ State files and logs are managed under `~/.local/state/tk/`:
 - `GET /api/check-directory?path=<path>`: Validates folder and checks for `.tickets/`.
 - `GET /api/browse?path=<path>`: Returns subfolders with `.tickets` badges for repository browsing.
 - `GET /api/tickets?directory=<path>`: Returns array of ticket JSON objects parsed from `.tickets/*.md`.
+- `GET /api/tickets/version?directory=<path>`: Returns `{"version": <string|null>}`, a change fingerprint (file count and mtimes of `.tickets/*.md`); `null` without `.tickets/`.
 - `POST /api/tickets`: Creates a new ticket Markdown file.
 - `PUT /api/tickets`: Updates ticket fields and metadata.
 - `PUT /api/tickets/status`: Transitions ticket status (`open`, `in_progress`, `closed`).
