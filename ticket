@@ -162,30 +162,109 @@ remove_yaml_field() {
     _sed_i "$file" "/^${field}:/d"
 }
 
+# Print the string entries of a projects.json file, one per line. Accepts the current
+# {"projects": [...]} schema and the legacy top-level [...] list. Pure awk (no python3/jq).
+_read_projects_json() {
+    LC_ALL=C awk '
+    function hexval(h,    v, j) {
+        v = 0; h = tolower(h)
+        for (j = 1; j <= length(h); j++) v = v * 16 + index("0123456789abcdef", substr(h, j, 1)) - 1
+        return v
+    }
+    function utf8(cp) {
+        if (cp < 128) return sprintf("%c", cp)
+        if (cp < 2048) return sprintf("%c%c", 192 + int(cp / 64), 128 + cp % 64)
+        if (cp < 65536) return sprintf("%c%c%c", 224 + int(cp / 4096), 128 + int(cp / 64) % 64, 128 + cp % 64)
+        return sprintf("%c%c%c%c", 240 + int(cp / 262144), 128 + int(cp / 4096) % 64, 128 + int(cp / 64) % 64, 128 + cp % 64)
+    }
+    { buf = buf $0 "\n" }
+    END {
+        n = length(buf); i = 1
+        while (i <= n && substr(buf, i, 1) ~ /[ \t\r\n]/) i++
+        if (substr(buf, i, 1) == "{") {
+            p = match(buf, /"projects"[ \t\r\n]*:[ \t\r\n]*\[/)
+            if (!p) exit
+            i = p + RLENGTH
+        } else if (substr(buf, i, 1) == "[") {
+            i++
+        } else exit
+        out = ""; cnt = 0
+        while (i <= n) {
+            c = substr(buf, i, 1)
+            if (c == "]") { if (cnt) printf "%s", out; exit }
+            if (c ~ /[ \t\r\n,]/) { i++; continue }
+            if (c != "\"") exit
+            if (c == "\"") {
+                s = ""; i++
+                while (i <= n) {
+                    c = substr(buf, i, 1)
+                    if (c == "\\") {
+                        i++; e = substr(buf, i, 1)
+                        if (e == "n") s = s "\n"
+                        else if (e == "t") s = s "\t"
+                        else if (e == "r") s = s "\r"
+                        else if (e == "u") {
+                            cp = hexval(substr(buf, i + 1, 4)); i += 4
+                            if (cp >= 55296 && cp < 56320 && substr(buf, i + 1, 2) == "\\u") {
+                                lo = hexval(substr(buf, i + 3, 4))
+                                if (lo >= 56320 && lo < 57344) { cp = 65536 + (cp - 55296) * 1024 + (lo - 56320); i += 6 }
+                            }
+                            s = s utf8(cp)
+                        }
+                        else s = s e
+                    } else if (c == "\"") break
+                    else s = s c
+                    i++
+                }
+                if (c != "\"") exit
+                out = out s "\n"; cnt++
+            }
+            i++
+        }
+    }' "$1" 2>/dev/null
+}
+
+# Record a project in ~/.local/state/tk/projects.json (most recent first), the schema
+# read by tk_webui/tk_cli.py. Written atomically via temp file + mv. Never fails tk init.
 register_global_project() {
     local proj_dir="$1"
-    python3 -c "
-import json, os
-from pathlib import Path
-state_dir = Path.home() / '.local' / 'state' / 'tk'
-state_dir.mkdir(parents=True, exist_ok=True)
-pfile = state_dir / 'projects.json'
-projs = []
-if pfile.exists():
-    try:
-        data = json.loads(pfile.read_text(encoding='utf-8'))
-        if isinstance(data, list):
-            projs = data
-        elif isinstance(data, dict):
-            projs = data.get('projects', [])
-    except Exception:
-        pass
-abs_p = str(Path('$proj_dir').expanduser().resolve())
-if abs_p in projs:
-    projs.remove(abs_p)
-projs.insert(0, abs_p)
-pfile.write_text(json.dumps({'projects': projs}, indent=2), encoding='utf-8')
-" 2>/dev/null || true
+    local state_dir="$HOME/.local/state/tk"
+    local pfile="$state_dir/projects.json"
+    local abs_p
+    if [[ -d "$proj_dir" ]]; then
+        abs_p=$(cd "$proj_dir" && pwd -P) || abs_p="$proj_dir"
+    elif [[ "$proj_dir" == /* ]]; then
+        abs_p="$proj_dir"
+    else
+        abs_p="$PWD/$proj_dir"
+    fi
+
+    mkdir -p "$state_dir" 2>/dev/null || return 0
+    local -a projs=("$abs_p")
+    local p
+    if [[ -f "$pfile" ]]; then
+        while IFS= read -r p; do
+            [[ "$p" == "$abs_p" ]] || projs+=("$p")
+        done < <(_read_projects_json "$pfile")
+    fi
+
+    local tmp="${pfile}.tmp.$$"
+    {
+        printf '{\n  "projects": [\n'
+        local i last=$(( ${#projs[@]} - 1 )) esc
+        for i in "${!projs[@]}"; do
+            esc="${projs[$i]//\\/\\\\}"
+            esc="${esc//\"/\\\"}"
+            esc="${esc//$'\t'/\\t}"
+            esc="${esc//$'\n'/\\n}"
+            esc="${esc//$'\r'/\\r}"
+            printf '    "%s"' "$esc"
+            [[ $i -lt $last ]] && printf ','
+            printf '\n'
+        done
+        printf '  ]\n}'
+    } > "$tmp" 2>/dev/null && mv -f "$tmp" "$pfile" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+    return 0
 }
 
 cmd_init() {
@@ -426,76 +505,69 @@ cmd_reopen() {
     cmd_status "$1" "open"
 }
 
+# Rewrite the title/description/design/acceptance parts of a ticket body, keeping the
+# frontmatter, other sections, and Notes. Pure awk; new values are passed via ENVIRON so
+# backslashes and newlines are taken literally.
 _update_ticket_file() {
     local file="$1"
-    local title="$2" has_title="$3"
-    local desc="$4" has_desc="$5"
-    local design="$6" has_design="$7"
-    local accept="$8" has_accept="$9"
+    local tmp="${file}.tmp.$$"
 
-    python3 - "$file" "$title" "$has_title" "$desc" "$has_desc" "$design" "$has_design" "$accept" "$has_accept" << 'PYEOF'
-import sys, re
+    if TK_U_TITLE="$2" TK_U_HAS_TITLE="$3" TK_U_DESC="$4" TK_U_HAS_DESC="$5" \
+       TK_U_DESIGN="$6" TK_U_HAS_DESIGN="$7" TK_U_ACCEPT="$8" TK_U_HAS_ACCEPT="$9" \
+       awk '
+    function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
+    { sub(/\r$/, ""); line[++n] = $0 }
+    END {
+        if (n < 1 || line[1] !~ /^---[ \t]*$/) exit 3
+        k = 0
+        for (i = 2; i <= n; i++) if (line[i] ~ /^---[ \t]*$/) { k = i; break }
+        if (!k) exit 3
 
-file_path = sys.argv[1]
-new_title, has_title = sys.argv[2], sys.argv[3] == "1"
-new_desc, has_desc = sys.argv[4], sys.argv[5] == "1"
-new_design, has_design = sys.argv[6], sys.argv[7] == "1"
-new_accept, has_accept = sys.argv[8], sys.argv[9] == "1"
+        start = k + 1; title = ""
+        for (i = k + 1; i <= n; i++) {
+            if (line[i] ~ /^#[ \t]+./) {
+                title = line[i]; sub(/^#[ \t]+/, "", title); title = trim(title)
+                start = i + 1; break
+            }
+        }
 
-with open(file_path, "r", encoding="utf-8") as f:
-    content = f.read()
+        # Split the remaining body on "## " headings; section 0 is the description.
+        ns = 0; sec[0] = ""; first = 1
+        for (i = start; i <= n; i++) {
+            if (line[i] ~ /^##[ \t]+/) {
+                ns++; h = line[i]; sub(/^##[ \t]+/, "", h)
+                stitle[ns] = trim(h); sec[ns] = ""; first = 1
+            } else {
+                sec[ns] = (first ? line[i] : sec[ns] "\n" line[i]); first = 0
+            }
+        }
+        desc = trim(sec[0]); design = ""; accept = ""; notes = ""; no = 0
+        for (j = 1; j <= ns; j++) {
+            lt = tolower(stitle[j]); c = trim(sec[j])
+            if (index(lt, "design")) design = c
+            else if (index(lt, "acceptance")) accept = c
+            else if (index(lt, "notes")) notes = c
+            else { no++; otitle[no] = stitle[j]; ocont[no] = c }
+        }
 
-m = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
-if not m:
-    sys.exit(0)
+        if (ENVIRON["TK_U_HAS_TITLE"] == "1") title = ENVIRON["TK_U_TITLE"]
+        if (ENVIRON["TK_U_HAS_DESC"] == "1") desc = ENVIRON["TK_U_DESC"]
+        if (ENVIRON["TK_U_HAS_DESIGN"] == "1") design = ENVIRON["TK_U_DESIGN"]
+        if (ENVIRON["TK_U_HAS_ACCEPT"] == "1") accept = ENVIRON["TK_U_ACCEPT"]
 
-frontmatter, body = m.group(1), m.group(2)
-
-title_m = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
-curr_title = title_m.group(1).strip() if title_m else ""
-body_rest = body[title_m.end():] if title_m else body
-
-sections = re.split(r"(?m)^##\s+", body_rest)
-curr_desc = sections[0].strip() if sections else ""
-
-design_sec = ""
-accept_sec = ""
-notes_sec = ""
-other_secs = []
-
-for s in sections[1:]:
-    lines = s.split("\n", 1)
-    stitle = lines[0].strip()
-    scontent = lines[1].strip() if len(lines) > 1 else ""
-    if "design" in stitle.lower():
-        design_sec = scontent
-    elif "acceptance" in stitle.lower():
-        accept_sec = scontent
-    elif "notes" in stitle.lower():
-        notes_sec = scontent
-    else:
-        other_secs.append((stitle, scontent))
-
-final_title = new_title if has_title else curr_title
-final_desc = new_desc if has_desc else curr_desc
-final_design = new_design if has_design else design_sec
-final_accept = new_accept if has_accept else accept_sec
-
-new_body = f"# {final_title}\n\n"
-if final_desc:
-    new_body += f"{final_desc}\n\n"
-if final_design:
-    new_body += f"## Design\n\n{final_design}\n\n"
-if final_accept:
-    new_body += f"## Acceptance Criteria\n\n{final_accept}\n\n"
-for stitle, scontent in other_secs:
-    new_body += f"## {stitle}\n\n{scontent}\n\n"
-if notes_sec:
-    new_body += f"## Notes\n\n{notes_sec}\n"
-
-with open(file_path, "w", encoding="utf-8") as f:
-    f.write(f"---\n{frontmatter}\n---\n{new_body}")
-PYEOF
+        printf "---\n"
+        for (i = 2; i <= k - 1; i++) printf "%s\n", line[i]
+        printf "---\n# %s\n\n", title
+        if (desc != "") printf "%s\n\n", desc
+        if (design != "") printf "## Design\n\n%s\n\n", design
+        if (accept != "") printf "## Acceptance Criteria\n\n%s\n\n", accept
+        for (j = 1; j <= no; j++) printf "## %s\n\n%s\n\n", otitle[j], ocont[j]
+        if (notes != "") printf "## Notes\n\n%s\n", notes
+    }' "$file" > "$tmp"; then
+        mv -f "$tmp" "$file"
+    else
+        rm -f "$tmp"
+    fi
 }
 
 cmd_update() {
