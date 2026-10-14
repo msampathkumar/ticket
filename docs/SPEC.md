@@ -168,7 +168,7 @@ Status writes (`start`, `close`, `reopen`, `status`) and claims run under a per-
    - `TK_SCRIPT`: Absolute path to the root `tk` executable.
 3. Plugins must conform to **[PLUGIN_SPEC.md](PLUGIN_SPEC.md)**:
    - Directory isolation: `plugins/<plugin-name>/` containing executable and `<PLUGIN-NAME>-SPEC.md`.
-   - Optionality: Except for `tk-webui`, all plugins are optional.
+   - Optionality: All plugins are optional; the core never requires one. The default `--full` install bundle includes the Web UI for convenience, and the other plugins are installed only on request (see Section 1).
    - Metadata discovery: `# tk-plugin: <description>` comment in header or `--tk-describe` flag for `tk help` discovery.
    - Version contract: `--version` flag for standardized version reporting.
 

@@ -21,7 +21,7 @@ Targets (combine freely, e.g. './install.sh --core --github'):
 
 Bundles:
   --full,            -f   Core + Web UI + Agent Skill  [default]
-  --all                   Everything above, including optional plugins
+  --all                   Everything above, including GitHub and SCION Task Force
 
 Other:
   --help,            -h   Show this help
