@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Removed
+- Packaging: AUR PKGBUILDs (`pkg/aur/`), `scripts/publish-aur.sh` and the release workflow AUR step; they pointed at upstream `wedow/ticket`.
+
 ## [0.5.0] - 2026-10-14
 
 ### Security
