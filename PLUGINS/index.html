@@ -1357,7 +1357,7 @@ Implement the <code>--tk-describe</code> flag:
 - <code>--core</code>: Installs only <code>tk</code> CLI.
 - <code>--webui</code>: Installs only the Web UI plugin.
 - <code>--skill</code>: Installs the agent skill.
-- <code>--github</code>: Installs the optional GitHub sync plugin (<code>tk-github</code>).
+- <code>--github</code>: Installs the optional GitHub import plugin (<code>tk-github</code>).
 - <code>--scion-taskforce</code>: Installs the optional SCION Task Force orchestrator (<code>tk-scion-taskforce</code>).
 - <code>--full</code> (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are <strong>not</strong> included; the installer prints how to add them.
 - <code>--all</code>: Installs everything, including optional plugins.
@@ -1367,7 +1367,7 @@ Implement the <code>--tk-describe</code> flag:
 <h2 id="5-official-plugins">5. Official Plugins<a class="headerlink" href="#5-official-plugins" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.</li>
-<li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. <em>(optional)</em></li>
+<li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. <em>(optional)</em></li>
 <li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Hands tickets tagged <code>taskforce</code> to SCION coding agents through a <code>tk</code> save hook; humans review and close. See the <a href="../plugins/scion-taskforce/">user guide</a>. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
 </ul>
 <hr />

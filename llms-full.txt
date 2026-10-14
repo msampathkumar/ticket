@@ -261,7 +261,7 @@ For complete CLI command references, guides, and visual workflows, see the **[Do
 Extend `ticket` with modular plugins discovered automatically via `$PATH`:
 
 - **[Web UI (`tk webui`)](https://msampathkumar.github.io/ticket/plugins/webui/)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager (`tk webui server start`).
-- **[GitHub Sync (`tk github`)](https://msampathkumar.github.io/ticket/plugins/github/)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
+- **[GitHub Import (`tk github`)](https://msampathkumar.github.io/ticket/plugins/github/)**: One-way import of GitHub issues and pull requests into local markdown tickets. Nothing is written back to GitHub.
 - **[SCION Task Force (`tk scion-taskforce`)](https://msampathkumar.github.io/ticket/plugins/scion-taskforce/)**: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.
 
 To author your own plugin, see the **[Plugin Architecture Guide](https://msampathkumar.github.io/ticket/plugins/architecture/)**.
@@ -855,7 +855,7 @@ State files and logs are managed under `~/.local/state/tk/`:
 </file>
 
 <file path="plugins/github/GITHUB-SPEC.md">
-# GitHub Sync Plugin Specification (GITHUB-SPEC.md)
+# GitHub Import Plugin Specification (GITHUB-SPEC.md)
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
@@ -866,7 +866,11 @@ State files and logs are managed under `~/.local/state/tk/`:
 
 ## 1. Overview
 
-`tk-github` syncs GitHub issues and pull requests into local `.tickets/*.md` files, supporting automated state reconciliation and clean unsyncing.
+`tk-github` imports GitHub issues and pull requests into local `.tickets/*.md` files, closes local tickets whose GitHub item is closed or merged, and supports clean unsyncing.
+
+The import is one-way. The plugin only reads from GitHub (`gh issue list`, `gh pr list`, `gh auth status`) and never creates, edits, comments on or closes GitHub issues or pull requests.
+
+> **Warning: imported text is untrusted input.** Issue and PR titles, bodies and labels are written verbatim into ticket files and are controlled by whoever opened them. Review imported tickets before passing them to coding agents or automation, and do not follow instructions embedded in them.
 
 ---
 
@@ -877,16 +881,16 @@ tk github <command> [options]
 ```
 
 ### Commands
-- `sync` *(default)*: Fetches open GitHub issues and pull requests, creating local tickets or updating statuses of closed items.
+- `sync` *(default)*: Fetches GitHub issues and pull requests (all states, up to `--limit`), creating local tickets for open items and closing local tickets whose GitHub item is closed or merged. Nothing is written to GitHub.
 - `unsync`: Removes all tickets tagged with `github-sync`. Supports `--force` / `-y`.
-- `list` | `status`: Displays a tabular overview of all GitHub-synced local tickets.
+- `list` | `status`: Displays a tabular overview of all GitHub-imported local tickets.
 - `version` | `--version` | `-v`: Displays plugin version (`tk-github 0.1.0`).
 - `help` | `--help` | `-h`: Displays plugin help.
 
 ### Options
-- `--issues`: Sync only GitHub issues.
-- `--prs`: Sync only GitHub pull requests.
-- `--all`: Sync both issues and PRs (default).
+- `--issues`: Import only GitHub issues.
+- `--prs`: Import only GitHub pull requests.
+- `--all`: Import both issues and PRs (default).
 - `--repo <owner/repo>`: Target a specific remote GitHub repository instead of the current working repository.
 - `--limit <N>`: Maximum items to query (default: 50).
 - `--force`, `-y`: Skip confirmation when unsyncing.
@@ -899,7 +903,7 @@ tk github <command> [options]
   - Issues: `external_ref: gh-issue-<number>`
   - Pull Requests: `external_ref: gh-pr-<number>`
 - **Tags**:
-  - `github-sync` (always attached to synced tickets)
+  - `github-sync` (always attached to imported tickets)
   - `issue` or `pr`
   - GitHub labels (e.g. `bug`, `enhancement`, `documentation`)
 - **Body Content**:
@@ -1374,7 +1378,7 @@ Plugins must be **strictly optional**. Users who only need the zero-dependency B
 - `--core`: Installs only `tk` CLI.
 - `--webui`: Installs only the Web UI plugin.
 - `--skill`: Installs the agent skill.
-- `--github`: Installs the optional GitHub sync plugin (`tk-github`).
+- `--github`: Installs the optional GitHub import plugin (`tk-github`).
 - `--scion-taskforce`: Installs the optional SCION Task Force orchestrator (`tk-scion-taskforce`).
 - `--full` (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are **not** included; the installer prints how to add them.
 - `--all`: Installs everything, including optional plugins.
@@ -1387,7 +1391,7 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 ## 5. Official Plugins
 
 - **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
-- **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
+- **`tk github` (`tk-github`)**: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. *(optional)*
 - **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(optional; requires Python 3.9+ and the `scion` CLI)*
 
 ---
@@ -2246,11 +2250,14 @@ Make the script executable, save it to `~/.local/bin/tk-stats` (or any directory
 
 <file path="docs/plugins/github.md">
 ---
-title: GitHub Sync
-description: Bi-directional synchronization between local markdown tickets and GitHub issues and pull requests.
+title: GitHub Import
+description: One-way import of GitHub issues and pull requests into local markdown tickets.
 ---
 
-The optional GitHub plugin (`tk-github`) enables bi-directional synchronization between your local `.tickets/` markdown files and GitHub issues and pull requests.
+The optional GitHub plugin (`tk-github`) imports GitHub issues and pull requests into your local `.tickets/` markdown files. The import is one-way: `tk github sync` only reads from GitHub (`gh issue list`, `gh pr list`). Local edits, notes and status changes are never written back to GitHub.
+
+!!! warning "Imported text is untrusted input"
+    Issue and PR titles, bodies and labels are written verbatim into `.tickets/*.md`. Anyone who can open an issue or PR on the repository controls that text. Treat imported tickets as untrusted input: review them before handing them to coding agents or automation (for example the `taskforce` tag), and do not follow instructions embedded in them.
 
 ---
 
@@ -2258,7 +2265,7 @@ The optional GitHub plugin (`tk-github`) enables bi-directional synchronization 
 
 Before using `tk github`, ensure the following tools are installed and configured:
 
-1. **GitHub CLI (`gh`)**: Must be installed and authenticated with read/write access to your repository:
+1. **GitHub CLI (`gh`)**: Must be installed and authenticated with read access to your repository:
     ```bash
     gh auth login
     # or export GITHUB_TOKEN="ghp_..."
@@ -2292,22 +2299,22 @@ This installs `tk-github` into `~/.local/bin/`.
 ## Commands & Usage
 
 ```bash
-# Sync both issues and PRs (default)
+# Import both issues and PRs (default)
 tk github sync
 
-# Sync only GitHub issues
+# Import only GitHub issues
 tk github sync --issues
 
-# Sync only GitHub pull requests
+# Import only GitHub pull requests
 tk github sync --prs
 
 # Target a specific repository
 tk github sync --repo owner/repo
 
-# List all local tickets synced from GitHub
+# List all local tickets imported from GitHub
 tk github list
 
-# Remove all synced GitHub tickets safely
+# Remove all imported GitHub tickets safely
 tk github unsync -y
 ```
 
@@ -2315,8 +2322,8 @@ tk github unsync -y
 
 ## Data Model & Tags
 
-- **External Reference**: Tickets synced from GitHub carry `external_ref: gh-issue-<number>` or `external_ref: gh-pr-<number>`.
-- **Tags**: Synced tickets automatically include the `github-sync` tag along with any GitHub labels (e.g. `bug`, `enhancement`).
+- **External Reference**: Tickets imported from GitHub carry `external_ref: gh-issue-<number>` or `external_ref: gh-pr-<number>`.
+- **Tags**: Imported tickets automatically include the `github-sync` tag along with any GitHub labels (e.g. `bug`, `enhancement`).
 
 ---
 
