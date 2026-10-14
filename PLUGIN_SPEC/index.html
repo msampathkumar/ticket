@@ -1586,7 +1586,7 @@
 </span></code></pre></div>
 <h3 id="21-installation-contract">2.1 Installation Contract<a class="headerlink" href="#21-installation-contract" title="Permanent link">&para;</a></h3>
 <ul>
-<li>The repo-level <code>install.sh</code> MUST offer a dedicated target per plugin (<code>--&lt;plugin-name&gt;</code>) and MUST NOT include optional plugins in the default <code>--full</code> bundle; only <code>--all</code> does.</li>
+<li>The repo-level <code>install.sh</code> MUST offer a dedicated target per plugin (<code>--&lt;plugin-name&gt;</code>) and MUST NOT add plugins to the default <code>--full</code> bundle (which ships only the Web UI alongside core and the agent skill); only <code>--all</code> installs every plugin.</li>
 <li>A plugin MAY ship its own <code>plugins/&lt;name&gt;/install.sh</code> (supporting <code>--uninstall</code>). If it does, the repo-level target MUST delegate to it rather than duplicating the logic.</li>
 <li>Installation MUST NOT touch the core <code>ticket</code> script. Discovery is purely by <code>$PATH</code>: once <code>tk-&lt;name&gt;</code> is installed, <code>tk help</code> lists it automatically using its <code># tk-plugin:</code> description.</li>
 </ul>

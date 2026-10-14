@@ -1359,8 +1359,8 @@ Implement the <code>--tk-describe</code> flag:
 - <code>--skill</code>: Installs the agent skill.
 - <code>--github</code>: Installs the optional GitHub import plugin (<code>tk-github</code>).
 - <code>--scion-taskforce</code>: Installs the optional SCION Task Force orchestrator (<code>tk-scion-taskforce</code>).
-- <code>--full</code> (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are <strong>not</strong> included; the installer prints how to add them.
-- <code>--all</code>: Installs everything, including optional plugins.
+- <code>--full</code> (default): Installs CLI, Web UI, and Agent Skill. Other plugins are <strong>not</strong> included; the installer prints how to add them.
+- <code>--all</code>: Installs everything, including the GitHub and SCION Task Force plugins.
 - <code>--help</code>: Lists all targets.</p>
 <p>A plugin may additionally ship its own <code>install.sh</code> (with <code>--uninstall</code>) inside <code>plugins/&lt;name&gt;/</code>. When it does, the top-level <code>install.sh</code> target must delegate to it so install logic lives in exactly one place (see <code>plugins/scion-taskforce/install.sh</code>).</p>
 <hr />

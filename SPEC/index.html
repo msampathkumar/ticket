@@ -1992,7 +1992,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <li><code>TK_SCRIPT</code>: Absolute path to the root <code>tk</code> executable.</li>
 <li>Plugins must conform to <strong><a href="../PLUGIN_SPEC/">PLUGIN_SPEC.md</a></strong>:</li>
 <li>Directory isolation: <code>plugins/&lt;plugin-name&gt;/</code> containing executable and <code>&lt;PLUGIN-NAME&gt;-SPEC.md</code>.</li>
-<li>Optionality: Except for <code>tk-webui</code>, all plugins are optional.</li>
+<li>Optionality: All plugins are optional; the core never requires one. The default <code>--full</code> install bundle includes the Web UI for convenience, and the other plugins are installed only on request (see Section 1).</li>
 <li>Metadata discovery: <code># tk-plugin: &lt;description&gt;</code> comment in header or <code>--tk-describe</code> flag for <code>tk help</code> discovery.</li>
 <li>Version contract: <code>--version</code> flag for standardized version reporting.</li>
 </ol>

@@ -1384,8 +1384,8 @@ Plugins must be **strictly optional**. Users who only need the zero-dependency B
 - `--skill`: Installs the agent skill.
 - `--github`: Installs the optional GitHub import plugin (`tk-github`).
 - `--scion-taskforce`: Installs the optional SCION Task Force orchestrator (`tk-scion-taskforce`).
-- `--full` (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are **not** included; the installer prints how to add them.
-- `--all`: Installs everything, including optional plugins.
+- `--full` (default): Installs CLI, Web UI, and Agent Skill. Other plugins are **not** included; the installer prints how to add them.
+- `--all`: Installs everything, including the GitHub and SCION Task Force plugins.
 - `--help`: Lists all targets.
 
 A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside `plugins/<name>/`. When it does, the top-level `install.sh` target must delegate to it so install logic lives in exactly one place (see `plugins/scion-taskforce/install.sh`).
@@ -1477,7 +1477,7 @@ plugins/
 
 ### 2.1 Installation Contract
 
-- The repo-level `install.sh` MUST offer a dedicated target per plugin (`--<plugin-name>`) and MUST NOT include optional plugins in the default `--full` bundle; only `--all` does.
+- The repo-level `install.sh` MUST offer a dedicated target per plugin (`--<plugin-name>`) and MUST NOT add plugins to the default `--full` bundle (which ships only the Web UI alongside core and the agent skill); only `--all` installs every plugin.
 - A plugin MAY ship its own `plugins/<name>/install.sh` (supporting `--uninstall`). If it does, the repo-level target MUST delegate to it rather than duplicating the logic.
 - Installation MUST NOT touch the core `ticket` script. Discovery is purely by `$PATH`: once `tk-<name>` is installed, `tk help` lists it automatically using its `# tk-plugin:` description.
 
@@ -1701,7 +1701,7 @@ Status writes (`start`, `close`, `reopen`, `status`) and claims run under a per-
    - `TK_SCRIPT`: Absolute path to the root `tk` executable.
 3. Plugins must conform to **[PLUGIN_SPEC.md](PLUGIN_SPEC.md)**:
    - Directory isolation: `plugins/<plugin-name>/` containing executable and `<PLUGIN-NAME>-SPEC.md`.
-   - Optionality: Except for `tk-webui`, all plugins are optional.
+   - Optionality: All plugins are optional; the core never requires one. The default `--full` install bundle includes the Web UI for convenience, and the other plugins are installed only on request (see Section 1).
    - Metadata discovery: `# tk-plugin: <description>` comment in header or `--tk-describe` flag for `tk help` discovery.
    - Version contract: `--version` flag for standardized version reporting.
 
