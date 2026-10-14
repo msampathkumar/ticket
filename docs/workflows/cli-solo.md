@@ -1,6 +1,6 @@
 ---
 title: Solo CLI Workflow
-description: Fast, offline, zero-dependency task management for individual developers and terminal power users.
+description: Fast, offline task management (portable Bash; no Python) for individual developers and terminal power users.
 ---
 
 The **Solo CLI Workflow** provides rapid, offline task tracking for individual developers and terminal power users directly in the shell.
@@ -57,11 +57,11 @@ tk ready
 
 ### 4. Work & Add Notes
 
-Mark the task in progress and record design decisions or progress notes:
+Mark the task in progress and record design decisions or progress notes. IDs accept partial matches, so `tk start a1b2` works too:
 
 ```bash
-tk start tic-10a
-tk add-note tic-10a "Evaluated in-memory cache vs WAL mode; choosing WAL mode."
+tk start tic-a1b2c3
+tk add-note tic-a1b2c3 "Evaluated in-memory cache vs WAL mode; choosing WAL mode."
 ```
 
 ### 5. Close and Unblock
@@ -69,7 +69,10 @@ tk add-note tic-10a "Evaluated in-memory cache vs WAL mode; choosing WAL mode."
 When work is complete, close the task:
 
 ```bash
-tk close tic-10a
+tk close tic-a1b2c3
 ```
 
 Any dependent tasks are automatically unblocked and immediately appear in `tk ready`.
+
+!!! tip "Working alongside agents"
+    If coding agents share this repository, use `tk start <id> --claim` instead of `tk start <id>`. It fails with exit code `3` when someone else already has the ticket in progress. See the [Agent Execution Loop](../agents/workflow.md).

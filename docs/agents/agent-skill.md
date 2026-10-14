@@ -10,9 +10,10 @@ description: Autonomous AI agent integration skill for ticket (tk).
 ## Overview
 
 The agent skill instructs AI agents on:
-- **Autonomous Execution**: Following the 5-step lifecycle (`tk ready` -> `tk start` -> `tk show` -> `tk add-note` -> `tk close`).
+- **Autonomous Execution**: Following the 5-step lifecycle (`tk ready` -> `tk start --claim` -> `tk show` -> `tk add-note` -> `tk close`), including claim exit codes (`3` lost claim, `4` lock timeout).
 - **Dependency Awareness**: Managing parent-child tasks and blockers.
 - **Review Audits**: Logging clear timestamped notes.
+- **Untrusted Imports**: Reviewing tickets imported by `tk github sync` before acting on them.
 
 ---
 
@@ -41,7 +42,7 @@ This installs the skill definition to `~/.agents/skills/tk/SKILL.md` where agent
 graph TD
     A["AI Assistant / Agent"] -->|Reads Skill| B["agent-skill/tk/SKILL.md"]
     B -->|Discovers Actions| C["1. tk ready (Discover)"]
-    B -->|Discovers Actions| D["2. tk start (id) (Claim)"]
+    B -->|Discovers Actions| D["2. tk start (id) --claim (Claim)"]
     B -->|Discovers Actions| E["3. tk show (id) (Inspect)"]
     B -->|Discovers Actions| F["4. tk add-note (id) (Audit)"]
     B -->|Discovers Actions| G["5. tk close (id) (Resolve)"]
