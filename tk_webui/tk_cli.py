@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import shutil
@@ -10,6 +11,8 @@ from typing import Dict, List, Optional, Tuple
 import yaml
 
 from .models import DirectoryBrowseItem, NoteItem, Ticket
+
+logger = logging.getLogger(__name__)
 
 
 def find_tk_binary() -> str:
@@ -105,6 +108,33 @@ def find_tickets_dir(base_dir: str) -> Optional[Path]:
 NOTE_TIMESTAMP_RE = re.compile(r"^\*\*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\*\*[ \t\r]*$", re.MULTILINE)
 
 
+def _as_str_list(value, split_commas: bool = False) -> List[str]:
+    """Coerce a frontmatter list field to strings.
+
+    YAML turns some flow-list items into other types, e.g. `[a, key: value]` yields a
+    mapping {"key": "value"}; such items become "key: value" instead of failing validation.
+    """
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        return [v.strip() for v in value.split(",") if v.strip()] if split_commas else [value]
+    if not isinstance(value, list):
+        value = [value]
+    items: List[str] = []
+    for item in value:
+        if item is None:
+            continue
+        if isinstance(item, dict):
+            items.extend(f"{k}: {v}" if v is not None else str(k) for k, v in item.items())
+        else:
+            items.append(str(item))
+    return items
+
+
+def _as_optional_str(value) -> Optional[str]:
+    return None if value is None or value == "" else str(value)
+
+
 def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
     """Parse a single ticket .md file."""
     try:
@@ -125,23 +155,31 @@ def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
     except Exception:
         meta = {}
 
-    ticket_id = meta.get("id") or file_path.stem
+    if not isinstance(meta, dict):
+        meta = {}
+    ticket_id = str(meta.get("id") or file_path.stem)
     status = str(meta.get("status", "open"))
     ticket_type = str(meta.get("type", "task"))
     priority = str(meta.get("priority", "2"))
-    assignee = meta.get("assignee")
-    tags = meta.get("tags", [])
-    if isinstance(tags, str):
-        tags = [t.strip() for t in tags.split(",") if t.strip()]
-    deps = meta.get("deps", [])
-    if not isinstance(deps, list):
-        deps = [deps] if deps else []
-    links = meta.get("links", [])
-    if not isinstance(links, list):
-        links = [links] if links else []
+    assignee = _as_optional_str(meta.get("assignee"))
+    # List fields are coerced item by item (tic-r5v9): one odd value must not fail the ticket.
+    # Previously non-string items (e.g. a YAML mapping from `[a, key: value]`) passed through
+    # and failed Ticket validation, which made /api/tickets return 500:
+    # tags = meta.get("tags", [])
+    # if isinstance(tags, str):
+    #     tags = [t.strip() for t in tags.split(",") if t.strip()]
+    # deps = meta.get("deps", [])
+    # if not isinstance(deps, list):
+    #     deps = [deps] if deps else []
+    # links = meta.get("links", [])
+    # if not isinstance(links, list):
+    #     links = [links] if links else []
+    tags = _as_str_list(meta.get("tags"), split_commas=True)
+    deps = _as_str_list(meta.get("deps"))
+    links = _as_str_list(meta.get("links"))
     created_val = meta.get("created")
     created = str(created_val.isoformat()) if hasattr(created_val, "isoformat") else (str(created_val) if created_val else None)
-    parent = meta.get("parent")
+    parent = _as_optional_str(meta.get("parent"))
     # Core writes `external-ref`; `external_ref` is the older Web UI/SPEC spelling.
     # external_ref = meta.get("external_ref")
     ext_val = meta.get("external-ref", meta.get("external_ref"))
@@ -225,7 +263,11 @@ def get_all_tickets(directory: str) -> List[Ticket]:
     for md_file in sorted(tickets_dir.glob("*.md")):
         if md_file.name.startswith("."):
             continue
-        ticket = parse_ticket_markdown(md_file)
+        try:
+            ticket = parse_ticket_markdown(md_file)
+        except Exception as exc:  # one malformed file must not break the whole board
+            logger.warning("Skipping unreadable ticket %s: %s", md_file, exc)
+            continue
         if ticket:
             tickets.append(ticket)
             ticket_map[ticket.id] = ticket
