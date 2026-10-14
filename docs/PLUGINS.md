@@ -67,7 +67,7 @@ Plugins must be **strictly optional**. Users who only need the zero-dependency B
 - `--core`: Installs only `tk` CLI.
 - `--webui`: Installs only the Web UI plugin.
 - `--skill`: Installs the agent skill.
-- `--github`: Installs the optional GitHub sync plugin (`tk-github`).
+- `--github`: Installs the optional GitHub import plugin (`tk-github`).
 - `--scion-taskforce`: Installs the optional SCION Task Force orchestrator (`tk-scion-taskforce`).
 - `--full` (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are **not** included; the installer prints how to add them.
 - `--all`: Installs everything, including optional plugins.
@@ -80,7 +80,7 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 ## 5. Official Plugins
 
 - **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
-- **`tk github` (`tk-github`)**: Syncs GitHub issues and PRs with local tickets, updates statuses on close/merge, and supports clean unsyncing. *(optional)*
+- **`tk github` (`tk-github`)**: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. *(optional)*
 - **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(optional; requires Python 3.9+ and the `scion` CLI)*
 
 ---

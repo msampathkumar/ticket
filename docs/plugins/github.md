@@ -1,9 +1,12 @@
 ---
-title: GitHub Sync
-description: Bi-directional synchronization between local markdown tickets and GitHub issues and pull requests.
+title: GitHub Import
+description: One-way import of GitHub issues and pull requests into local markdown tickets.
 ---
 
-The optional GitHub plugin (`tk-github`) enables bi-directional synchronization between your local `.tickets/` markdown files and GitHub issues and pull requests.
+The optional GitHub plugin (`tk-github`) imports GitHub issues and pull requests into your local `.tickets/` markdown files. The import is one-way: `tk github sync` only reads from GitHub (`gh issue list`, `gh pr list`). Local edits, notes and status changes are never written back to GitHub.
+
+!!! warning "Imported text is untrusted input"
+    Issue and PR titles, bodies and labels are written verbatim into `.tickets/*.md`. Anyone who can open an issue or PR on the repository controls that text. Treat imported tickets as untrusted input: review them before handing them to coding agents or automation (for example the `taskforce` tag), and do not follow instructions embedded in them.
 
 ---
 
@@ -11,7 +14,7 @@ The optional GitHub plugin (`tk-github`) enables bi-directional synchronization 
 
 Before using `tk github`, ensure the following tools are installed and configured:
 
-1. **GitHub CLI (`gh`)**: Must be installed and authenticated with read/write access to your repository:
+1. **GitHub CLI (`gh`)**: Must be installed and authenticated with read access to your repository:
     ```bash
     gh auth login
     # or export GITHUB_TOKEN="ghp_..."
@@ -45,22 +48,22 @@ This installs `tk-github` into `~/.local/bin/`.
 ## Commands & Usage
 
 ```bash
-# Sync both issues and PRs (default)
+# Import both issues and PRs (default)
 tk github sync
 
-# Sync only GitHub issues
+# Import only GitHub issues
 tk github sync --issues
 
-# Sync only GitHub pull requests
+# Import only GitHub pull requests
 tk github sync --prs
 
 # Target a specific repository
 tk github sync --repo owner/repo
 
-# List all local tickets synced from GitHub
+# List all local tickets imported from GitHub
 tk github list
 
-# Remove all synced GitHub tickets safely
+# Remove all imported GitHub tickets safely
 tk github unsync -y
 ```
 
@@ -68,8 +71,8 @@ tk github unsync -y
 
 ## Data Model & Tags
 
-- **External Reference**: Tickets synced from GitHub carry `external_ref: gh-issue-<number>` or `external_ref: gh-pr-<number>`.
-- **Tags**: Synced tickets automatically include the `github-sync` tag along with any GitHub labels (e.g. `bug`, `enhancement`).
+- **External Reference**: Tickets imported from GitHub carry `external_ref: gh-issue-<number>` or `external_ref: gh-pr-<number>`.
+- **Tags**: Imported tickets automatically include the `github-sync` tag along with any GitHub labels (e.g. `bug`, `enhancement`).
 
 ---
 
