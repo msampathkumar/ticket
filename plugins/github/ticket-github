@@ -138,6 +138,38 @@ ensure_ticket_tags() {
     fi
 }
 
+# GitHub label names -> comma-separated tk tags for item $2 of JSON array $1.
+# Labels are attacker-controlled. Tags end up in a YAML flow list and in a sed replacement
+# (update_yaml_field), so anything outside letters, digits and `_ . # + -` becomes '-',
+# and leading/trailing '-' are stripped. Commas cannot split one label into several tags.
+gh_labels_csv() {
+    echo "$1" | jq -r --argjson i "$2" \
+        '.[$i].labels[]?.name | gsub("[^\\p{L}\\p{N}_.#+-]+"; "-") | sub("^-+"; "") | sub("-+$"; "") | select(length > 0)' \
+        2>/dev/null | paste -sd, - || true
+}
+
+# Title of item $2 of JSON array $1, on a single line.
+gh_title() {
+    echo "$1" | jq -r --argjson i "$2" '.[$i].title // "" | gsub("[\\r\\n]+"; " ")'
+}
+
+# Create a local ticket from a GitHub item and print its ID.
+# Usage: create_imported_ticket <title> <placeholder> <type> <ext_ref> <tags> <description>
+# `tk create` reads the title as a bare positional argument and has no `--` terminator, so a
+# title starting with '-' (e.g. "--help", "-d x") would be parsed as an option. Such titles are
+# created with a safe placeholder and then set via `update --title`, whose value tk reads verbatim.
+# All other values are passed as option arguments, which tk also reads verbatim.
+create_imported_ticket() {
+    local title="$1" placeholder="$2" type="$3" ext_ref="$4" tags="$5" desc="$6"
+    local create_title="$title" new_id
+    [[ "$title" == -* ]] && create_title="$placeholder"
+    new_id=$("$TK_SCRIPT" super create "$create_title" -t "$type" --external-ref "$ext_ref" --tags "$tags" -d "$desc") || return 1
+    if [[ "$create_title" != "$title" ]]; then
+        "$TK_SCRIPT" super update "$new_id" --title "$title" >/dev/null || return 1
+    fi
+    echo "$new_id"
+}
+
 cmd_sync() {
     check_gh_cli
     mkdir -p "$TICKETS_DIR"
@@ -178,11 +210,11 @@ cmd_sync() {
         for ((i=0; i<count; i++)); do
             local num title body url state labels_str ext_ref
             num=$(echo "$issues_json" | jq -r ".[$i].number")
-            title=$(echo "$issues_json" | jq -r ".[$i].title")
+            title=$(gh_title "$issues_json" "$i")
             body=$(echo "$issues_json" | jq -r ".[$i].body // \"\"")
             url=$(echo "$issues_json" | jq -r ".[$i].url")
             state=$(echo "$issues_json" | jq -r ".[$i].state")
-            labels_str=$(echo "$issues_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+            labels_str=$(gh_labels_csv "$issues_json" "$i")
 
             ext_ref="gh-issue-$num"
             local tags="github-sync,github,issue,issue#$num"
@@ -211,7 +243,7 @@ cmd_sync() {
                     fi
                     local full_desc="${desc_body}"$'\n\n'"**GitHub URL:** $url"
                     local new_id
-                    new_id=$("$TK_SCRIPT" super create "$title" -t bug --external-ref "$ext_ref" --tags "$tags" -d "$full_desc")
+                    new_id=$(create_imported_ticket "$title" "GitHub issue #$num" bug "$ext_ref" "$tags" "$full_desc")
                     echo "  ✨ Created local ticket $new_id for Issue #$num ($title)"
                     ((created_count++))
                 fi
@@ -231,11 +263,11 @@ cmd_sync() {
         for ((i=0; i<pr_count; i++)); do
             local num title body url state labels_str ext_ref
             num=$(echo "$prs_json" | jq -r ".[$i].number")
-            title=$(echo "$prs_json" | jq -r ".[$i].title")
+            title=$(gh_title "$prs_json" "$i")
             body=$(echo "$prs_json" | jq -r ".[$i].body // \"\"")
             url=$(echo "$prs_json" | jq -r ".[$i].url")
             state=$(echo "$prs_json" | jq -r ".[$i].state")
-            labels_str=$(echo "$prs_json" | jq -r ".[$i].labels[].name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+            labels_str=$(gh_labels_csv "$prs_json" "$i")
 
             ext_ref="gh-pr-$num"
             local tags="github-sync,github,pr,pr#$num"
@@ -264,7 +296,7 @@ cmd_sync() {
                     fi
                     local full_desc="${desc_body}"$'\n\n'"**GitHub URL:** $url"
                     local new_id
-                    new_id=$("$TK_SCRIPT" super create "$title" -t task --external-ref "$ext_ref" --tags "$tags" -d "$full_desc")
+                    new_id=$(create_imported_ticket "$title" "GitHub PR #$num" task "$ext_ref" "$tags" "$full_desc")
                     echo "  ✨ Created local ticket $new_id for PR #$num ($title)"
                     ((created_count++))
                 fi
