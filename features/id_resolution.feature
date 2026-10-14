@@ -61,7 +61,7 @@ Feature: Ticket ID Resolution
     And a ticket exists with ID "dep-bbbb" and title "Dependency"
     When I run "ticket dep aaaa bbbb"
     Then the command should succeed
-    And ticket "dep-aaaa" should have "bbbb" in deps
+    And ticket "dep-aaaa" should have "dep-bbbb" in deps
 
   Scenario: ID resolution works with link command
     Given a ticket exists with ID "link-cccc" and title "First"

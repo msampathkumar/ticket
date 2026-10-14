@@ -56,3 +56,25 @@ Feature: Ticket Links
     When I run "ticket link link-0001 link-0002 link-0003"
     Then the command should succeed
     And the output should contain "Added 4 link(s) between 3 tickets"
+
+  Scenario: Unlink of an absent ID leaves a longer ID that contains it
+    Given a ticket exists with ID "link-1" and title "Short ID"
+    And a ticket exists with ID "link-12" and title "Longer ID"
+    And ticket "link-0001" is linked to "link-12"
+    When I run "ticket unlink link-0001 link-1"
+    Then the command should fail
+    And the output should be "Link not found"
+    And ticket "link-0001" should have "link-12" in links
+
+  Scenario: Unlink removes only the exact ID on both sides
+    Given a ticket exists with ID "link-1" and title "Short ID"
+    And a ticket exists with ID "link-12" and title "Longer ID"
+    And ticket "link-0001" is linked to "link-12"
+    And ticket "link-0001" is linked to "link-1"
+    And ticket "link-12" is linked to "link-1"
+    When I run "ticket unlink link-0001 link-1"
+    Then the command should succeed
+    And ticket "link-0001" should not have "link-1" in links
+    And ticket "link-0001" should have "link-12" in links
+    And ticket "link-1" should not have "link-0001" in links
+    And ticket "link-1" should have "link-12" in links
