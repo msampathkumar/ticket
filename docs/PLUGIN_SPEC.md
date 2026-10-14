@@ -37,7 +37,7 @@ plugins/
 
 ### 2.1 Installation Contract
 
-- The repo-level `install.sh` MUST offer a dedicated target per plugin (`--<plugin-name>`) and MUST NOT include optional plugins in the default `--full` bundle; only `--all` does.
+- The repo-level `install.sh` MUST offer a dedicated target per plugin (`--<plugin-name>`) and MUST NOT add plugins to the default `--full` bundle (which ships only the Web UI alongside core and the agent skill); only `--all` installs every plugin.
 - A plugin MAY ship its own `plugins/<name>/install.sh` (supporting `--uninstall`). If it does, the repo-level target MUST delegate to it rather than duplicating the logic.
 - Installation MUST NOT touch the core `ticket` script. Discovery is purely by `$PATH`: once `tk-<name>` is installed, `tk help` lists it automatically using its `# tk-plugin:` description.
 

@@ -69,8 +69,8 @@ Plugins must be **strictly optional**. Users who only need the zero-dependency B
 - `--skill`: Installs the agent skill.
 - `--github`: Installs the optional GitHub import plugin (`tk-github`).
 - `--scion-taskforce`: Installs the optional SCION Task Force orchestrator (`tk-scion-taskforce`).
-- `--full` (default): Installs CLI, Web UI, and Agent Skill. Optional plugins are **not** included; the installer prints how to add them.
-- `--all`: Installs everything, including optional plugins.
+- `--full` (default): Installs CLI, Web UI, and Agent Skill. Other plugins are **not** included; the installer prints how to add them.
+- `--all`: Installs everything, including the GitHub and SCION Task Force plugins.
 - `--help`: Lists all targets.
 
 A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside `plugins/<name>/`. When it does, the top-level `install.sh` target must delegate to it so install logic lives in exactly one place (see `plugins/scion-taskforce/install.sh`).
