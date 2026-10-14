@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tk-plugin: Sync GitHub issues and pull requests into local tickets
+# tk-plugin: Import GitHub issues and pull requests into local tickets (one-way)
 # tk-plugin-version: 0.4.0
 
 set -euo pipefail
@@ -33,7 +33,7 @@ fi
 
 show_help() {
     cat << EOF
-tk-github (v${VERSION}) — Sync GitHub issues and pull requests into local tk tickets.
+tk-github (v${VERSION}) — Import GitHub issues and pull requests into local tk tickets (one-way).
 Created by Sampath Kumar & wedow contributors
 GitHub: https://github.com/msampathkumar/ticket
 License: MIT
@@ -41,24 +41,24 @@ License: MIT
 Usage: tk github <command> [options]
 
 Commands:
-  sync                     Sync open GitHub issues and/or PRs (default)
+  sync                     Import GitHub issues and/or PRs; nothing is written to GitHub (default)
   unsync [--force|-y]      Remove all tickets created by github-sync
   list | status            List all locally synced GitHub tickets
   version | --version | -v Display plugin version
   help | --help | -h       Display this help message
 
 Options:
-  --issues                 Sync only GitHub issues
-  --prs                    Sync only GitHub pull requests
-  --all                    Sync both issues and pull requests (default)
+  --issues                 Import only GitHub issues
+  --prs                    Import only GitHub pull requests
+  --all                    Import both issues and pull requests (default)
   --repo <owner/repo>      Target a specific GitHub repository
   --limit <N>              Max number of issues/PRs to fetch (default: 50)
   --force, -y              Bypass confirmation prompt on unsync
 
 Examples:
-  tk github sync           # Sync both issues and PRs from current repo
-  tk github sync --issues  # Sync only issues
-  tk github sync --prs     # Sync only pull requests
+  tk github sync           # Import both issues and PRs from current repo
+  tk github sync --issues  # Import only issues
+  tk github sync --prs     # Import only pull requests
   tk github list           # View all synced tickets
   tk github unsync -y      # Remove all synced GitHub tickets
 
@@ -365,7 +365,7 @@ case "${1:-sync}" in
         cmd_version
         ;;
     --tk-describe)
-        echo "tk-plugin: Sync GitHub issues and pull requests into local tickets"
+        echo "tk-plugin: Import GitHub issues and pull requests into local tickets (one-way)"
         ;;
     help|--help|-h)
         show_help

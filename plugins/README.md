@@ -11,7 +11,7 @@ All plugins follow the [Plugin Specification (PLUGIN_SPEC.md)](../docs/PLUGIN_SP
 | Plugin Folder | Command | Spec Document | Description |
 | :--- | :--- | :--- | :--- |
 | [`webui/`](../tk_webui) | `tk webui` | [WEBUI-SPEC.md](../tk_webui/WEBUI-SPEC.md) | Full-featured Kanban, Table, Mind Map DAG, and Timeline dashboard |
-| [`github/`](github/) | `tk github` | [GITHUB-SPEC.md](github/GITHUB-SPEC.md) | Sync GitHub issues & pull requests into local tickets |
+| [`github/`](github/) | `tk github` | [GITHUB-SPEC.md](github/GITHUB-SPEC.md) | Import GitHub issues & pull requests into local tickets (one-way, read-only on GitHub) |
 | [`scion-taskforce/`](scion-taskforce/) | `tk scion-taskforce` | [SCION-TASKFORCE-SPEC.md](scion-taskforce/SCION-TASKFORCE-SPEC.md) | Opt-in SCION worker per ticket, triggered by a `tk` save hook (optional install; [user guide](../docs/plugins/scion-taskforce.md)) |
 
 > [!NOTE]
