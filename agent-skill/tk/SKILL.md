@@ -1,11 +1,11 @@
 ---
 name: tk
-description: Minimal, dependency-aware task tracker. Built to scale agentic workflows. Manage tickets, DAG dependencies, atomic claims for concurrent agents, Kanban Web UI, GitHub issue import, and SCION task forces.
+description: Dependency-aware, Git-friendly task queue for humans and coding agents. Manage tickets, DAG dependencies, atomic claims for concurrent agents, Kanban Web UI, GitHub issue import, and SCION task forces.
 ---
 
 # tk - Developer & Agent Operational Guide
 
-`tk` (`ticket`) is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
+`tk` (`ticket`) is a **dependency-aware, Git-friendly task queue for humans and coding agents.**
 
 - **Repository**: [https://github.com/msampathkumar/ticket](https://github.com/msampathkumar/ticket)
 - **Documentation**: [https://msampathkumar.github.io/ticket/](https://msampathkumar.github.io/ticket/)

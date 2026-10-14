@@ -1,11 +1,11 @@
 ---
 title: ticket (tk)
-description: Minimal, dependency-aware task tracker. Built to scale agentic workflows.
+description: Dependency-aware, Git-friendly task queue for humans and coding agents.
 ---
 
 # <img src="images/logo.svg" width="36" height="36" alt="tk logo" style="vertical-align: -6px; display: inline-block;" /> ticket (tk)
 
-> Minimal, dependency-aware task tracker. Built to scale agentic workflows.
+> Dependency-aware, Git-friendly task queue for humans and coding agents.
 
 ---
 
@@ -46,8 +46,8 @@ graph TD
 Extend `ticket` with optional plugins discovered automatically via `$PATH`:
 
 - **[Web UI (`tk webui`)](plugins/webui.md)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.
-- **[GitHub Sync (`tk github`)](plugins/github.md)**: One-way import of GitHub issues and pull requests into local tickets.
-- **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.
+- **[GitHub Import (`tk github`)](plugins/github.md)**: One-way import of GitHub issues and pull requests into local tickets.
+- **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Event-driven bridge from tickets to SCION coding agents: saving a `taskforce` ticket starts its SCION worker; humans review and close.
 
 Learn how to write custom plugins in pure Bash or Python in the [Plugin Architecture Guide](plugins/architecture.md).
 

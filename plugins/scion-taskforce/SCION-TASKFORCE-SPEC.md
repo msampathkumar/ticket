@@ -3,7 +3,7 @@
 | | |
 | :--- | :--- |
 | Plugin | `tk-scion-taskforce` / `ticket-scion-taskforce`, command `tk scion-taskforce` |
-| Language | Python 3.9+ standard library; PyYAML optional. Thin POSIX Bash discovery wrapper |
+| Language | Python 3.9+ standard library; PyYAML optional. Thin Bash discovery wrapper |
 | Runtime | [SCION](https://github.com/GoogleCloudPlatform/scion) CLI on Podman, Docker or Kubernetes |
 | Dispatch | Event-driven: a per-project `tk` post-write hook runs `on-save <id>`. No daemon, no polling |
 | Version | `0.1.0` |

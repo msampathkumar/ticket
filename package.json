@@ -1,7 +1,7 @@
 {
   "name": "ticket",
   "version": "0.4.0",
-  "description": "Minimal, dependency-aware task tracker. Built to scale agentic workflows.",
+  "description": "Dependency-aware, Git-friendly task queue for humans and coding agents.",
   "bin": {
     "tk": "./ticket",
     "ticket": "./ticket"

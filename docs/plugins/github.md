@@ -71,7 +71,7 @@ tk github unsync -y
 
 ## Data Model & Tags
 
-- **External Reference**: Tickets imported from GitHub carry `external_ref: gh-issue-<number>` or `external_ref: gh-pr-<number>`.
+- **External Reference**: Tickets imported from GitHub carry `external-ref: gh-issue-<number>` or `external-ref: gh-pr-<number>` (the legacy `external_ref` spelling is still matched on re-sync).
 - **Tags**: Imported tickets automatically include the `github-sync` tag along with any GitHub labels (e.g. `bug`, `enhancement`).
 
 ---

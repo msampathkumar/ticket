@@ -10,7 +10,7 @@ cd "$ROOT_DIR"
 
 OUTPUT_FILE="docs/llms-full.txt"
 DOCS_DIR="docs"
-PROJECT_NAME="ticket (tk) — Minimal, dependency-aware task tracker. Built to scale agentic workflows."
+PROJECT_NAME="ticket (tk) — Dependency-aware, Git-friendly task queue for humans and coding agents"
 
 echo "--- Generating consolidated LLM context file: ${OUTPUT_FILE} ---"
 

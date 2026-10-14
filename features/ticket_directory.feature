@@ -75,7 +75,7 @@ Feature: Ticket Directory Resolution
     Given the tickets directory does not exist
     When I run "ticket help"
     Then the command should succeed
-    And the output should contain "Minimal, offline task tracker"
+    And the output should contain "Dependency-aware, Git-friendly task queue"
 
   Scenario: Init command initializes repository and creates setup ticket
     Given the tickets directory does not exist

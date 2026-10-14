@@ -15,6 +15,11 @@ def before_all(context):
     plugins_dir = context.project_dir / 'plugins'
     if plugins_dir.exists():
         os.environ['PATH'] = str(plugins_dir) + ':' + os.environ.get('PATH', '')
+        # Each plugin's own folder too, so the repo's tk-<name> wins over an older copy
+        # installed in ~/.local/bin (it would otherwise shadow help text and behaviour).
+        plugin_dirs = sorted(str(d) for d in plugins_dir.iterdir() if d.is_dir())
+        if plugin_dirs:
+            os.environ['PATH'] = ':'.join(plugin_dirs) + ':' + os.environ['PATH']
 
     # Never let the suite reach the developer's real `scion`/Hub: a real `scion hub link` on a
     # temp dir creates a stray Hub project (`ticket-test-xxxxxxxx`). Scenarios that need a runtime

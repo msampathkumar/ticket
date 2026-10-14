@@ -1,7 +1,7 @@
 [project]
 site_url = "https://msampathkumar.github.io/ticket/"
 site_name = "ticket (tk)"
-site_description = "Minimal, dependency-aware task tracker. Built to scale agentic workflows."
+site_description = "Dependency-aware, Git-friendly task queue for humans and coding agents."
 site_author = "Sampath Kumar & contributors"
 copyright = "Copyright &copy; 2026 Sampath Kumar"
 repo_url = "https://github.com/msampathkumar/ticket"
@@ -26,7 +26,7 @@ nav = [
   { "Plugins & Ecosystem" = [
     { "Plugin Architecture" = "plugins/architecture.md" },
     { "Interactive Web UI" = "plugins/webui.md" },
-    { "GitHub Sync" = "plugins/github.md" },
+    { "GitHub Import" = "plugins/github.md" },
     { "SCION Task Force" = "plugins/scion-taskforce.md" },
   ] },
   { "AI Agent Integration" = [

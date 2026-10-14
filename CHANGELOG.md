@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
+### Security
+- Web UI: stored XSS fixed; ticket fields are HTML-escaped and markdown is sanitised with DOMPurify (#3).
+- Web UI: permissive CORS removed; a Host-header allowlist blocks DNS rebinding and cross-origin writes get 403 (#4).
+- Web UI: ticket IDs passed to `tk` are validated and titles starting with `-` are rejected, so no value is parsed as a CLI option (#5).
+- GitHub: imported titles starting with `-` and labels with `,` `/` `&` can no longer inject `tk` options or break the tags line (#14).
+- Web UI: `tk webui server stop` checks that the recorded PID is the Web UI before signalling it (#13).
+- Web UI: frontend libraries are vendored and version-pinned; no scripts load from a CDN (#11).
+
 ### Added
+- Core: `tk start <id> --claim [--assignee X]` claims a ticket atomically under a per-ticket `mkdir` lock with stale-lock recovery; exit `3` on a lost claim, `4` on lock timeout (#8).
+- Web UI: the board refreshes within ~3 s when tickets change on disk (#15).
+- Docs: SPEC Section 1 defines core scope and non-goals (#27).
+- Core: `tk dep` rejects a dependency that would create a cycle (#35).
 - Core: post-write hooks. Executables in `.tickets/.hooks/post-write.d/` run after each successful write with `TK_EVENT`, `TK_TICKET_ID`, `TK_TICKET_FILE`, `TICKETS_DIR` and `TK_SCRIPT`; in the background by default (`TK_HOOKS_SYNC=1` inline, `TK_NO_HOOKS=1` off); output goes to `.tickets/.hooks/hooks.log`.
 - SCION Task Force: menu-based `init` wizard with validation; runs `tk init` and `scion init` when missing.
 - SCION Task Force: standard worker template `tk-worker-gemini-cli-with-api-key-auth`; `test` verifies end to end through a real ticket.
@@ -12,6 +24,16 @@
 - SCION Task Force: `scripts/live-test.sh`, a black-box live test with real Scion workers.
 
 ### Changed
+- Core: no `python3` dependency; `tk init` (projects.json) and `tk update` body rewrites are pure awk/Bash, with atomic projects.json writes (#6).
+- Core: ticket IDs use a 6-char hash (`TK_ID_HASH_LENGTH`, 4-32) with a retry on local collision; 4-char IDs still resolve (#12).
+- Core: `tk init` adds `.locks/` and `.hooks/hooks.log` to `.tickets/.gitignore`; the lock directory ignores itself in older repos (#19).
+- Project tagline is now "Dependency-aware, Git-friendly task queue for humans and coding agents." across README, docs, SPEC, agent guides, agent skill, `package.json`, the docs site and `tk help`/`tk version`.
+- Core and plugins: the scion-taskforce and Web UI help descriptions drop the "orchestrator" and "PR review" claims; the GitHub plugin is called an import.
+- Web UI: layout uses the full viewport width on large screens (#18).
+- Web UI: `app.js` split into ES modules under `static/js/`, no behaviour change (#26).
+- GitHub: documented as a one-way import with an untrusted-input warning; nothing is written to GitHub (#9).
+- Docs: SPEC, README, agent guides, agent skill, core CLI and Web UI pages updated for claims, IDs, scope and security model; all plugins documented as optional (#29, #30, #31, #32, #33).
+- Tests: every Behave scenario runs with a sandboxed `HOME` and tk_cli state dir (#28).
 - SCION Task Force: event-driven. The per-project save hook runs `on-save <id>`; `sync` catches up. Close stops the worker; removing `taskforce`, adding `no-taskforce` or deleting the ticket removes it.
 - SCION Task Force: only `init` links a folder to the Scion Hub; dispatch may start Podman and re-link a configured project.
 - SCION Task Force: `.scion/agents/` is excluded through `.git/info/exclude`, never `.gitignore`.
@@ -22,6 +44,17 @@
 - SCION Task Force: the polling daemon and `server` commands (they print a migration hint), tmux auto-accept, `test --raw`.
 
 ### Fixed
+- Core: field values containing `/`, `&`, `\` or `|` are stored verbatim, newlines are rejected, only frontmatter lines are updated, and values YAML would misread are single-quoted (#16).
+- Core: `tk init`/`tk create` in a folder with a non-ASCII name wrote no ticket file ("Illegal byte sequence"); the ID prefix is now ASCII, falling back to `tk` (#22).
+- Core: `tk create`, `tk init` and `tk update` exit 1 with a clear error, no ID and no hook when the ticket file cannot be written (#25).
+- Web UI: `server start` reports success only once the server accepts connections, with a port pre-check and the log path on failure (#7).
+- Web UI: opens the directory passed to `tk webui <dir>` (`GET /api/config`) (#10).
+- Web UI: projects.json writes are atomic and byte-compatible with core; unreachable projects are no longer dropped (#17).
+- Web UI: notes split only on `tk add-note` timestamp lines (#20).
+- Web UI: reads the `external-ref` key core writes, with the legacy `external_ref` as fallback (#21).
+- Web UI: version comes from one source (0.4.0, was 0.1.0) (#23).
+- Web UI: blocked/ready state matches `tk ready` / `tk blocked` (#24).
+- Web UI: the Tree Graph fits and centres in the viewport on open and reset (#34).
 - SCION Task Force: `tk reopen` on a reviewed ticket removes `waiting-for-review` (with a note) so a new worker starts; before, the tag blocked dispatch.
 - SCION Task Force: a note for a paused gemini-cli worker no longer stalls it. The worker template now ships `home/.gemini/tk-system-settings.json` (topic narration off, next-speaker check on), loaded through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` so Scion's own settings stay intact. Re-run `tk scion-taskforce init` in existing projects to add it.
 - SCION Task Force: a note for a paused worker resumes it first and sends the note once it runs (plus 8 s to settle). In live tests the resumed worker then acted in about 20 s instead of 2.5 min.

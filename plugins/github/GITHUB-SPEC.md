@@ -43,8 +43,9 @@ tk github <command> [options]
 ## 3. Data Model & Tags
 
 - **External Reference**:
-  - Issues: `external_ref: gh-issue-<number>`
-  - Pull Requests: `external_ref: gh-pr-<number>`
+  - Issues: `external-ref: gh-issue-<number>`
+  - Pull Requests: `external-ref: gh-pr-<number>`
+  - The legacy `external_ref` spelling is still matched when re-syncing.
 - **Tags**:
   - `github-sync` (always attached to imported tickets)
   - `issue` or `pr`

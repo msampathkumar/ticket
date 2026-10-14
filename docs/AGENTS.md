@@ -1,6 +1,6 @@
 # tk - AI Agent Guidelines & Integration Guide
 
-`tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.** This document outlines operational standards for AI coding assistants and autonomous agents (e.g., Antigravity, Claude, Cursor, Copilot, Gemini CLI) operating within repositories tracked by `tk`.
+`tk` is a **dependency-aware, Git-friendly task queue for humans and coding agents.** This document outlines operational standards for AI coding assistants and autonomous agents (e.g., Antigravity, Claude, Cursor, Copilot, Gemini CLI) operating within repositories tracked by `tk`.
 
 ---
 

@@ -67,7 +67,7 @@ from tk_scion_taskforce.workers import (
     tags,
 )
 
-HELP_TEXT = """tk-scion-taskforce - Autonomous SCION task force orchestrator plugin for tk
+HELP_TEXT = """tk-scion-taskforce - Event-driven bridge from tk tickets to SCION coding agents
 
 Usage:
   tk scion-taskforce [--config <path>] [--dry-run] <subcommand> [args...]
