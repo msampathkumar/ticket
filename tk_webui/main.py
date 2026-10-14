@@ -2,12 +2,15 @@ import argparse
 import os
 from pathlib import Path
 from typing import List
+from urllib.parse import urlparse
 
 import uvicorn
-from fastapi import Body, FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Body, FastAPI, HTTPException, Query, Request
+
+# from fastapi.middleware.cors import CORSMiddleware  # removed with permissive CORS (tic-2b85)
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .models import (
     DirectoryBrowseItem,
@@ -39,13 +42,49 @@ from .tk_cli import (
 
 app = FastAPI(title="tk Web UI", version="0.1.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Removed: permissive CORS let any website drive the local API (tic-2b85).
+# The UI is served from the same origin, so no CORS headers are needed.
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# Host header allowlist (blocks DNS rebinding). Extended by register_host()
+# with the --host the server binds to; TK_WEBUI_HOST carries it across reloads.
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def register_host(host: str) -> None:
+    """Allow requests addressed to the configured bind host."""
+    os.environ["TK_WEBUI_HOST"] = host
+    if host in ("0.0.0.0", "::"):
+        # Bound to all interfaces: the user opted into LAN access.
+        host = "*"
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
+
+
+if os.environ.get("TK_WEBUI_HOST"):
+    register_host(os.environ["TK_WEBUI_HOST"])
+
+
+@app.middleware("http")
+async def reject_cross_origin_writes(request: Request, call_next):
+    """CSRF defence: state-changing requests must come from the UI's own origin."""
+    origin = request.headers.get("origin")
+    if request.method not in SAFE_METHODS and origin is not None:
+        if urlparse(origin).netloc.lower() != request.headers.get("host", "").lower():
+            return JSONResponse(status_code=403, content={"detail": "Cross-origin request rejected"})
+    return await call_next(request)
+
+
+# Added last so it runs first. The list is read when the middleware stack is
+# built (first request), so register_host() calls in main() still apply.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -356,6 +395,7 @@ def main():
 
         target_dir = os.path.abspath(os.path.expanduser(parsed_args.directory))
         os.environ["INITIAL_PROJECT_DIR"] = target_dir
+        register_host(parsed_args.host)
         print(f"🚀 Starting tk-webui on http://{parsed_args.host}:{parsed_args.port} (ASCII: T=84, K=75)")
         print(f"📁 Initial directory: {os.environ['INITIAL_PROJECT_DIR']}")
         uvicorn.run("tk_webui.main:app", host=parsed_args.host, port=parsed_args.port, reload=parsed_args.reload)
