@@ -1144,10 +1144,32 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scope
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#core-principles" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Core Principles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Non-goals
       </span>
     </span>
   </a>
@@ -1439,10 +1461,32 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scope
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#core-principles" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Core Principles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Non-goals
       </span>
     </span>
   </a>
@@ -1699,14 +1743,33 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <hr />
 <h2 id="1-system-goals-philosophy">1. System Goals &amp; Philosophy<a class="headerlink" href="#1-system-goals-philosophy" title="Permanent link">&para;</a></h2>
 <p><code>tk</code> is a <strong>minimal, dependency-aware task tracker. Built to scale agentic workflows.</strong></p>
+<h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
+<p><code>tk</code> core is a minimal task queue that many agents and humans can share through plain files. It provides:</p>
+<ul>
+<li>Plain-text tickets (<code>.tickets/*.md</code>) that version and merge through Git; Git itself is optional.</li>
+<li>DAG dependencies with cycle detection, and a deterministic ready queue (<code>tk ready</code>).</li>
+<li>Atomic claiming (<code>tk start --claim</code>) and per-ticket locks for concurrent agents.</li>
+<li>Post-write hooks (<code>.tickets/.hooks/post-write.d/</code>) as the single extension point for reacting to changes.</li>
+</ul>
+<p>Everything else lives in optional plugins, discovered on <code>$PATH</code> as <code>tk-&lt;cmd&gt;</code> (see Section 5): the Web UI (<code>tk webui</code>), GitHub sync (<code>tk github</code>), and agent dispatch (<code>tk scion-taskforce</code>, an event-driven bridge from ticket hooks to Scion, which runs the agents).</p>
 <h3 id="core-principles">Core Principles<a class="headerlink" href="#core-principles" title="Permanent link">&para;</a></h3>
 <ol>
 <li><strong>Zero Database</strong>: State is stored locally in <code>.tickets/*.md</code>.</li>
 <li><strong>Plain-Text Transparency</strong>: Every ticket is a Markdown file with YAML frontmatter.</li>
 <li><strong>DAG-Driven</strong>: Native dependency tracking (<code>deps</code>) enables topological sorting, cycle detection, and ready-queue computation.</li>
-<li><strong>Unix Portability</strong>: Core CLI runs on POSIX Bash with <code>awk</code> and <code>sed</code>—no external runtime required.</li>
+<li><strong>Unix Portability</strong>: Core CLI is a single portable Bash script (Bash 3.2+, macOS and Linux) using standard tools (<code>awk</code>, <code>sed</code>, <code>grep</code>, <code>find</code>, <code>mkdir</code>); no other runtime required. It is Bash, not POSIX <code>sh</code>.</li>
 <li><strong>Decoupled Extensions</strong>: Web UI and external integrations operate as modular plugins.</li>
 </ol>
+<h3 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h3>
+<p>Core will not:</p>
+<ul>
+<li>Use a database, server, or background daemon. Hooks run once per write and exit.</li>
+<li>Access the network. Sync with GitHub or other services belongs to plugins.</li>
+<li>Orchestrate agents (spawning, scheduling, assigning, or supervising workers). Core supplies the shared queue, claims, and hooks; orchestration belongs to plugins and the tools they drive.</li>
+<li>Require a runtime beyond Bash and standard Unix tools. <code>jq</code> is optional and only needed for <code>tk query &lt;filter&gt;</code>; Python is used only by plugins.</li>
+<li>Require Git. Tickets are plain files; Git is the recommended way to share and review them.</li>
+<li>Render a UI. The terminal output is plain text; visual views belong to <code>tk webui</code>.</li>
+</ul>
 <hr />
 <h2 id="2-data-model-ticket-schema">2. Data Model &amp; Ticket Schema<a class="headerlink" href="#2-data-model-ticket-schema" title="Permanent link">&para;</a></h2>
 <h3 id="21-file-storage-naming">2.1 File Storage &amp; Naming<a class="headerlink" href="#21-file-storage-naming" title="Permanent link">&para;</a></h3>

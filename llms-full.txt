@@ -1542,12 +1542,32 @@ Each plugin's `<PLUGIN-NAME>-SPEC.md` must include:
 
 `tk` is a **minimal, dependency-aware task tracker. Built to scale agentic workflows.**
 
+### Scope
+`tk` core is a minimal task queue that many agents and humans can share through plain files. It provides:
+
+- Plain-text tickets (`.tickets/*.md`) that version and merge through Git; Git itself is optional.
+- DAG dependencies with cycle detection, and a deterministic ready queue (`tk ready`).
+- Atomic claiming (`tk start --claim`) and per-ticket locks for concurrent agents.
+- Post-write hooks (`.tickets/.hooks/post-write.d/`) as the single extension point for reacting to changes.
+
+Everything else lives in optional plugins, discovered on `$PATH` as `tk-<cmd>` (see Section 5): the Web UI (`tk webui`), GitHub sync (`tk github`), and agent dispatch (`tk scion-taskforce`, an event-driven bridge from ticket hooks to Scion, which runs the agents).
+
 ### Core Principles
 1. **Zero Database**: State is stored locally in `.tickets/*.md`.
 2. **Plain-Text Transparency**: Every ticket is a Markdown file with YAML frontmatter.
 3. **DAG-Driven**: Native dependency tracking (`deps`) enables topological sorting, cycle detection, and ready-queue computation.
-4. **Unix Portability**: Core CLI runs on POSIX Bash with `awk` and `sed`—no external runtime required.
+4. **Unix Portability**: Core CLI is a single portable Bash script (Bash 3.2+, macOS and Linux) using standard tools (`awk`, `sed`, `grep`, `find`, `mkdir`); no other runtime required. It is Bash, not POSIX `sh`.
 5. **Decoupled Extensions**: Web UI and external integrations operate as modular plugins.
+
+### Non-goals
+Core will not:
+
+- Use a database, server, or background daemon. Hooks run once per write and exit.
+- Access the network. Sync with GitHub or other services belongs to plugins.
+- Orchestrate agents (spawning, scheduling, assigning, or supervising workers). Core supplies the shared queue, claims, and hooks; orchestration belongs to plugins and the tools they drive.
+- Require a runtime beyond Bash and standard Unix tools. `jq` is optional and only needed for `tk query <filter>`; Python is used only by plugins.
+- Require Git. Tickets are plain files; Git is the recommended way to share and review them.
+- Render a UI. The terminal output is plain text; visual views belong to `tk webui`.
 
 ---
 
