@@ -2,7 +2,7 @@
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
-- **Version**: `0.5.0`
+- **Version**: `0.5.1`
 - **Installation**: Optional (`./install.sh --github`)
 
 ---

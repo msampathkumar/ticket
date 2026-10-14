@@ -2,11 +2,21 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-14
+
 ### Added
-- Release assets: every GitHub release ships `tk`, `tk-core.zip` and `SHA256SUMS` for install without cloning (`make dist`, `scripts/build-dist.sh`; `release-assets.yml` backfills an existing tag). Documented in the agent skill, README and installation guide.
+- Release assets: every GitHub release ships `tk`, `tk-core.zip` and `SHA256SUMS` for install without cloning (`make dist`, `scripts/build-dist.sh`; `release-assets.yml` backfills an existing tag). Documented in the agent skill, README and installation guide (#49).
+- CI: the "Web UI CSS is fresh" job fails when `tk_webui/static/css/tailwind.css` is stale (`make webui-css`, `make webui-css-check`) (#47).
+
+### Changed
+- Core: the fallback agent skill embedded in `tk` includes the install-without-cloning section (#49).
+
+### Fixed
+- GitHub: re-sync replaces legacy label tags (e.g. `autorelease: pending`, `autorelease:pending`) with the sanitised tag and removes duplicates; user-added tags are kept (#46).
+- Web UI: regenerated `tailwind.css` to match the pinned build (#47).
 
 ### Removed
-- Packaging: AUR PKGBUILDs (`pkg/aur/`), `scripts/publish-aur.sh` and the release workflow AUR step; they pointed at upstream `wedow/ticket`.
+- Packaging: AUR PKGBUILDs (`pkg/aur/`), `scripts/publish-aur.sh` and the release workflow AUR step; they pointed at upstream `wedow/ticket` (#45).
 
 ## [0.5.0] - 2026-10-14
 
