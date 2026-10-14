@@ -462,6 +462,73 @@ validate_status() {
     return 1
 }
 
+# Per-ticket lock for status writes: mkdir is atomic on POSIX filesystems, so no flock needed.
+# Lock dir: $TICKETS_DIR/.locks/<id>.lock, holding an "owner" file with "<pid> <host> <epoch>".
+# A lock is stale (and is moved aside, then removed) when its owner pid is gone on this host,
+# or it is older than TK_LOCK_STALE_SECONDS (default 60). Waits up to TK_LOCK_TIMEOUT seconds
+# (default 10) and then fails with exit code 4.
+TK_EXIT_CLAIM_LOST=3
+TK_EXIT_LOCK_TIMEOUT=4
+_TK_HELD_LOCK=""
+
+_lock_is_stale() {
+    local lock="$1" pid host epoch now
+    read -r pid host epoch < "$lock/owner" 2>/dev/null || {
+        # No owner file yet: the holder may be between mkdir and writing it. Use the dir age.
+        epoch=$(_mtime "$lock") || return 1
+        pid="" host=""
+    }
+    now=$(date +%s)
+    if [[ -n "$pid" && "$host" == "$(hostname 2>/dev/null || echo localhost)" ]] && ! kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+    [[ -n "$epoch" && $(( now - epoch )) -ge ${TK_LOCK_STALE_SECONDS:-60} ]]
+}
+
+_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
+ticket_lock() {
+    local id="$1"
+    local lock_root="$TICKETS_DIR/.locks"
+    local lock="$lock_root/${id}.lock"
+    local timeout=${TK_LOCK_TIMEOUT:-10}
+    local start now
+    start=$(date +%s)
+    mkdir -p "$lock_root"
+    while ! mkdir "$lock" 2>/dev/null; do
+        if _lock_is_stale "$lock"; then
+            # Rename first so only one waiter removes a given stale lock.
+            local aside="$lock.stale.$$"
+            mv "$lock" "$aside" 2>/dev/null && rm -rf "$aside"
+            continue
+        fi
+        now=$(date +%s)
+        if (( now - start >= timeout )); then
+            echo "Error: ticket '$id' is locked by another tk process ($lock); retry, or remove it if stale" >&2
+            return $TK_EXIT_LOCK_TIMEOUT
+        fi
+        sleep 0.1 2>/dev/null || sleep 1
+    done
+    echo "$$ $(hostname 2>/dev/null || echo localhost) $(date +%s)" > "$lock/owner"
+    _TK_HELD_LOCK="$lock"
+    trap '_ticket_unlock' EXIT
+    trap '_ticket_unlock; exit 130' INT TERM
+}
+
+_ticket_unlock() {
+    if [[ -n "$_TK_HELD_LOCK" ]]; then
+        rm -rf "$_TK_HELD_LOCK"
+        _TK_HELD_LOCK=""
+    fi
+}
+
+ticket_unlock() {
+    _ticket_unlock
+    trap - EXIT INT TERM
+}
+
 cmd_status() {
     if [[ $# -lt 2 ]]; then
         echo "Usage: $(basename "$0") status <id> <status>" >&2
@@ -476,17 +543,66 @@ cmd_status() {
 
     local file
     file=$(ticket_path "$id") || return 1
+    local tid
+    tid=$(basename "$file" .md)
 
+    ticket_lock "$tid" || return $?
     update_yaml_field "$file" "status" "$status"
-    echo "Updated $(basename "$file" .md) -> $status"
+    ticket_unlock
+    echo "Updated $tid -> $status"
 }
 
+# tk start <id> [--claim [--assignee <name>]]
+# --claim: under the ticket lock, set status in_progress and assignee, unless the ticket is
+# already in_progress for a different assignee (exit 3). Re-claiming your own ticket succeeds.
 cmd_start() {
-    if [[ $# -lt 1 ]]; then
-        echo "Usage: $(basename "$0") start <id>" >&2
+    local id="" claim=0 assignee="" has_assignee=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --claim) claim=1; shift ;;
+            -a|--assignee) assignee="${2:-}"; has_assignee=1; shift 2 || shift ;;
+            --assignee=*) assignee="${1#--assignee=}"; has_assignee=1; shift ;;
+            -*) echo "Unknown option: $1" >&2; return 1 ;;
+            *) id="$1"; shift ;;
+        esac
+    done
+    if [[ -z "$id" ]]; then
+        echo "Usage: $(basename "$0") start <id> [--claim [--assignee <name>]]" >&2
         return 1
     fi
-    cmd_status "$1" "in_progress"
+    if [[ $claim -eq 0 ]]; then
+        if [[ $has_assignee -eq 1 ]]; then
+            echo "Error: --assignee requires --claim (use 'tk update <id> -a <name>' otherwise)" >&2
+            return 1
+        fi
+        _TK_HOOK_ID="$id"
+        cmd_status "$id" "in_progress"
+        return
+    fi
+
+    if [[ $has_assignee -eq 0 || -z "$assignee" ]]; then
+        assignee=$(git config user.name 2>/dev/null || true)
+        [[ -z "$assignee" ]] && assignee="${USER:-$(id -un 2>/dev/null || echo unknown)}"
+    fi
+
+    local file tid
+    file=$(ticket_path "$id") || return 1
+    tid=$(basename "$file" .md)
+    _TK_HOOK_ID="$tid"
+
+    ticket_lock "$tid" || return $?
+    local cur_status cur_assignee
+    cur_status=$(yaml_field "$file" "status" || true)
+    cur_assignee=$(yaml_field "$file" "assignee" || true)
+    if [[ "$cur_status" == "in_progress" && -n "$cur_assignee" && "$cur_assignee" != "$assignee" ]]; then
+        ticket_unlock
+        echo "Error: $tid is already claimed by '$cur_assignee'" >&2
+        return $TK_EXIT_CLAIM_LOST
+    fi
+    update_yaml_field "$file" "assignee" "$assignee"
+    update_yaml_field "$file" "status" "in_progress"
+    ticket_unlock
+    echo "Claimed $tid -> in_progress ($assignee)"
 }
 
 cmd_close() {
@@ -1904,7 +2020,9 @@ Commands:
     --external-ref         External reference (e.g., gh-123, JIRA-456)
     --parent               Parent ticket ID
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
-  start <id>               Set status to in_progress
+  start <id> [--claim [--assignee X]]
+                           Set status to in_progress; --claim also sets assignee and
+                           fails (exit 3) if in_progress for another assignee
   close <id>               Set status to closed
   reopen <id>              Set status to open
   status <id> <status>     Update status (open|in_progress|closed)
@@ -2281,6 +2399,7 @@ if [[ " $HOOK_EVENTS " == *" $_tk_cmd "* ]]; then
     case "$_tk_cmd:$_tk_arg1" in
         dep:tree|dep:cycle) ;;
         create:*) run_hooks "$_tk_cmd" "$_TK_HOOK_ID" ;;
+        start:*) run_hooks "$_tk_cmd" "${_TK_HOOK_ID:-$_tk_arg1}" ;;
         *) run_hooks "$_tk_cmd" "$_tk_arg1" ;;
     esac
 fi

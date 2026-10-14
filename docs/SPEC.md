@@ -91,6 +91,7 @@ Following the frontmatter, the Markdown body contains:
 | `tk init [path]` | Initializes `.tickets/` tracking repository |
 | `tk create <title> [options]` | Creates ticket, prints generated ID to stdout |
 | `tk start <id>` | Sets status to `in_progress` |
+| `tk start <id> --claim [--assignee X]` | Atomically sets status `in_progress` and `assignee` (default: `git config user.name`, else `$USER`); fails with exit code `3` if already `in_progress` for a different assignee |
 | `tk close <id>` | Sets status to `closed` |
 | `tk reopen <id>` | Sets status to `open` |
 | `tk status <id> <status>` | Updates status directly (`open`, `in_progress`, `closed`) |
@@ -113,6 +114,26 @@ Following the frontmatter, the Markdown body contains:
 | `tk agent-skill [--install]` | Displays or installs agent skill to `~/.agents/skills/tk/` |
 | `tk version` / `--version` | Prints version, description, and license information |
 | `tk help` | Displays available built-in commands and discovered plugins |
+
+### 4.1 Exit Codes
+
+| Code | Meaning |
+| :--- | :--- |
+| `0` | Success |
+| `1` | Error (usage, ticket not found, invalid value) |
+| `3` | Claim lost: `tk start --claim` found the ticket `in_progress` for another assignee |
+| `4` | Lock timeout: another `tk` process held the ticket lock for longer than `TK_LOCK_TIMEOUT` |
+
+### 4.2 Ticket Locks & Claiming
+
+Status writes (`start`, `close`, `reopen`, `status`) and claims run under a per-ticket lock, so concurrent agents cannot interleave a read-check-write on the same ticket.
+
+- **Mechanism**: `mkdir $TICKETS_DIR/.locks/<id>.lock` (atomic on POSIX filesystems; no `flock` dependency). The lock holds an `owner` file: `<pid> <host> <epoch>`. It is removed on exit, including on error or `SIGINT`/`SIGTERM`.
+- **Waiting**: a busy lock is retried every 0.1s for up to `TK_LOCK_TIMEOUT` seconds (default `10`), then the command exits `4`.
+- **Stale locks**: a lock is stale when its owner pid no longer runs on the same host, or it is older than `TK_LOCK_STALE_SECONDS` (default `60`). A waiter renames a stale lock aside (only one waiter wins the rename) and deletes it. Locks from crashed processes on other hosts (shared network filesystems) expire by age only. To clear one manually: `rm -rf .tickets/.locks/<id>.lock`.
+- **Claim rule**: `--claim` succeeds if the ticket is not `in_progress`, has no assignee, or is already assigned to the claimant (re-claiming is idempotent). Agents sharing one identity must pass distinct `--assignee` values.
+- **Scope**: locks coordinate `tk` processes sharing one `.tickets/` directory. Claims across separate Git clones are reconciled through Git, not by this lock.
+- Plain `tk start <id>` is unchanged: it sets `in_progress` without checking or changing the assignee.
 
 ---
 
