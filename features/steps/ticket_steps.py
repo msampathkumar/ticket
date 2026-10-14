@@ -258,7 +258,7 @@ Description
 
 @given(r'python3 is not available on PATH')
 def step_no_python(context):
-    """Shadow python/python3 with stubs that record any call and fail; sandbox HOME."""
+    """Shadow python/python3 with stubs that record any call and fail."""
     shim = Path(context.test_dir) / '.no-python-bin'
     shim.mkdir(parents=True, exist_ok=True)
     marker = Path(context.test_dir) / '.python-invoked'
@@ -266,7 +266,8 @@ def step_no_python(context):
         stub = shim / name
         stub.write_text(f'#!/bin/sh\necho "$0 $*" >> "{marker}"\nexit 127\n')
         stub.chmod(0o755)
-    (Path(context.test_dir) / 'home').mkdir(exist_ok=True)
+    # Redundant: features/environment.py sandboxes HOME for every scenario (tic-0ok7).
+    # (Path(context.test_dir) / 'home').mkdir(exist_ok=True)
     context.no_python_dir = str(shim)
 
 
@@ -392,7 +393,8 @@ def step_run_command(context, command):
         env['PATH'] = context.plugin_dir + ':' + env['PATH']
     if getattr(context, 'no_python_dir', None):
         env['PATH'] = context.no_python_dir + ':' + env['PATH']
-        env['HOME'] = str(Path(context.test_dir) / 'home')
+        # Redundant: HOME is already test_dir/home via features/environment.py (tic-0ok7).
+        # env['HOME'] = str(Path(context.test_dir) / 'home')
 
     result = subprocess.run(
         cmd,
@@ -1118,7 +1120,8 @@ def step_run_installer(context, args):
 
     env = os.environ.copy()
     env['BIN_DIR'] = str(bin_dir)
-    env['HOME'] = str(home_dir)
+    # Redundant: HOME is already test_dir/home via features/environment.py (tic-0ok7).
+    # env['HOME'] = str(home_dir)
 
     result = subprocess.run(
         f'bash "{repo_root / "install.sh"}" {args}',

@@ -4,7 +4,7 @@ Feature: Non-ASCII project directory names
   So that ticket files are written with valid ASCII IDs
 
   Scenario: tk init in a folder with non-ASCII characters writes the setup ticket with an ASCII prefix
-    When I run "mkdir -p 'p ü3' && cd 'p ü3' && HOME=$PWD/home ticket init"
+    When I run "mkdir -p 'p ü3' && cd 'p ü3' && ticket init"
     Then the command should succeed
     And the output should not contain "Illegal byte sequence"
     When I run "ls 'p ü3/.tickets'"

@@ -27,24 +27,9 @@ def _client(context):
         from tk_webui import tk_cli
         from tk_webui.main import app
 
-        # Use the repo's tk script and keep projects.json (written by both tk_cli and the core
-        # script) out of the developer's real state dir.
-        saved = (tk_cli.TK_BIN, tk_cli.STATE_DIR, tk_cli.PROJECTS_FILE, os.environ.get("HOME"))
-
-        def restore():
-            tk_cli.TK_BIN, tk_cli.STATE_DIR, tk_cli.PROJECTS_FILE, home = saved
-            if home is None:
-                os.environ.pop("HOME", None)
-            else:
-                os.environ["HOME"] = home
-
-        context.add_cleanup(restore)
-        os.environ["HOME"] = str(Path(context.test_dir) / "home")
-
-        context.add_cleanup(restore)
+        # Use the repo's tk script. HOME and the tk_cli state dir are sandboxed per scenario
+        # in features/environment.py, which also restores TK_BIN.
         tk_cli.TK_BIN = str(Path(context.project_dir) / "ticket")
-        tk_cli.STATE_DIR = Path(context.test_dir) / ".state" / "tk"
-        tk_cli.PROJECTS_FILE = tk_cli.STATE_DIR / "projects.json"
         # The Host allowlist accepts 127.0.0.1, not TestClient's default "testserver".
         context.api_client = TestClient(app, base_url="http://127.0.0.1")
     return context.api_client
