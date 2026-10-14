@@ -101,6 +101,10 @@ def find_tickets_dir(base_dir: str) -> Optional[Path]:
     return None
 
 
+# Note header written by `tk add-note`: a line holding only **YYYY-MM-DDTHH:MM:SSZ**.
+NOTE_TIMESTAMP_RE = re.compile(r"^\*\*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\*\*[ \t\r]*$", re.MULTILINE)
+
+
 def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
     """Parse a single ticket .md file."""
     try:
@@ -168,8 +172,10 @@ def parse_ticket_markdown(file_path: Path) -> Optional[Ticket]:
         elif "acceptance" in sec_title:
             acceptance = sec_content
         elif "notes" in sec_title:
-            # Parse timestamped notes: **YYYY-MM-DD...** \n note content
-            note_blocks = re.split(r"(?m)^\*\*([^*]+)\*\*", sec_content)
+            # Split only on the exact timestamp line `tk add-note` writes, so bold
+            # text inside a note does not start a new note.
+            # note_blocks = re.split(r"(?m)^\*\*([^*]+)\*\*", sec_content)
+            note_blocks = NOTE_TIMESTAMP_RE.split(sec_content)
             # note_blocks[0] is text before first timestamp (usually empty)
             i = 1
             while i < len(note_blocks):

@@ -45,3 +45,23 @@ def step_webui_note(context, note, ticket_id):
 def step_ticket_count(context, count):
     files = list((Path(context.test_dir) / '.tickets').glob('*.md'))
     assert len(files) == int(count), f"Expected {count} tickets, found {[f.name for f in files]}"
+
+
+@when(r'I add a note to "(?P<ticket_id>[^"]*)" via the web UI with text')
+def step_webui_note_multiline(context, ticket_id):
+    ok, message = _tk_cli(context).add_note_cli(context.test_dir, ticket_id, context.text)
+    _record(context, ok, message)
+
+
+@then(r'the web UI should show (?P<count>\d+) notes? on "(?P<ticket_id>[^"]*)"')
+def step_webui_note_count(context, count, ticket_id):
+    ticket = _tk_cli(context).parse_ticket_markdown(Path(context.test_dir) / '.tickets' / f'{ticket_id}.md')
+    assert ticket is not None, f"Could not parse {ticket_id}"
+    context.webui_notes = ticket.notes
+    assert len(ticket.notes) == int(count), f"Expected {count} notes, got {[n.model_dump() for n in ticket.notes]}"
+
+
+@then(r'web UI note (?P<index>\d+) should contain "(?P<text>[^"]*)"')
+def step_webui_note_contains(context, index, text):
+    note = context.webui_notes[int(index) - 1]
+    assert text in note.text, f"'{text}' not in note text: {note.text!r}"
