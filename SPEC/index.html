@@ -1713,7 +1713,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <ul>
 <li>Directory: <code>.tickets/</code> (located in the repository root or discovered upwards in parent directories).</li>
 <li>File Naming: <code>&lt;prefix&gt;-&lt;hash&gt;.md</code> (e.g., <code>tic-6mex2q.md</code>, <code>msa-y8zi0k.md</code>).</li>
-<li>Prefix defaults to 3 characters derived from the folder name or random alphanumeric.</li>
+<li>Prefix defaults to 3 characters derived from the folder name or random alphanumeric. Only ASCII letters, digits and <code>.</code> are kept; a folder name with none falls back to <code>tk</code>.</li>
 <li>Hash is a random lowercase alphanumeric string from <code>/dev/urandom</code> (fallback: <code>$RANDOM</code>), 6 characters by default (<code>TK_ID_HASH_LENGTH</code>, 4-32). Lowercase keeps IDs distinct on case-insensitive filesystems.</li>
 <li>Generation retries if <code>&lt;id&gt;.md</code> already exists locally. Across branches, 6 characters (36^6 ≈ 2.2 × 10^9 values) keep the collision chance for 1,000 tickets near 0.02%, versus about 25% with 4 characters.</li>
 <li>Older 4-character IDs (e.g., <code>tic-6mex</code>) remain valid; exact and partial ID resolution work for both lengths.</li>

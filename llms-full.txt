@@ -1556,7 +1556,7 @@ Each plugin's `<PLUGIN-NAME>-SPEC.md` must include:
 ### 2.1 File Storage & Naming
 - Directory: `.tickets/` (located in the repository root or discovered upwards in parent directories).
 - File Naming: `<prefix>-<hash>.md` (e.g., `tic-6mex2q.md`, `msa-y8zi0k.md`).
-  - Prefix defaults to 3 characters derived from the folder name or random alphanumeric.
+  - Prefix defaults to 3 characters derived from the folder name or random alphanumeric. Only ASCII letters, digits and `.` are kept; a folder name with none falls back to `tk`.
   - Hash is a random lowercase alphanumeric string from `/dev/urandom` (fallback: `$RANDOM`), 6 characters by default (`TK_ID_HASH_LENGTH`, 4-32). Lowercase keeps IDs distinct on case-insensitive filesystems.
   - Generation retries if `<id>.md` already exists locally. Across branches, 6 characters (36^6 ≈ 2.2 × 10^9 values) keep the collision chance for 1,000 tickets near 0.02%, versus about 25% with 4 characters.
   - Older 4-character IDs (e.g., `tic-6mex`) remain valid; exact and partial ID resolution work for both lengths.
