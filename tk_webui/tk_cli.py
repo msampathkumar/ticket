@@ -232,6 +232,29 @@ def run_tk_cmd(directory: str, args: List[str]) -> Tuple[int, str, str]:
         return 1, "", str(e)
 
 
+# Ticket IDs (full or partial) are word characters, dots and hyphens, never starting with '-'.
+# Rejecting anything else keeps IDs from being parsed as tk options or used as find(1) globs.
+TICKET_ID_RE = re.compile(r"^\w[\w.-]*$")
+
+
+def validate_ticket_id(value: str, field: str = "ticket_id") -> Optional[str]:
+    """Return an error message if value is not a safe ticket ID, else None."""
+    if not isinstance(value, str) or not TICKET_ID_RE.match(value):
+        return f"Invalid {field}: {value!r}"
+    return None
+
+
+def validate_positional_text(value: str, field: str) -> Optional[str]:
+    """Return an error message if a bare positional value could be read as a tk option.
+
+    Values passed after an option flag (e.g. `-d <text>`) are taken verbatim by tk, so only
+    bare positional arguments need this check.
+    """
+    if value.startswith("-"):
+        return f"Invalid {field}: must not start with '-'"
+    return None
+
+
 def create_ticket_cli(
     directory: str,
     title: str,
@@ -246,6 +269,11 @@ def create_ticket_cli(
     external_ref: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """Create a ticket via `tk create`."""
+    # `tk create` takes the title as a bare positional argument, so a leading '-' would be
+    # parsed as an option. Parent is resolved by tk as a (partial) ticket ID.
+    err = validate_positional_text(title, "title") or (parent and validate_ticket_id(parent, "parent"))
+    if err:
+        return False, err
     args = ["create", title]
     if description:
         args.extend(["-d", description])
@@ -288,6 +316,9 @@ def update_ticket_content_cli(
     external_ref: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """Update ticket fields via `tk update` or direct file rewrite."""
+    err = validate_ticket_id(ticket_id) or (parent and validate_ticket_id(parent, "parent"))
+    if err:
+        return False, err
     args = ["update", ticket_id]
     if title is not None:
         args.extend(["--title", title])
@@ -318,6 +349,9 @@ def update_ticket_content_cli(
 
 def update_ticket_status_cli(directory: str, ticket_id: str, new_status: str) -> Tuple[bool, str]:
     """Update status of a ticket."""
+    err = validate_ticket_id(ticket_id)
+    if err:
+        return False, err
     if new_status == "in_progress":
         args = ["start", ticket_id]
     elif new_status == "closed":
@@ -335,6 +369,10 @@ def update_ticket_status_cli(directory: str, ticket_id: str, new_status: str) ->
 
 def add_note_cli(directory: str, ticket_id: str, note: str) -> Tuple[bool, str]:
     """Add note/comment to a ticket."""
+    # The note itself is safe: `tk add-note` joins all remaining args ("$*") without option parsing.
+    err = validate_ticket_id(ticket_id)
+    if err:
+        return False, err
     args = ["add-note", ticket_id, note]
     code, stdout, stderr = run_tk_cmd(directory, args)
     if code == 0:
@@ -344,6 +382,9 @@ def add_note_cli(directory: str, ticket_id: str, note: str) -> Tuple[bool, str]:
 
 def add_dep_cli(directory: str, ticket_id: str, dep_id: str) -> Tuple[bool, str]:
     """Add dependency."""
+    err = validate_ticket_id(ticket_id) or validate_ticket_id(dep_id, "dep_id")
+    if err:
+        return False, err
     args = ["dep", ticket_id, dep_id]
     code, stdout, stderr = run_tk_cmd(directory, args)
     if code == 0:
@@ -353,6 +394,9 @@ def add_dep_cli(directory: str, ticket_id: str, dep_id: str) -> Tuple[bool, str]
 
 def remove_dep_cli(directory: str, ticket_id: str, dep_id: str) -> Tuple[bool, str]:
     """Remove dependency."""
+    err = validate_ticket_id(ticket_id) or validate_ticket_id(dep_id, "dep_id")
+    if err:
+        return False, err
     args = ["undep", ticket_id, dep_id]
     code, stdout, stderr = run_tk_cmd(directory, args)
     if code == 0:
@@ -362,6 +406,9 @@ def remove_dep_cli(directory: str, ticket_id: str, dep_id: str) -> Tuple[bool, s
 
 def add_link_cli(directory: str, ticket_id: str, target_id: str) -> Tuple[bool, str]:
     """Add symmetric link between two tickets."""
+    err = validate_ticket_id(ticket_id) or validate_ticket_id(target_id, "target_id")
+    if err:
+        return False, err
     args = ["link", ticket_id, target_id]
     code, stdout, stderr = run_tk_cmd(directory, args)
     if code == 0:
@@ -371,6 +418,9 @@ def add_link_cli(directory: str, ticket_id: str, target_id: str) -> Tuple[bool, 
 
 def remove_link_cli(directory: str, ticket_id: str, target_id: str) -> Tuple[bool, str]:
     """Remove symmetric link between two tickets."""
+    err = validate_ticket_id(ticket_id) or validate_ticket_id(target_id, "target_id")
+    if err:
+        return False, err
     args = ["unlink", ticket_id, target_id]
     code, stdout, stderr = run_tk_cmd(directory, args)
     if code == 0:
