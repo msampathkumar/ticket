@@ -1226,6 +1226,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#24-field-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2.4 Field Values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-repository-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2.5 Repository Files
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1543,6 +1565,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#24-field-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2.4 Field Values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-repository-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2.5 Repository Files
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1784,7 +1828,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <h3 id="22-yaml-frontmatter-schema">2.2 YAML Frontmatter Schema<a class="headerlink" href="#22-yaml-frontmatter-schema" title="Permanent link">&para;</a></h3>
 <p>Each ticket file begins with a YAML header delimited by <code>---</code>:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nn">---</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span><span class="w">          </span><span class="c1"># Unique ticket identifier, e.g. tic-6mex (Required)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span><span class="w">          </span><span class="c1"># Unique ticket identifier, e.g. tic-6mex2q (Required)</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enum</span><span class="w">        </span><span class="c1"># open | in_progress | closed (Required)</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nt">deps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list[string]</span><span class="w">  </span><span class="c1"># Array of ticket IDs this ticket depends on (Required)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">links</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list[string]</span><span class="w"> </span><span class="c1"># Array of related ticket IDs (symmetric) (Optional)</span>
@@ -1792,29 +1836,82 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enum</span><span class="w">          </span><span class="c1"># bug | feature | task | epic | chore (Default: task)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span><span class="w">   </span><span class="c1"># 0 (Critical) to 4 (Trivial) (Default: 2)</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nt">assignee</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span><span class="w">    </span><span class="c1"># Assignee name or git username (Optional)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list[string]</span><span class="w">  </span><span class="c1"># Array of tag strings (Optional)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nt">external-ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span><span class="w"> </span><span class="c1"># External issue/PR reference, e.g. gh-123 (Optional)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="nt">parent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span><span class="w">      </span><span class="c1"># Parent ticket ID if this ticket is a subtask (Optional)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">external_ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string# External issue/PR reference, e.g. gh-123 (Optional)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list[string]</span><span class="w">  </span><span class="c1"># Array of tag strings (Optional)</span>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="nn">---</span>
 </span></code></pre></div>
+<p>The external reference key is <code>external-ref</code> (hyphen). Readers should also accept the legacy <code>external_ref</code> spelling.</p>
 <h3 id="23-markdown-body-structure">2.3 Markdown Body Structure<a class="headerlink" href="#23-markdown-body-structure" title="Permanent link">&para;</a></h3>
-<p>Following the frontmatter, the Markdown body contains:</p>
+<p>Following the frontmatter, the Markdown body contains (sections are omitted when empty):</p>
 <div class="language-markdown highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gh"># &lt;Title&gt;</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>&lt;Description text...&gt;
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="gu">## Design Notes</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>&lt;Architecture or design thoughts...&gt;
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="gu">## Acceptance Criteria</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">- [ ]</span> Criterion 1
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="k">- [ ]</span> Criterion 2
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="gu">## Review Notes / Audit Trail</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>&lt;!-- Timestamped review comments appended by tk add-note --&gt;
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="gu">### Note (2026-09-25T10:30:00Z)</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>&lt;Comment content&gt;
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="gu">## Design</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>&lt;Architecture or design thoughts...&gt;
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="gu">## Acceptance Criteria</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>&lt;Criteria...&gt;
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="gu">## Notes</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="gs">**2026-09-25T10:30:00Z**</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>&lt;Note text appended by tk add-note&gt;
 </span></code></pre></div>
+<p><code>tk add-note</code> creates the <code>## Notes</code> section on first use and appends each note as a bold UTC timestamp line, a blank line, then the note text.</p>
+<h3 id="24-field-values">2.4 Field Values<a class="headerlink" href="#24-field-values" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Verbatim</strong>: values are stored exactly as given, including <code>/</code>, <code>&amp;</code>, <code>\</code> and <code>|</code>.</li>
+<li><strong>Quoting</strong>: a scalar is YAML-quoted (single quotes) only when plain YAML would read it differently: a leading indicator character (<code>[</code>, <code>]</code>, <code>{</code>, <code>}</code>, <code>#</code>, <code>&amp;</code>, <code>*</code>, <code>!</code>, <code>|</code>, <code>&gt;</code>, <code>'</code>, <code>"</code>, <code>%</code>, <code>@</code>, backtick, <code>,</code>), a leading <code>-</code>, <code>?</code> or <code>:</code> that stands alone or is followed by a space, an embedded <code>:</code> or <code>#</code>, a trailing <code>:</code>, or leading/trailing spaces. Other values are written unchanged.</li>
+<li><strong>Single line</strong>: frontmatter values must not contain a newline or carriage return. <code>tk</code> rejects them with <code>Error: &lt;field&gt; must be a single line (newlines are not allowed)</code> and exit code <code>1</code>; the value is not written. The title, description, design, acceptance and notes live in the body and may span lines.</li>
+<li><strong>Write failures</strong>: if a ticket file cannot be written (read-only directory, invalid path), <code>tk</code> prints <code>Error: cannot write ticket file '&lt;path&gt;'</code>, exits <code>1</code>, prints no ID, and fires no hooks.</li>
+</ul>
+<h3 id="25-repository-files">2.5 Repository Files<a class="headerlink" href="#25-repository-files" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Path</th>
+<th style="text-align: left;">Purpose</th>
+<th style="text-align: left;">In Git</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>.tickets/*.md</code></td>
+<td style="text-align: left;">Tickets</td>
+<td style="text-align: left;">Yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.tickets/.gitignore</code></td>
+<td style="text-align: left;">Written by <code>tk init</code>: <code>.locks/</code> and <code>.hooks/hooks.log</code> (missing lines appended only)</td>
+<td style="text-align: left;">Yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.tickets/.locks/</code></td>
+<td style="text-align: left;">Per-ticket lock directories (Section 4.2); contains a self-ignoring <code>.gitignore</code></td>
+<td style="text-align: left;">No</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.tickets/.hooks/post-write.d/</code></td>
+<td style="text-align: left;">Executable post-write hooks (Section 5.1)</td>
+<td style="text-align: left;">Optional</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.tickets/.hooks/hooks.log</code></td>
+<td style="text-align: left;">Hook output</td>
+<td style="text-align: left;">No</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>~/.local/state/tk/projects.json</code></td>
+<td style="text-align: left;">Projects registered by <code>tk init</code>, used by the Web UI project list</td>
+<td style="text-align: left;">Outside the repo</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="3-dependency-dag-semantics">3. Dependency DAG Semantics<a class="headerlink" href="#3-dependency-dag-semantics" title="Permanent link">&para;</a></h2>
 <h3 id="31-directed-acyclic-graph-dag-rules">3.1 Directed Acyclic Graph (DAG) Rules<a class="headerlink" href="#31-directed-acyclic-graph-dag-rules" title="Permanent link">&para;</a></h3>
@@ -1840,12 +1937,16 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><code>tk init [path]</code></td>
-<td style="text-align: left;">Initializes <code>.tickets/</code> tracking repository</td>
+<td style="text-align: left;"><code>tk init [dir]</code></td>
+<td style="text-align: left;">Initializes <code>.tickets/</code> with a closed setup ticket and <code>.tickets/.gitignore</code>; safe to re-run</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk create &lt;title&gt; [options]</code></td>
-<td style="text-align: left;">Creates ticket, prints generated ID to stdout</td>
+<td style="text-align: left;"><code>tk uninit [dir]</code></td>
+<td style="text-align: left;">Deletes the <code>.tickets/</code> directory (no confirmation)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk create [title] [options]</code></td>
+<td style="text-align: left;">Creates ticket, prints generated ID to stdout. Options: <code>-d/--description</code>, <code>--design</code>, <code>--acceptance</code>, <code>-t/--type</code>, <code>-p/--priority</code>, <code>-a/--assignee</code>, <code>--external-ref</code>, <code>--parent</code>, <code>--tags</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk start &lt;id&gt;</code></td>
@@ -1876,36 +1977,36 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 <td style="text-align: left;">Removes dependency relationship</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk link &lt;id&gt; &lt;link-id&gt;</code></td>
-<td style="text-align: left;">Adds symmetric relational link between tickets</td>
+<td style="text-align: left;"><code>tk link &lt;id&gt; &lt;id&gt; [id...]</code></td>
+<td style="text-align: left;">Adds symmetric relational links between tickets</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk unlink &lt;id&gt; &lt;link-id&gt;</code></td>
+<td style="text-align: left;"><code>tk unlink &lt;id&gt; &lt;target-id&gt;</code></td>
 <td style="text-align: left;">Removes symmetric relational link between tickets</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk dep tree &lt;id&gt;</code></td>
-<td style="text-align: left;">Prints hierarchical ASCII dependency tree</td>
+<td style="text-align: left;"><code>tk dep tree [--full] &lt;id&gt;</code></td>
+<td style="text-align: left;">Prints hierarchical ASCII dependency tree (<code>--full</code> disables deduplication)</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk dep cycle</code></td>
 <td style="text-align: left;">Traverses graph and outputs detected cycles</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk ready</code></td>
-<td style="text-align: left;">Lists unblocked, actionable tickets</td>
+<td style="text-align: left;"><code>tk ready [-a X] [-T X]</code></td>
+<td style="text-align: left;">Lists unblocked, actionable tickets (filter by assignee or tag)</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk blocked</code></td>
+<td style="text-align: left;"><code>tk blocked [-a X] [-T X]</code></td>
 <td style="text-align: left;">Lists blocked tickets with unresolved blockers</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk closed [--limit=N]</code></td>
-<td style="text-align: left;">Lists recently closed tickets</td>
+<td style="text-align: left;"><code>tk closed [--limit=N] [-a X] [-T X]</code></td>
+<td style="text-align: left;">Lists recently closed tickets by file mtime (default 20)</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk ls</code> / <code>tk list [options]</code></td>
-<td style="text-align: left;">Lists tickets (default: hides closed, limit 10, with filters)</td>
+<td style="text-align: left;">Lists tickets (default: hides closed, limit 10). Options: <code>-s/--status</code>, <code>-a/--assignee</code>, <code>-t/--type</code>, <code>-p/--priority</code>, <code>-T/--tag</code>, <code>-n/--limit</code>, <code>--full</code>, <code>--all</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk edit &lt;id&gt;</code></td>
@@ -1913,7 +2014,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk query [jq-filter]</code></td>
-<td style="text-align: left;">Outputs tickets as JSON lines, with optional jq filter</td>
+<td style="text-align: left;">Outputs tickets as JSON lines; the optional filter requires <code>jq</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk find &lt;search-term&gt;</code></td>
@@ -1921,30 +2022,35 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk show &lt;id&gt;</code></td>
-<td style="text-align: left;">Displays ticket metadata and full markdown body</td>
+<td style="text-align: left;">Displays ticket metadata and full markdown body (paged via <code>$TICKET_PAGER</code>/<code>$PAGER</code> on a terminal)</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk update &lt;id&gt; [options]</code></td>
-<td style="text-align: left;">Updates fields (title, desc, priority, tags, etc.)</td>
+<td style="text-align: left;">Updates fields. Options: <code>--title</code>, <code>-d/--description</code>, <code>-p/--priority</code>, <code>-t/--type</code>, <code>-a/--assignee</code>, <code>--tags</code>, <code>--design</code>, <code>--acceptance</code>, <code>--parent</code>, <code>--external-ref</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk add-note &lt;id&gt; [text]</code></td>
-<td style="text-align: left;">Appends timestamped note</td>
+<td style="text-align: left;">Appends timestamped note (reads stdin when <code>text</code> is omitted)</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk agent-skill [--install]</code></td>
-<td style="text-align: left;">Displays or installs agent skill to <code>~/.agents/skills/tk/</code></td>
+<td style="text-align: left;"><code>tk agent-skill [--install] [--path]</code></td>
+<td style="text-align: left;">Displays the agent skill, installs it to <code>~/.agents/skills/tk/</code> (or <code>$AGENTS_SKILLS_DIR</code>), or prints its installed path</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk version</code> / <code>--version</code></td>
+<td style="text-align: left;"><code>tk version</code> / <code>--version</code> / <code>-v</code></td>
 <td style="text-align: left;">Prints version, description, and license information</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk help</code></td>
+<td style="text-align: left;"><code>tk help</code> / <code>--help</code> / <code>-h</code></td>
 <td style="text-align: left;">Displays available built-in commands and discovered plugins</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk super &lt;cmd&gt; [args]</code></td>
+<td style="text-align: left;">Runs a built-in command, bypassing a plugin with the same name</td>
 </tr>
 </tbody>
 </table>
+<p>All commands accept full or partial ticket IDs.</p>
 <h3 id="41-exit-codes">4.1 Exit Codes<a class="headerlink" href="#41-exit-codes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -1960,7 +2066,7 @@ Architecture changes, format updates, and new features follow a <strong>spec-dri
 </tr>
 <tr>
 <td style="text-align: left;"><code>1</code></td>
-<td style="text-align: left;">Error (usage, ticket not found, invalid value)</td>
+<td style="text-align: left;">Error (usage, ticket not found, invalid or multi-line value, ticket file not writable)</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>3</code></td>

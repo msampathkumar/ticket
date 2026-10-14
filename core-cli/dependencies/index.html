@@ -731,6 +731,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#ready-queue-for-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ready Queue for Agents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1334,6 +1345,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#ready-queue-for-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ready Queue for Agents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1417,25 +1439,66 @@
 
   <h1>Dependency Intelligence</h1>
 
-<p><code>ticket</code> (<code>tk</code>) treats task dependencies as a <strong>Directed Acyclic Graph (DAG)</strong>. This ensures tasks are completed in the correct logical sequence without circular deadlocks.</p>
+<p><code>ticket</code> (<code>tk</code>) treats task dependencies as a <strong>Directed Acyclic Graph (DAG)</strong>, so <code>tk ready</code> can compute the next actionable work deterministically.</p>
 <hr />
 <h2 id="how-dependencies-work">How Dependencies Work<a class="headerlink" href="#how-dependencies-work" title="Permanent link">&para;</a></h2>
-<p>When task <code>B</code> depends on task <code>A</code>:
-1. <code>B</code> is considered <strong>blocked</strong> until <code>A</code> is closed.
-2. <code>tk ready</code> will only show <code>B</code> after <code>A</code> transitions to <code>closed</code>.
-3. Closing <code>A</code> automatically unblocks <code>B</code>.</p>
+<p>When ticket <code>B</code> depends on ticket <code>A</code> (<code>deps: [A]</code> in <code>B</code>'s frontmatter):</p>
+<ol>
+<li><code>B</code> is <strong>blocked</strong> while <code>A</code> is <code>open</code> or <code>in_progress</code>.</li>
+<li><code>tk ready</code> lists <code>B</code> only after <code>A</code> is <code>closed</code>; until then <code>tk blocked</code> lists it with its blockers.</li>
+<li>Closing <code>A</code> unblocks <code>B</code> with no further action.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Relation</th>
+<th style="text-align: left;">Field</th>
+<th style="text-align: left;">Blocks?</th>
+<th style="text-align: left;">Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Dependency</td>
+<td style="text-align: left;"><code>deps</code></td>
+<td style="text-align: left;">Yes</td>
+<td style="text-align: left;"><code>tk dep &lt;id&gt; &lt;dep-id&gt;</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Link</td>
+<td style="text-align: left;"><code>links</code> (symmetric)</td>
+<td style="text-align: left;">No</td>
+<td style="text-align: left;"><code>tk link &lt;id&gt; &lt;id&gt; [id...]</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Parent/subtask</td>
+<td style="text-align: left;"><code>parent</code></td>
+<td style="text-align: left;">No</td>
+<td style="text-align: left;"><code>tk create --parent &lt;id&gt;</code>, <code>tk update &lt;id&gt; --parent &lt;id&gt;</code></td>
+</tr>
+</tbody>
+</table>
 <h3 id="adding-dependencies">Adding Dependencies<a class="headerlink" href="#adding-dependencies" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># tic-backend-api must finish before tic-frontend-ui can start</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>dep<span class="w"> </span>tic-frontend-ui<span class="w"> </span>tic-backend-api
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># The API ticket must close before the UI ticket is ready</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>dep<span class="w"> </span>web-ui3k9a<span class="w"> </span>api-7f2c1d
 </span></code></pre></div>
+<p>Both IDs must exist; <code>tk dep</code> exits <code>1</code> if either is not found.</p>
 <h3 id="cycle-detection">Cycle Detection<a class="headerlink" href="#cycle-detection" title="Permanent link">&para;</a></h3>
-<p>To prevent circular deadlocks (e.g., A depends on B, B depends on A), <code>tk</code> includes native cycle detection:
+<p><code>tk dep</code> does not reject a dependency that closes a loop. Run <code>tk dep cycle</code> to report cycles among open tickets; tickets in a cycle never become ready until one edge is removed with <code>tk undep</code>.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>cycle
-</span></code></pre></div></p>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># Cycle 1: web-ui3k9a -&gt; api-7f2c1d -&gt; web-ui3k9a</span>
+</span></code></pre></div>
 <h3 id="viewing-dependency-trees">Viewing Dependency Trees<a class="headerlink" href="#viewing-dependency-trees" title="Permanent link">&para;</a></h3>
-<p>Inspect recursive upstream and downstream relationships:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>tic-frontend-ui
-</span></code></pre></div></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>web-ui3k9a<span class="w">          </span><span class="c1"># repeated subtrees are shown once</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>tk<span class="w"> </span>dep<span class="w"> </span>tree<span class="w"> </span>--full<span class="w"> </span>web-ui3k9a<span class="w">   </span><span class="c1"># disable deduplication</span>
+</span></code></pre></div>
+<hr />
+<h2 id="ready-queue-for-agents">Ready Queue for Agents<a class="headerlink" href="#ready-queue-for-agents" title="Permanent link">&para;</a></h2>
+<p>Many agents can share one queue. Each takes a ready ticket and claims it atomically:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>ready<span class="w"> </span>-T<span class="w"> </span>backend<span class="w">                              </span><span class="c1"># pick a candidate</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tk<span class="w"> </span>start<span class="w"> </span>api-7f2c1d<span class="w"> </span>--claim<span class="w"> </span>--assignee<span class="w"> </span>agent-2<span class="w">   </span><span class="c1"># exit 3 if someone else claimed it first</span>
+</span></code></pre></div>
+<p>A claim that loses the race exits <code>3</code>; pick another ticket from <code>tk ready</code>. See <a href="../commands/#status-and-claiming">Command Reference</a>.</p>
 
 
 

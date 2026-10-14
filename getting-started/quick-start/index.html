@@ -424,10 +424,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-create-a-task" class="md-nav__link">
+  <a href="#step-2-create-tasks" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 2: Create a Task
+        Step 2: Create Tasks
       </span>
     </span>
   </a>
@@ -435,10 +435,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-3-check-actionable-work-tk-ready" class="md-nav__link">
+  <a href="#step-3-add-a-dependency" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 3: Check Actionable Work (<code>tk ready</code>)
+        Step 3: Add a Dependency
       </span>
     </span>
   </a>
@@ -446,10 +446,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-4-claim-work-on-the-task" class="md-nav__link">
+  <a href="#step-4-check-actionable-work-tk-ready" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 4: Claim &amp; Work on the Task
+        Step 4: Check Actionable Work (<code>tk ready</code>)
       </span>
     </span>
   </a>
@@ -457,10 +457,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-5-close-the-task-unblock-dependents" class="md-nav__link">
+  <a href="#step-5-claim-work-on-the-task" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 5: Close the Task &amp; Unblock Dependents
+        Step 5: Claim &amp; Work on the Task
       </span>
     </span>
   </a>
@@ -468,10 +468,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-6-launch-the-interactive-web-ui" class="md-nav__link">
+  <a href="#step-6-close-the-task-unblock-dependents" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 6: Launch the Interactive Web UI
+        Step 6: Close the Task &amp; Unblock Dependents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-launch-the-web-ui-optional-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Step 7: Launch the Web UI (Optional Plugin)
       </span>
     </span>
   </a>
@@ -1312,10 +1323,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-create-a-task" class="md-nav__link">
+  <a href="#step-2-create-tasks" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 2: Create a Task
+        Step 2: Create Tasks
       </span>
     </span>
   </a>
@@ -1323,10 +1334,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-3-check-actionable-work-tk-ready" class="md-nav__link">
+  <a href="#step-3-add-a-dependency" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 3: Check Actionable Work (<code>tk ready</code>)
+        Step 3: Add a Dependency
       </span>
     </span>
   </a>
@@ -1334,10 +1345,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-4-claim-work-on-the-task" class="md-nav__link">
+  <a href="#step-4-check-actionable-work-tk-ready" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 4: Claim &amp; Work on the Task
+        Step 4: Check Actionable Work (<code>tk ready</code>)
       </span>
     </span>
   </a>
@@ -1345,10 +1356,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-5-close-the-task-unblock-dependents" class="md-nav__link">
+  <a href="#step-5-claim-work-on-the-task" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 5: Close the Task &amp; Unblock Dependents
+        Step 5: Claim &amp; Work on the Task
       </span>
     </span>
   </a>
@@ -1356,10 +1367,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-6-launch-the-interactive-web-ui" class="md-nav__link">
+  <a href="#step-6-close-the-task-unblock-dependents" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Step 6: Launch the Interactive Web UI
+        Step 6: Close the Task &amp; Unblock Dependents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-launch-the-web-ui-optional-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Step 7: Launch the Web UI (Optional Plugin)
       </span>
     </span>
   </a>
@@ -1454,34 +1476,45 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>my-project
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tk<span class="w"> </span>init
 </span></code></pre></div>
-<p>This creates a <code>.tickets/</code> directory where all tasks are stored as plain Markdown files with YAML frontmatter.</p>
-<h2 id="step-2-create-a-task">Step 2: Create a Task<a class="headerlink" href="#step-2-create-a-task" title="Permanent link">&para;</a></h2>
-<p>Create your first task with priority and tags:</p>
+<p>This creates <code>.tickets/</code> with a closed setup ticket and a <code>.tickets/.gitignore</code> that keeps lock files and the hook log out of Git. Tickets are plain Markdown files with YAML frontmatter; commit them with your code. (<code>tk create</code> also initializes <code>.tickets/</code> if it is missing.)</p>
+<h2 id="step-2-create-tasks">Step 2: Create Tasks<a class="headerlink" href="#step-2-create-tasks" title="Permanent link">&para;</a></h2>
+<p>Create tasks with priority and tags:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Implement user authentication"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"Add JWT-based auth to FastAPI backend"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--tags<span class="w"> </span>backend,security
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># myp-a1b2c3</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>tk<span class="w"> </span>create<span class="w"> </span><span class="s2">"Add login page"</span><span class="w"> </span>--tags<span class="w"> </span>frontend
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># myp-d4e5f6</span>
 </span></code></pre></div>
-<p><code>tk</code> prints the generated task ID (e.g., <code>tic-abc1</code>).</p>
-<h2 id="step-3-check-actionable-work-tk-ready">Step 3: Check Actionable Work (<code>tk ready</code>)<a class="headerlink" href="#step-3-check-actionable-work-tk-ready" title="Permanent link">&para;</a></h2>
-<p>Run <code>tk ready</code> to list unblocked tasks whose dependencies are fully satisfied:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>ready
+<p><code>tk</code> prints the generated ID: a prefix from the folder name plus a 6-character random hash. Commands accept partial IDs (<code>tk show a1b</code>).</p>
+<h2 id="step-3-add-a-dependency">Step 3: Add a Dependency<a class="headerlink" href="#step-3-add-a-dependency" title="Permanent link">&para;</a></h2>
+<p>The login page needs the auth work first:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tk<span class="w"> </span>dep<span class="w"> </span>myp-d4e5f6<span class="w"> </span>myp-a1b2c3
 </span></code></pre></div>
-<h2 id="step-4-claim-work-on-the-task">Step 4: Claim &amp; Work on the Task<a class="headerlink" href="#step-4-claim-work-on-the-task" title="Permanent link">&para;</a></h2>
+<h2 id="step-4-check-actionable-work-tk-ready">Step 4: Check Actionable Work (<code>tk ready</code>)<a class="headerlink" href="#step-4-check-actionable-work-tk-ready" title="Permanent link">&para;</a></h2>
+<p><code>tk ready</code> lists tickets whose dependencies are all closed:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>ready
+</span></code></pre></div>
+<p>Only <code>myp-a1b2c3</code> is listed; <code>tk blocked</code> shows <code>myp-d4e5f6</code> waiting on it.</p>
+<h2 id="step-5-claim-work-on-the-task">Step 5: Claim &amp; Work on the Task<a class="headerlink" href="#step-5-claim-work-on-the-task" title="Permanent link">&para;</a></h2>
 <p>Mark the task as in progress:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tk<span class="w"> </span>start<span class="w"> </span>tic-abc1
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>start<span class="w"> </span>myp-a1b2c3
 </span></code></pre></div>
-<p>Add review notes or progress logs:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tk<span class="w"> </span>add-note<span class="w"> </span>tic-abc1<span class="w"> </span><span class="s2">"Completed token generation logic and unit tests."</span>
+<p>When several agents or people share the queue, claim instead. The claim sets the assignee and status in one locked step and exits <code>3</code> if someone else already holds the ticket:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tk<span class="w"> </span>start<span class="w"> </span>myp-a1b2c3<span class="w"> </span>--claim
 </span></code></pre></div>
-<h2 id="step-5-close-the-task-unblock-dependents">Step 5: Close the Task &amp; Unblock Dependents<a class="headerlink" href="#step-5-close-the-task-unblock-dependents" title="Permanent link">&para;</a></h2>
-<p>When finished, close the task:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tk<span class="w"> </span>close<span class="w"> </span>tic-abc1
+<p>Add progress notes:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tk<span class="w"> </span>add-note<span class="w"> </span>myp-a1b2c3<span class="w"> </span><span class="s2">"Completed token generation logic and unit tests."</span>
 </span></code></pre></div>
-<p>This automatically updates the status and unblocks any downstream dependent tasks.</p>
-<h2 id="step-6-launch-the-interactive-web-ui">Step 6: Launch the Interactive Web UI<a class="headerlink" href="#step-6-launch-the-interactive-web-ui" title="Permanent link">&para;</a></h2>
-<p>Launch the 4-lane Kanban board and DAG Mind Map:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tk<span class="w"> </span>webui
+<h2 id="step-6-close-the-task-unblock-dependents">Step 6: Close the Task &amp; Unblock Dependents<a class="headerlink" href="#step-6-close-the-task-unblock-dependents" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>tk<span class="w"> </span>close<span class="w"> </span>myp-a1b2c3
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>tk<span class="w"> </span>ready<span class="w">    </span><span class="c1"># myp-d4e5f6 is now ready</span>
+</span></code></pre></div>
+<h2 id="step-7-launch-the-web-ui-optional-plugin">Step 7: Launch the Web UI (Optional Plugin)<a class="headerlink" href="#step-7-launch-the-web-ui-optional-plugin" title="Permanent link">&para;</a></h2>
+<p>If you installed the Web UI (<code>./install.sh --full</code> or <code>--webui</code>), open the Kanban board and DAG Mind Map:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tk<span class="w"> </span>webui
 </span></code></pre></div>
 <p>Open <a href="http://localhost:8475">http://localhost:8475</a> in your browser.</p>
 

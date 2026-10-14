@@ -397,6 +397,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installation-flags" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1285,6 +1296,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installation-flags" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1393,7 +1415,7 @@
 
   <h1>Installation</h1>
 
-<p><code>ticket</code> (<code>tk</code>) is designed with a zero-dependency POSIX Bash core and modular optional plugins. You can install only what you need.</p>
+<p><code>ticket</code> (<code>tk</code>) has a single-file Bash core with no runtime dependencies. Plugins are optional; install only what you need.</p>
 <h2 id="quick-install">Quick Install<a class="headerlink" href="#quick-install" title="Permanent link">&para;</a></h2>
 <p>Clone the repository and run the modular installer:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/msampathkumar/ticket.git
@@ -1402,64 +1424,89 @@
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Full Suite (CLI + Web UI + Agent Skill) — default</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>./install.sh<span class="w"> </span>--full
 </span></code></pre></div>
-<p>Binaries are installed to <code>~/.local/bin/</code> (<code>tk</code>, <code>tk-webui</code>, plus optional plugin binaries). Ensure <code>~/.local/bin</code> is in your <code>$PATH</code>.</p>
+<p>Binaries are installed to <code>~/.local/bin/</code> (override with <code>BIN_DIR</code>). Ensure that directory is on your <code>$PATH</code>.</p>
 <hr />
-<h2 id="installation-flags">Installation Flags<a class="headerlink" href="#installation-flags" title="Permanent link">&para;</a></h2>
-<p>The installer supports composable flags so you can install precisely the components you require:</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<p><strong>Core CLI</strong>: Bash 3.2+ and standard Unix tools (<code>awk</code>, <code>sed</code>, <code>grep</code>, <code>find</code>, <code>mkdir</code>, <code>date</code>) on macOS or Linux. Python and Node are not used.</p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">Flag</th>
-<th style="text-align: left;">Description</th>
-<th style="text-align: left;">Mandatory Dependencies</th>
+<th style="text-align: left;">Optional tool</th>
+<th style="text-align: left;">Used for</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><code>--core</code></td>
-<td style="text-align: left;">Installs only the core <code>tk</code> POSIX Bash CLI</td>
-<td style="text-align: left;"><strong>Zero</strong> (Pure Bash)</td>
+<td style="text-align: left;"><code>jq</code></td>
+<td style="text-align: left;"><code>tk query &lt;filter&gt;</code> (unfiltered <code>tk query</code> works without it)</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>--webui</code></td>
-<td style="text-align: left;">Installs the interactive Kanban &amp; DAG Web UI (<code>tk-webui</code>)</td>
-<td style="text-align: left;">Python 3.9+, FastAPI</td>
+<td style="text-align: left;"><code>rg</code> (ripgrep)</td>
+<td style="text-align: left;">Faster <code>tk find</code>; <code>grep</code> is used otherwise</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>--skill</code></td>
-<td style="text-align: left;">Installs the AI agent skill (<code>tk-agent-skill</code>)</td>
+<td style="text-align: left;"><code>git</code></td>
+<td style="text-align: left;">Sharing tickets; default assignee from <code>git config user.name</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="installation-flags">Installation Flags<a class="headerlink" href="#installation-flags" title="Permanent link">&para;</a></h2>
+<p>Flags accumulate, so any combination works (e.g. <code>./install.sh --core --github</code>):</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Flag</th>
+<th style="text-align: left;">Installs</th>
+<th style="text-align: left;">Requires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>--core</code>, <code>-c</code></td>
+<td style="text-align: left;">Core <code>tk</code> CLI</td>
+<td style="text-align: left;">Bash 3.2+</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--webui</code>, <code>-w</code></td>
+<td style="text-align: left;">Web UI plugin (<code>tk webui</code>) in a local <code>.venv</code></td>
+<td style="text-align: left;">Python 3.9+ with <code>uv</code> or <code>pip</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--skill</code>, <code>-s</code></td>
+<td style="text-align: left;">Agent skill to <code>~/.agents/skills/tk/SKILL.md</code></td>
 <td style="text-align: left;">None</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>--github</code></td>
-<td style="text-align: left;">Installs the optional GitHub sync plugin (<code>tk-github</code>)</td>
-<td style="text-align: left;">Python / Bash</td>
+<td style="text-align: left;"><code>--github</code>, <code>-g</code></td>
+<td style="text-align: left;">GitHub import plugin (<code>tk github</code>)</td>
+<td style="text-align: left;"><code>gh</code> (authenticated), <code>jq</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>--scion-taskforce</code></td>
-<td style="text-align: left;">Installs the autonomous SCION Task Force worker orchestrator (<code>tk-scion-taskforce</code>)</td>
+<td style="text-align: left;"><code>--scion-taskforce</code>, <code>-t</code></td>
+<td style="text-align: left;">SCION Task Force plugin (<code>tk scion-taskforce</code>)</td>
 <td style="text-align: left;">Python 3.9+, <code>scion</code> CLI</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>--full</code></td>
-<td style="text-align: left;"><strong>(Default)</strong> Installs Core CLI, Web UI, and Agent Skill</td>
-<td style="text-align: left;">Python 3.9+ (for Web UI)</td>
+<td style="text-align: left;"><code>--full</code>, <code>-f</code></td>
+<td style="text-align: left;"><strong>(Default)</strong> Core, Web UI and Agent Skill</td>
+<td style="text-align: left;">Python 3.9+ (for the Web UI)</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>--all</code></td>
-<td style="text-align: left;">Installs everything, including optional plugins</td>
-<td style="text-align: left;">Python 3.9+, <code>scion</code> CLI</td>
+<td style="text-align: left;">Everything above</td>
+<td style="text-align: left;">All of the above</td>
 </tr>
 </tbody>
 </table>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Install only the lightweight core CLI (no Python/Node required)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Core CLI only (no Python required)</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>./install.sh<span class="w"> </span>--core
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Install Core CLI + GitHub sync plugin</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Core CLI + GitHub import plugin</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>./install.sh<span class="w"> </span>--core<span class="w"> </span>--github
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Install everything including optional plugins</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Everything, including the GitHub and SCION Task Force plugins</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>./install.sh<span class="w"> </span>--all
 </span></code></pre></div>
 

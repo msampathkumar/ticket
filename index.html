@@ -1430,7 +1430,7 @@
 <hr />
 <h2 id="architecture-workflow">Architecture &amp; Workflow<a class="headerlink" href="#architecture-workflow" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>graph TD
-    A[".tickets/*.md&lt;br/&gt;(Plain Text &amp; Git)"] --&gt; B["Core POSIX CLI&lt;br/&gt;(tk ready, tk start, tk dep)"]
+    A[".tickets/*.md&lt;br/&gt;(Plain Text &amp; Git)"] --&gt; B["Core Bash CLI&lt;br/&gt;(tk ready, tk start, tk dep)"]
     B --&gt; C["Interactive Web UI&lt;br/&gt;(Kanban &amp; DAG Mind Map)"]
     B --&gt; D["AI Agent Skill&lt;br/&gt;(Automated 5-Step Loop)"]
 
@@ -1443,15 +1443,16 @@
 <ul>
 <li><strong>Plain Text Storage</strong>: Tasks reside in <code>.tickets/*.md</code> files with YAML frontmatter, versioned directly in Git alongside the codebase.</li>
 <li><strong>DAG Dependency Tracking</strong>: Native support for parent-child hierarchies, blockers, cycle detection, and automated downstream unblocking.</li>
-<li><strong>Fast POSIX Core</strong>: Core CLI runs on portable POSIX Bash with zero mandatory runtime dependencies (no Python or Node required for base operations).</li>
+<li><strong>Portable Bash Core</strong>: One Bash 3.2+ script using standard Unix tools; no Python or Node. <code>jq</code> is optional (only for <code>tk query</code> filters).</li>
+<li><strong>Safe for Concurrent Agents</strong>: <code>tk start --claim</code> claims a ticket atomically under a per-ticket lock, exiting <code>3</code> if another agent got there first.</li>
 <li><strong>AI Agent Integration</strong>: Deterministic 5-step operational loop, reusable agent skill (<code>agent-skill/tk/SKILL.md</code>), and machine-readable context endpoints.</li>
 </ul>
 <hr />
 <h2 id="official-plugins">Official Plugins<a class="headerlink" href="#official-plugins" title="Permanent link">&para;</a></h2>
-<p>Extend <code>ticket</code> with modular plugins discovered automatically via <code>$PATH</code>:</p>
+<p>Extend <code>ticket</code> with optional plugins discovered automatically via <code>$PATH</code>:</p>
 <ul>
 <li><strong><a href="plugins/webui/">Web UI (<code>tk webui</code>)</a></strong>: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.</li>
-<li><strong><a href="plugins/github/">GitHub Sync (<code>tk github</code>)</a></strong>: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.</li>
+<li><strong><a href="plugins/github/">GitHub Sync (<code>tk github</code>)</a></strong>: One-way import of GitHub issues and pull requests into local tickets.</li>
 <li><strong><a href="plugins/scion-taskforce/">SCION Task Force (<code>tk scion-taskforce</code>)</a></strong>: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.</li>
 </ul>
 <p>Learn how to write custom plugins in pure Bash or Python in the <a href="plugins/architecture/">Plugin Architecture Guide</a>.</p>
@@ -1464,7 +1465,7 @@
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Full Suite (CLI + Web UI + Agent Skill) — default</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>./install.sh<span class="w"> </span>--full
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Core CLI Only (Pure Bash, zero Python dependencies)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Core CLI only (pure Bash, no Python)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>./install.sh<span class="w"> </span>--core
 </span></code></pre></div>
 <hr />

@@ -655,10 +655,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#core-crud-lifecycle" class="md-nav__link">
+  <a href="#repository" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Core CRUD &amp; Lifecycle
+        Repository
       </span>
     </span>
   </a>
@@ -666,10 +666,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dependency-intelligence" class="md-nav__link">
+  <a href="#create-show-update" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Dependency Intelligence
+        Create, Show, Update
       </span>
     </span>
   </a>
@@ -677,10 +677,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#querying-listing" class="md-nav__link">
+  <a href="#status-and-claiming" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Querying &amp; Listing
+        Status and Claiming
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies-and-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dependencies and Links
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queues-and-listing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Queues and Listing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Other
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Exit Codes
       </span>
     </span>
   </a>
@@ -1268,10 +1312,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#core-crud-lifecycle" class="md-nav__link">
+  <a href="#repository" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Core CRUD &amp; Lifecycle
+        Repository
       </span>
     </span>
   </a>
@@ -1279,10 +1323,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dependency-intelligence" class="md-nav__link">
+  <a href="#create-show-update" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Dependency Intelligence
+        Create, Show, Update
       </span>
     </span>
   </a>
@@ -1290,10 +1334,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#querying-listing" class="md-nav__link">
+  <a href="#status-and-claiming" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Querying &amp; Listing
+        Status and Claiming
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies-and-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dependencies and Links
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queues-and-listing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Queues and Listing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Other
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Exit Codes
       </span>
     </span>
   </a>
@@ -1383,9 +1471,9 @@
 
   <h1>Command Reference</h1>
 
-<p>The <code>tk</code> CLI provides commands for task lifecycle management, dependency tracking, and querying.</p>
+<p>The <code>tk</code> CLI covers the ticket lifecycle, dependency tracking, and querying. Every command accepts a full or partial ticket ID (<code>tk show 5c4</code> matches <code>nw-5c46a1</code>). Run <code>tk help</code> for the built-in summary and the list of installed plugins.</p>
 <hr />
-<h2 id="core-crud-lifecycle">Core CRUD &amp; Lifecycle<a class="headerlink" href="#core-crud-lifecycle" title="Permanent link">&para;</a></h2>
+<h2 id="repository">Repository<a class="headerlink" href="#repository" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1396,49 +1484,157 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><code>tk init [path]</code></td>
-<td style="text-align: left;">Initialize <code>.tickets</code> repository</td>
+<td style="text-align: left;"><code>tk init [dir]</code></td>
+<td style="text-align: left;">Create <code>.tickets/</code> with a closed setup ticket and <code>.tickets/.gitignore</code>. Safe to re-run.</td>
 <td style="text-align: left;"><code>tk init</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk create [title]</code></td>
-<td style="text-align: left;">Create a new ticket (returns ID)</td>
+<td style="text-align: left;"><code>tk uninit [dir]</code></td>
+<td style="text-align: left;">Delete the <code>.tickets/</code> directory and every ticket in it. No confirmation.</td>
+<td style="text-align: left;"><code>tk uninit</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>tk create</code> also initializes <code>.tickets/</code> (with the setup ticket) in the current directory when none is found.</p>
+<hr />
+<h2 id="create-show-update">Create, Show, Update<a class="headerlink" href="#create-show-update" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Command</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>tk create [title] [options]</code></td>
+<td style="text-align: left;">Create a ticket and print its ID</td>
 <td style="text-align: left;"><code>tk create "Fix login bug" -p 0 -t bug</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk show &lt;id&gt;</code></td>
-<td style="text-align: left;">Display full ticket details</td>
-<td style="text-align: left;"><code>tk show tic-c83r</code></td>
+<td style="text-align: left;">Print the ticket (uses <code>$TICKET_PAGER</code> or <code>$PAGER</code> on a terminal)</td>
+<td style="text-align: left;"><code>tk show tic-c83r2a</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk update &lt;id&gt;</code></td>
-<td style="text-align: left;">Update title, description, priority, tags</td>
-<td style="text-align: left;"><code>tk update tic-c83r -p 1 --tags urgent</code></td>
-</tr>
-<tr>
-<td style="text-align: left;"><code>tk start &lt;id&gt;</code></td>
-<td style="text-align: left;">Transition ticket to <code>in_progress</code></td>
-<td style="text-align: left;"><code>tk start tic-c83r</code></td>
-</tr>
-<tr>
-<td style="text-align: left;"><code>tk close &lt;id&gt;</code></td>
-<td style="text-align: left;">Transition ticket to <code>closed</code></td>
-<td style="text-align: left;"><code>tk close tic-c83r</code></td>
-</tr>
-<tr>
-<td style="text-align: left;"><code>tk reopen &lt;id&gt;</code></td>
-<td style="text-align: left;">Transition ticket back to <code>open</code></td>
-<td style="text-align: left;"><code>tk reopen tic-c83r</code></td>
+<td style="text-align: left;"><code>tk update &lt;id&gt; [options]</code></td>
+<td style="text-align: left;">Update fields in place</td>
+<td style="text-align: left;"><code>tk update tic-c83r2a -p 1 --tags urgent</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk edit &lt;id&gt;</code></td>
-<td style="text-align: left;">Open ticket markdown file in <code>$EDITOR</code></td>
-<td style="text-align: left;"><code>tk edit tic-c83r</code></td>
+<td style="text-align: left;">Open the ticket file in <code>$EDITOR</code></td>
+<td style="text-align: left;"><code>tk edit tic-c83r2a</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk add-note &lt;id&gt; [text]</code></td>
+<td style="text-align: left;">Append a timestamped note; reads stdin when <code>text</code> is omitted</td>
+<td style="text-align: left;"><code>echo "Done" \| tk add-note tic-1</code></td>
 </tr>
 </tbody>
 </table>
+<p><strong><code>create</code> options</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Option</th>
+<th style="text-align: left;">Meaning</th>
+<th style="text-align: left;">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>-d</code>, <code>--description</code></td>
+<td style="text-align: left;">Description text</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--design</code></td>
+<td style="text-align: left;">Design notes</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--acceptance</code></td>
+<td style="text-align: left;">Acceptance criteria</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-t</code>, <code>--type</code></td>
+<td style="text-align: left;"><code>bug</code>, <code>feature</code>, <code>task</code>, <code>epic</code>, <code>chore</code></td>
+<td style="text-align: left;"><code>task</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-p</code>, <code>--priority</code></td>
+<td style="text-align: left;"><code>0</code> (highest) to <code>4</code></td>
+<td style="text-align: left;"><code>2</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-a</code>, <code>--assignee</code></td>
+<td style="text-align: left;">Assignee</td>
+<td style="text-align: left;"><code>git config user.name</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--external-ref</code></td>
+<td style="text-align: left;">External reference, e.g. <code>gh-123</code>, <code>JIRA-456</code></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--parent</code></td>
+<td style="text-align: left;">Parent ticket ID</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--tags</code></td>
+<td style="text-align: left;">Comma-separated tags</td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>update</code> options</strong>: <code>--title</code>, <code>-d</code>/<code>--description</code>, <code>-p</code>/<code>--priority</code>, <code>-t</code>/<code>--type</code>, <code>-a</code>/<code>--assignee</code>, <code>--tags</code>, <code>--design</code>, <code>--acceptance</code>, <code>--parent</code>, <code>--external-ref</code>.</p>
+<p>Values are stored verbatim, including <code>/</code>, <code>&amp;</code>, <code>\</code> and <code>|</code>. Frontmatter fields (assignee, tags, external ref, parent, and other single-line values) reject newlines with an error. See <a href="../../SPEC/">SPEC §2.4</a>.</p>
 <hr />
-<h2 id="dependency-intelligence">Dependency Intelligence<a class="headerlink" href="#dependency-intelligence" title="Permanent link">&para;</a></h2>
+<h2 id="status-and-claiming">Status and Claiming<a class="headerlink" href="#status-and-claiming" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Command</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>tk start &lt;id&gt;</code></td>
+<td style="text-align: left;">Set status to <code>in_progress</code></td>
+<td style="text-align: left;"><code>tk start tic-c83r2a</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk start &lt;id&gt; --claim [--assignee X]</code></td>
+<td style="text-align: left;">Set <code>in_progress</code> and the assignee in one locked step</td>
+<td style="text-align: left;"><code>tk start tic-c83r2a --claim --assignee agent-2</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk close &lt;id&gt;</code></td>
+<td style="text-align: left;">Set status to <code>closed</code></td>
+<td style="text-align: left;"><code>tk close tic-c83r2a</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk reopen &lt;id&gt;</code></td>
+<td style="text-align: left;">Set status to <code>open</code></td>
+<td style="text-align: left;"><code>tk reopen tic-c83r2a</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk status &lt;id&gt; &lt;status&gt;</code></td>
+<td style="text-align: left;">Set <code>open</code>, <code>in_progress</code>, or <code>closed</code></td>
+<td style="text-align: left;"><code>tk status tic-c83r2a open</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>--claim</code> defaults the assignee to <code>git config user.name</code>, else <code>$USER</code>. It fails with exit code <code>3</code> when the ticket is already <code>in_progress</code> for a different assignee; re-claiming your own ticket succeeds. Agents that share one identity must pass distinct <code>--assignee</code> values.</p>
+<p>Status writes and claims run under a per-ticket lock in <code>.tickets/.locks/</code>. If another <code>tk</code> process holds the lock for longer than <code>TK_LOCK_TIMEOUT</code> seconds (default <code>10</code>), the command exits <code>4</code>. See <a href="../../SPEC/">SPEC §4.2</a>.</p>
+<hr />
+<h2 id="dependencies-and-links">Dependencies and Links<a class="headerlink" href="#dependencies-and-links" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1450,38 +1646,38 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><code>tk dep &lt;id&gt; &lt;dep-id&gt;</code></td>
-<td style="text-align: left;">Add dependency (<code>id</code> depends on <code>dep-id</code>)</td>
+<td style="text-align: left;"><code>id</code> depends on <code>dep-id</code></td>
 <td style="text-align: left;"><code>tk dep tic-2 tic-1</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk undep &lt;id&gt; &lt;dep-id&gt;</code></td>
-<td style="text-align: left;">Remove dependency relationship</td>
+<td style="text-align: left;">Remove a dependency</td>
 <td style="text-align: left;"><code>tk undep tic-2 tic-1</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk dep tree &lt;id&gt;</code></td>
-<td style="text-align: left;">Display recursive dependency tree</td>
+<td style="text-align: left;"><code>tk dep tree [--full] &lt;id&gt;</code></td>
+<td style="text-align: left;">Print the dependency tree; <code>--full</code> disables deduplication</td>
 <td style="text-align: left;"><code>tk dep tree tic-1</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>tk dep cycle</code></td>
-<td style="text-align: left;">Detect dependency cycles across open tickets</td>
+<td style="text-align: left;">Report dependency cycles among open tickets</td>
 <td style="text-align: left;"><code>tk dep cycle</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk ready</code></td>
-<td style="text-align: left;">List unblocked actionable tasks</td>
-<td style="text-align: left;"><code>tk ready</code></td>
+<td style="text-align: left;"><code>tk link &lt;id&gt; &lt;id&gt; [id...]</code></td>
+<td style="text-align: left;">Link tickets symmetrically (no blocking)</td>
+<td style="text-align: left;"><code>tk link tic-1 tic-2 tic-3</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk blocked</code></td>
-<td style="text-align: left;">List tasks waiting on unresolved dependencies</td>
-<td style="text-align: left;"><code>tk blocked</code></td>
+<td style="text-align: left;"><code>tk unlink &lt;id&gt; &lt;target-id&gt;</code></td>
+<td style="text-align: left;">Remove a link</td>
+<td style="text-align: left;"><code>tk unlink tic-1 tic-2</code></td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="querying-listing">Querying &amp; Listing<a class="headerlink" href="#querying-listing" title="Permanent link">&para;</a></h2>
+<h2 id="queues-and-listing">Queues and Listing<a class="headerlink" href="#queues-and-listing" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1492,27 +1688,97 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><code>tk ls</code></td>
-<td style="text-align: left;">List tickets (hides closed, limit 10)</td>
+<td style="text-align: left;"><code>tk ready [-a X] [-T X]</code></td>
+<td style="text-align: left;">Open or in-progress tickets whose dependencies are all closed</td>
+<td style="text-align: left;"><code>tk ready -T backend</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk blocked [-a X] [-T X]</code></td>
+<td style="text-align: left;">Open or in-progress tickets with unresolved dependencies</td>
+<td style="text-align: left;"><code>tk blocked</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk closed [--limit=N] [-a X] [-T X]</code></td>
+<td style="text-align: left;">Recently closed tickets, by file mtime (default 20)</td>
+<td style="text-align: left;"><code>tk closed --limit=5</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk ls</code>, <code>tk list [options]</code></td>
+<td style="text-align: left;">List tickets; hides closed, limit 10</td>
 <td style="text-align: left;"><code>tk ls -s open -p 1</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk query [jq]</code></td>
-<td style="text-align: left;">Output tickets as JSON, filterable with <code>jq</code></td>
-<td style="text-align: left;"><code>tk query '.[] | select(.priority==0)'</code></td>
-</tr>
-<tr>
-<td style="text-align: left;"><code>tk find &lt;term&gt;</code></td>
-<td style="text-align: left;">Full-text search across all tickets</td>
+<td style="text-align: left;"><code>tk find &lt;search-term&gt;</code></td>
+<td style="text-align: left;">Search text across tickets</td>
 <td style="text-align: left;"><code>tk find "authentication"</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>tk add-note &lt;id&gt; [text]</code></td>
-<td style="text-align: left;">Append timestamped audit note</td>
-<td style="text-align: left;"><code>tk add-note tic-1 "Tested successfully"</code></td>
+<td style="text-align: left;"><code>tk query [jq-filter]</code></td>
+<td style="text-align: left;">Print tickets as JSON lines; the filter needs <code>jq</code></td>
+<td style="text-align: left;"><code>tk query '.priority == "0"'</code></td>
 </tr>
 </tbody>
 </table>
+<p><code>-a</code> filters by assignee, <code>-T</code> by tag.</p>
+<p><strong><code>ls</code> options</strong>: <code>-s</code>/<code>--status</code> (<code>open</code>, <code>in_progress</code>, <code>closed</code>, <code>all</code>), <code>-a</code>/<code>--assignee</code>, <code>-t</code>/<code>--type</code>, <code>-p</code>/<code>--priority</code>, <code>-T</code>/<code>--tag</code>, <code>-n</code>/<code>--limit</code> (default 10), <code>--full</code> (no limit), <code>--all</code> (all statuses, no limit).</p>
+<hr />
+<h2 id="other">Other<a class="headerlink" href="#other" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Command</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>tk agent-skill [--install] [--path]</code></td>
+<td style="text-align: left;">Print the agent skill, install it to <code>~/.agents/skills/tk/SKILL.md</code>, or print its installed path</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk version</code>, <code>--version</code>, <code>-v</code></td>
+<td style="text-align: left;">Print version and project information</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk help</code>, <code>--help</code>, <code>-h</code></td>
+<td style="text-align: left;">Print built-in commands and installed plugins</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tk super &lt;cmd&gt; [args]</code></td>
+<td style="text-align: left;">Run a built-in command, bypassing any plugin with the same name</td>
+</tr>
+</tbody>
+</table>
+<p>A plugin named <code>tk-&lt;cmd&gt;</code> or <code>ticket-&lt;cmd&gt;</code> takes precedence over a built-in <code>&lt;cmd&gt;</code>; see <a href="../../plugins/architecture/">Plugin Architecture</a>.</p>
+<hr />
+<h2 id="exit-codes">Exit Codes<a class="headerlink" href="#exit-codes" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Code</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>0</code></td>
+<td style="text-align: left;">Success</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>1</code></td>
+<td style="text-align: left;">Error: usage, ticket not found, invalid or multi-line value, or a ticket file that cannot be written</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>3</code></td>
+<td style="text-align: left;">Claim lost: <code>tk start --claim</code> found the ticket <code>in_progress</code> for another assignee</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>4</code></td>
+<td style="text-align: left;">Lock timeout: another <code>tk</code> process held the ticket lock longer than <code>TK_LOCK_TIMEOUT</code></td>
+</tr>
+</tbody>
+</table>
+<p>A failed write prints <code>Error: cannot write ticket file '&lt;path&gt;'</code>, prints no ticket ID, and fires no hooks.</p>
 
 
 

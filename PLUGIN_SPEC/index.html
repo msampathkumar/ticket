@@ -1284,6 +1284,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#42-reacting-to-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4.2 Reacting to Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1458,6 +1469,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#42-reacting-to-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4.2 Reacting to Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1607,15 +1629,18 @@
 <hr />
 <h2 id="4-execution-protocol-context">4. Execution Protocol &amp; Context<a class="headerlink" href="#4-execution-protocol-context" title="Permanent link">&para;</a></h2>
 <p>When <code>tk &lt;plugin-command&gt; [args...]</code> is executed:
-1. <code>tk</code> resolves the target <code>.tickets/</code> folder.
-2. <code>tk</code> sets and exports environment variables:
-   - <code>TICKETS_DIR</code>: Absolute path to <code>.tickets/</code> directory.
+1. <code>tk</code> looks for <code>tk-&lt;plugin-command&gt;</code> or <code>ticket-&lt;plugin-command&gt;</code> on <code>$PATH</code>, then under <code>plugins/&lt;plugin-command&gt;/</code>. A plugin takes precedence over a built-in command of the same name.
+2. <code>tk</code> resolves the <code>.tickets/</code> folder (<code>TICKETS_DIR</code> if set, else upward discovery) and exports environment variables:
+   - <code>TICKETS_DIR</code>: Path to the <code>.tickets/</code> directory. Exported only when set or found; plugins MUST handle it being unset.
    - <code>TK_SCRIPT</code>: Absolute path to <code>tk</code> executable.
-3. <code>tk</code> invokes <code>tk-&lt;plugin-command&gt; "$@"</code> using <code>exec</code>.</p>
+3. <code>tk</code> invokes the plugin with the remaining arguments using <code>exec</code>.</p>
 <h3 id="41-calling-core-built-ins">4.1 Calling Core Built-Ins<a class="headerlink" href="#41-calling-core-built-ins" title="Permanent link">&para;</a></h3>
 <p>Plugins can execute core <code>tk</code> routines without triggering recursion by using:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="s2">"</span><span class="nv">$TK_SCRIPT</span><span class="s2">"</span><span class="w"> </span>super<span class="w"> </span>&lt;built-in-command&gt;<span class="w"> </span><span class="o">[</span>args...<span class="o">]</span>
 </span></code></pre></div></p>
+<p>Plugins SHOULD write tickets through <code>tk</code> rather than editing files directly, so that locks, value validation and post-write hooks apply.</p>
+<h3 id="42-reacting-to-changes">4.2 Reacting to Changes<a class="headerlink" href="#42-reacting-to-changes" title="Permanent link">&para;</a></h3>
+<p>Plugins that react to ticket writes SHOULD install an executable in <code>.tickets/.hooks/post-write.d/</code> rather than polling or running a daemon. See <a href="../SPEC/">SPEC §5.1</a> for events and environment.</p>
 <hr />
 <h2 id="5-plugin-specification-template-plugin-name-specmd">5. Plugin Specification Template (<code>&lt;PLUGIN-NAME&gt;-SPEC.md</code>)<a class="headerlink" href="#5-plugin-specification-template-plugin-name-specmd" title="Permanent link">&para;</a></h2>
 <p>Each plugin's <code>&lt;PLUGIN-NAME&gt;-SPEC.md</code> must include:

@@ -1318,18 +1318,19 @@
 <p>When you execute:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tk<span class="w"> </span>&lt;command&gt;<span class="w"> </span><span class="o">[</span>args...<span class="o">]</span>
 </span></code></pre></div>
-The <code>tk</code> dispatcher first checks for an executable named <code>tk-&lt;command&gt;</code> or <code>ticket-&lt;command&gt;</code> in your system <code>$PATH</code>. If found, <code>tk</code> delegates execution directly to that plugin binary or script.</p>
+The <code>tk</code> dispatcher first looks for an executable named <code>tk-&lt;command&gt;</code> or <code>ticket-&lt;command&gt;</code> on <code>$PATH</code>, then in the repository's <code>plugins/&lt;command&gt;/</code> directory. If found, <code>tk</code> replaces itself with that plugin (<code>exec</code>). A plugin takes precedence over a built-in command of the same name.</p>
 <p>To bypass plugins and run a built-in command directly, use <code>tk super &lt;command&gt;</code>.</p>
 <hr />
 <h2 id="2-environment-context-passed-to-plugins">2. Environment Context Passed to Plugins<a class="headerlink" href="#2-environment-context-passed-to-plugins" title="Permanent link">&para;</a></h2>
 <p>When <code>tk</code> launches a plugin, it automatically exports two environment variables:</p>
 <ul>
-<li><code>TICKETS_DIR</code>: The absolute path to the active <code>.tickets</code> directory.</li>
+<li><code>TICKETS_DIR</code>: The path to the active <code>.tickets</code> directory. Exported only when one is set or found; plugins must handle it being unset.</li>
 <li><code>TK_SCRIPT</code>: The absolute path to the root <code>tk</code> executable.</li>
 </ul>
 <p>Plugins can call built-in commands by executing:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="s2">"</span><span class="nv">$TK_SCRIPT</span><span class="s2">"</span><span class="w"> </span>super<span class="w"> </span>&lt;command&gt;<span class="w"> </span><span class="o">[</span>args...<span class="o">]</span>
 </span></code></pre></div></p>
+<p>To react to ticket changes without polling, install an executable in <code>.tickets/.hooks/post-write.d/</code>. <code>tk</code> runs it after every successful write with <code>TK_EVENT</code>, <code>TK_TICKET_ID</code> and <code>TK_TICKET_FILE</code> set. See <a href="../SPEC/">SPEC §5.1</a>.</p>
 <hr />
 <h2 id="3-required-plugin-metadata">3. Required Plugin Metadata<a class="headerlink" href="#3-required-plugin-metadata" title="Permanent link">&para;</a></h2>
 <h3 id="31-help-discovery-metadata">3.1 Help Discovery Metadata<a class="headerlink" href="#31-help-discovery-metadata" title="Permanent link">&para;</a></h3>
@@ -1366,9 +1367,9 @@ Implement the <code>--tk-describe</code> flag:
 <hr />
 <h2 id="5-official-plugins">5. Official Plugins<a class="headerlink" href="#5-official-plugins" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.</li>
-<li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. <em>(optional)</em></li>
-<li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Hands tickets tagged <code>taskforce</code> to SCION coding agents through a <code>tk</code> save hook; humans review and close. See the <a href="../plugins/scion-taskforce/">user guide</a>. <em>(optional; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
+<li><strong><code>tk webui</code> (<code>tk-webui</code>)</strong>: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard. <em>(in the default <code>--full</code> bundle; requires Python 3.9+)</em></li>
+<li><strong><code>tk github</code> (<code>tk-github</code>)</strong>: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. <em>(install with <code>--github</code>; requires <code>gh</code> and <code>jq</code>)</em></li>
+<li><strong><code>tk scion-taskforce</code> (<code>tk-scion-taskforce</code>)</strong>: Hands tickets tagged <code>taskforce</code> to SCION coding agents through a <code>tk</code> save hook; humans review and close. See the <a href="../plugins/scion-taskforce/">user guide</a>. <em>(install with <code>--scion-taskforce</code>; requires Python 3.9+ and the <code>scion</code> CLI)</em></li>
 </ul>
 <hr />
 <h2 id="6-example-plugin-tk-stats">6. Example Plugin: <code>tk-stats</code><a class="headerlink" href="#6-example-plugin-tk-stats" title="Permanent link">&para;</a></h2>
@@ -1391,12 +1392,12 @@ Implement the <code>--tk-describe</code> flag:
 </span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="nv">TICKETS_DIR</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">TICKETS_DIR</span><span class="k">:-</span><span class="p">.tickets</span><span class="si">}</span><span class="s2">"</span>
 </span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>
 </span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="nv">total</span><span class="o">=</span><span class="k">$(</span>ls<span class="w"> </span>-1<span class="w"> </span><span class="s2">"</span><span class="nv">$TICKETS_DIR</span><span class="s2">"</span>/*.md<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="k">)</span>
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="nv">open</span><span class="o">=</span><span class="k">$(</span><span class="s2">"</span><span class="nv">$TK_SCRIPT</span><span class="s2">"</span><span class="w"> </span>super<span class="w"> </span>ready<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="k">)</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="nv">ready</span><span class="o">=</span><span class="k">$(</span><span class="s2">"</span><span class="nv">$TK_SCRIPT</span><span class="s2">"</span><span class="w"> </span>super<span class="w"> </span>ready<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="k">)</span>
 </span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="nv">blocked</span><span class="o">=</span><span class="k">$(</span><span class="s2">"</span><span class="nv">$TK_SCRIPT</span><span class="s2">"</span><span class="w"> </span>super<span class="w"> </span>blocked<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="k">)</span>
 </span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"📊 Total Tickets : </span><span class="nv">$total</span><span class="s2">"</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"🟢 Ready (Open)  : </span><span class="nv">$open</span><span class="s2">"</span>
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"🔴 Blocked       : </span><span class="nv">$blocked</span><span class="s2">"</span>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"Total   : </span><span class="nv">$total</span><span class="s2">"</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"Ready   : </span><span class="nv">$ready</span><span class="s2">"</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"Blocked : </span><span class="nv">$blocked</span><span class="s2">"</span>
 </span></code></pre></div>
 Make it executable:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>chmod<span class="w"> </span>+x<span class="w"> </span>~/.local/bin/tk-stats

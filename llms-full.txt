@@ -1400,7 +1400,7 @@ When you execute:
 ```bash
 tk <command> [args...]
 ```
-The `tk` dispatcher first checks for an executable named `tk-<command>` or `ticket-<command>` in your system `$PATH`. If found, `tk` delegates execution directly to that plugin binary or script.
+The `tk` dispatcher first looks for an executable named `tk-<command>` or `ticket-<command>` on `$PATH`, then in the repository's `plugins/<command>/` directory. If found, `tk` replaces itself with that plugin (`exec`). A plugin takes precedence over a built-in command of the same name.
 
 To bypass plugins and run a built-in command directly, use `tk super <command>`.
 
@@ -1410,13 +1410,15 @@ To bypass plugins and run a built-in command directly, use `tk super <command>`.
 
 When `tk` launches a plugin, it automatically exports two environment variables:
 
-- `TICKETS_DIR`: The absolute path to the active `.tickets` directory.
+- `TICKETS_DIR`: The path to the active `.tickets` directory. Exported only when one is set or found; plugins must handle it being unset.
 - `TK_SCRIPT`: The absolute path to the root `tk` executable.
 
 Plugins can call built-in commands by executing:
 ```bash
 "$TK_SCRIPT" super <command> [args...]
 ```
+
+To react to ticket changes without polling, install an executable in `.tickets/.hooks/post-write.d/`. `tk` runs it after every successful write with `TK_EVENT`, `TK_TICKET_ID` and `TK_TICKET_FILE` set. See [SPEC §5.1](SPEC.md).
 
 ---
 
@@ -1469,9 +1471,9 @@ A plugin may additionally ship its own `install.sh` (with `--uninstall`) inside 
 
 ## 5. Official Plugins
 
-- **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard.
-- **`tk github` (`tk-github`)**: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. *(optional)*
-- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(optional; requires Python 3.9+ and the `scion` CLI)*
+- **`tk webui` (`tk-webui`)**: Interactive Kanban, Table, DAG Mind Map, and Timeline dashboard. *(in the default `--full` bundle; requires Python 3.9+)*
+- **`tk github` (`tk-github`)**: Imports GitHub issues and PRs into local tickets (one-way), closes local tickets when the GitHub item is closed or merged, and supports clean unsyncing. Nothing is written back to GitHub. Imported text is untrusted input. *(install with `--github`; requires `gh` and `jq`)*
+- **`tk scion-taskforce` (`tk-scion-taskforce`)**: Hands tickets tagged `taskforce` to SCION coding agents through a `tk` save hook; humans review and close. See the [user guide](plugins/scion-taskforce.md). *(install with `--scion-taskforce`; requires Python 3.9+ and the `scion` CLI)*
 
 ---
 
@@ -1498,12 +1500,12 @@ fi
 TICKETS_DIR="${TICKETS_DIR:-.tickets}"
 
 total=$(ls -1 "$TICKETS_DIR"/*.md 2>/dev/null | wc -l || echo 0)
-open=$("$TK_SCRIPT" super ready | wc -l || echo 0)
+ready=$("$TK_SCRIPT" super ready | wc -l || echo 0)
 blocked=$("$TK_SCRIPT" super blocked | wc -l || echo 0)
 
-echo "📊 Total Tickets : $total"
-echo "🟢 Ready (Open)  : $open"
-echo "🔴 Blocked       : $blocked"
+echo "Total   : $total"
+echo "Ready   : $ready"
+echo "Blocked : $blocked"
 ```
 Make it executable:
 ```bash
@@ -1581,17 +1583,22 @@ Compiled binaries (Go, Rust, C) MUST implement:
 ## 4. Execution Protocol & Context
 
 When `tk <plugin-command> [args...]` is executed:
-1. `tk` resolves the target `.tickets/` folder.
-2. `tk` sets and exports environment variables:
-   - `TICKETS_DIR`: Absolute path to `.tickets/` directory.
+1. `tk` looks for `tk-<plugin-command>` or `ticket-<plugin-command>` on `$PATH`, then under `plugins/<plugin-command>/`. A plugin takes precedence over a built-in command of the same name.
+2. `tk` resolves the `.tickets/` folder (`TICKETS_DIR` if set, else upward discovery) and exports environment variables:
+   - `TICKETS_DIR`: Path to the `.tickets/` directory. Exported only when set or found; plugins MUST handle it being unset.
    - `TK_SCRIPT`: Absolute path to `tk` executable.
-3. `tk` invokes `tk-<plugin-command> "$@"` using `exec`.
+3. `tk` invokes the plugin with the remaining arguments using `exec`.
 
 ### 4.1 Calling Core Built-Ins
 Plugins can execute core `tk` routines without triggering recursion by using:
 ```bash
 "$TK_SCRIPT" super <built-in-command> [args...]
 ```
+
+Plugins SHOULD write tickets through `tk` rather than editing files directly, so that locks, value validation and post-write hooks apply.
+
+### 4.2 Reacting to Changes
+Plugins that react to ticket writes SHOULD install an executable in `.tickets/.hooks/post-write.d/` rather than polling or running a daemon. See [SPEC §5.1](SPEC.md) for events and environment.
 
 ---
 
@@ -1662,7 +1669,7 @@ Each ticket file begins with a YAML header delimited by `---`:
 
 ```yaml
 ---
-id: string          # Unique ticket identifier, e.g. tic-6mex (Required)
+id: string          # Unique ticket identifier, e.g. tic-6mex2q (Required)
 status: enum        # open | in_progress | closed (Required)
 deps: list[string]  # Array of ticket IDs this ticket depends on (Required)
 links: list[string] # Array of related ticket IDs (symmetric) (Optional)
@@ -1670,33 +1677,57 @@ created: ISO-8601   # Timestamp of ticket creation (e.g. 2026-09-25T10:01:06Z) (
 type: enum          # bug | feature | task | epic | chore (Default: task)
 priority: integer   # 0 (Critical) to 4 (Trivial) (Default: 2)
 assignee: string    # Assignee name or git username (Optional)
-tags: list[string]  # Array of tag strings (Optional)
+external-ref: string # External issue/PR reference, e.g. gh-123 (Optional)
 parent: string      # Parent ticket ID if this ticket is a subtask (Optional)
-external_ref: string# External issue/PR reference, e.g. gh-123 (Optional)
+tags: list[string]  # Array of tag strings (Optional)
 ---
 ```
 
+The external reference key is `external-ref` (hyphen). Readers should also accept the legacy `external_ref` spelling.
+
 ### 2.3 Markdown Body Structure
 
-Following the frontmatter, the Markdown body contains:
+Following the frontmatter, the Markdown body contains (sections are omitted when empty):
 
 ```markdown
 # <Title>
 
 <Description text...>
 
-## Design Notes
+## Design
+
 <Architecture or design thoughts...>
 
 ## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
 
-## Review Notes / Audit Trail
-<!-- Timestamped review comments appended by tk add-note -->
-### Note (2026-09-25T10:30:00Z)
-<Comment content>
+<Criteria...>
+
+## Notes
+
+**2026-09-25T10:30:00Z**
+
+<Note text appended by tk add-note>
 ```
+
+`tk add-note` creates the `## Notes` section on first use and appends each note as a bold UTC timestamp line, a blank line, then the note text.
+
+### 2.4 Field Values
+
+- **Verbatim**: values are stored exactly as given, including `/`, `&`, `\` and `|`.
+- **Quoting**: a scalar is YAML-quoted (single quotes) only when plain YAML would read it differently: a leading indicator character (`[`, `]`, `{`, `}`, `#`, `&`, `*`, `!`, `|`, `>`, `'`, `"`, `%`, `@`, backtick, `,`), a leading `-`, `?` or `:` that stands alone or is followed by a space, an embedded `: ` or ` #`, a trailing `:`, or leading/trailing spaces. Other values are written unchanged.
+- **Single line**: frontmatter values must not contain a newline or carriage return. `tk` rejects them with `Error: <field> must be a single line (newlines are not allowed)` and exit code `1`; the value is not written. The title, description, design, acceptance and notes live in the body and may span lines.
+- **Write failures**: if a ticket file cannot be written (read-only directory, invalid path), `tk` prints `Error: cannot write ticket file '<path>'`, exits `1`, prints no ID, and fires no hooks.
+
+### 2.5 Repository Files
+
+| Path | Purpose | In Git |
+| :--- | :--- | :--- |
+| `.tickets/*.md` | Tickets | Yes |
+| `.tickets/.gitignore` | Written by `tk init`: `.locks/` and `.hooks/hooks.log` (missing lines appended only) | Yes |
+| `.tickets/.locks/` | Per-ticket lock directories (Section 4.2); contains a self-ignoring `.gitignore` | No |
+| `.tickets/.hooks/post-write.d/` | Executable post-write hooks (Section 5.1) | Optional |
+| `.tickets/.hooks/hooks.log` | Hook output | No |
+| `~/.local/state/tk/projects.json` | Projects registered by `tk init`, used by the Web UI project list | Outside the repo |
 
 ---
 
@@ -1718,8 +1749,9 @@ Following the frontmatter, the Markdown body contains:
 
 | Command | Description |
 | :--- | :--- |
-| `tk init [path]` | Initializes `.tickets/` tracking repository |
-| `tk create <title> [options]` | Creates ticket, prints generated ID to stdout |
+| `tk init [dir]` | Initializes `.tickets/` with a closed setup ticket and `.tickets/.gitignore`; safe to re-run |
+| `tk uninit [dir]` | Deletes the `.tickets/` directory (no confirmation) |
+| `tk create [title] [options]` | Creates ticket, prints generated ID to stdout. Options: `-d/--description`, `--design`, `--acceptance`, `-t/--type`, `-p/--priority`, `-a/--assignee`, `--external-ref`, `--parent`, `--tags` |
 | `tk start <id>` | Sets status to `in_progress` |
 | `tk start <id> --claim [--assignee X]` | Atomically sets status `in_progress` and `assignee` (default: `git config user.name`, else `$USER`); fails with exit code `3` if already `in_progress` for a different assignee |
 | `tk close <id>` | Sets status to `closed` |
@@ -1727,30 +1759,33 @@ Following the frontmatter, the Markdown body contains:
 | `tk status <id> <status>` | Updates status directly (`open`, `in_progress`, `closed`) |
 | `tk dep <id> <dep-id>` | Adds dependency relationship |
 | `tk undep <id> <dep-id>` | Removes dependency relationship |
-| `tk link <id> <link-id>` | Adds symmetric relational link between tickets |
-| `tk unlink <id> <link-id>` | Removes symmetric relational link between tickets |
-| `tk dep tree <id>` | Prints hierarchical ASCII dependency tree |
+| `tk link <id> <id> [id...]` | Adds symmetric relational links between tickets |
+| `tk unlink <id> <target-id>` | Removes symmetric relational link between tickets |
+| `tk dep tree [--full] <id>` | Prints hierarchical ASCII dependency tree (`--full` disables deduplication) |
 | `tk dep cycle` | Traverses graph and outputs detected cycles |
-| `tk ready` | Lists unblocked, actionable tickets |
-| `tk blocked` | Lists blocked tickets with unresolved blockers |
-| `tk closed [--limit=N]` | Lists recently closed tickets |
-| `tk ls` / `tk list [options]` | Lists tickets (default: hides closed, limit 10, with filters) |
+| `tk ready [-a X] [-T X]` | Lists unblocked, actionable tickets (filter by assignee or tag) |
+| `tk blocked [-a X] [-T X]` | Lists blocked tickets with unresolved blockers |
+| `tk closed [--limit=N] [-a X] [-T X]` | Lists recently closed tickets by file mtime (default 20) |
+| `tk ls` / `tk list [options]` | Lists tickets (default: hides closed, limit 10). Options: `-s/--status`, `-a/--assignee`, `-t/--type`, `-p/--priority`, `-T/--tag`, `-n/--limit`, `--full`, `--all` |
 | `tk edit <id>` | Opens ticket in `$EDITOR` |
-| `tk query [jq-filter]` | Outputs tickets as JSON lines, with optional jq filter |
+| `tk query [jq-filter]` | Outputs tickets as JSON lines; the optional filter requires `jq` |
 | `tk find <search-term>` | Case-insensitive text search across tickets |
-| `tk show <id>` | Displays ticket metadata and full markdown body |
-| `tk update <id> [options]` | Updates fields (title, desc, priority, tags, etc.) |
-| `tk add-note <id> [text]` | Appends timestamped note |
-| `tk agent-skill [--install]` | Displays or installs agent skill to `~/.agents/skills/tk/` |
-| `tk version` / `--version` | Prints version, description, and license information |
-| `tk help` | Displays available built-in commands and discovered plugins |
+| `tk show <id>` | Displays ticket metadata and full markdown body (paged via `$TICKET_PAGER`/`$PAGER` on a terminal) |
+| `tk update <id> [options]` | Updates fields. Options: `--title`, `-d/--description`, `-p/--priority`, `-t/--type`, `-a/--assignee`, `--tags`, `--design`, `--acceptance`, `--parent`, `--external-ref` |
+| `tk add-note <id> [text]` | Appends timestamped note (reads stdin when `text` is omitted) |
+| `tk agent-skill [--install] [--path]` | Displays the agent skill, installs it to `~/.agents/skills/tk/` (or `$AGENTS_SKILLS_DIR`), or prints its installed path |
+| `tk version` / `--version` / `-v` | Prints version, description, and license information |
+| `tk help` / `--help` / `-h` | Displays available built-in commands and discovered plugins |
+| `tk super <cmd> [args]` | Runs a built-in command, bypassing a plugin with the same name |
+
+All commands accept full or partial ticket IDs.
 
 ### 4.1 Exit Codes
 
 | Code | Meaning |
 | :--- | :--- |
 | `0` | Success |
-| `1` | Error (usage, ticket not found, invalid value) |
+| `1` | Error (usage, ticket not found, invalid or multi-line value, ticket file not writable) |
 | `3` | Claim lost: `tk start --claim` found the ticket `in_progress` for another assignee |
 | `4` | Lock timeout: another `tk` process held the ticket lock for longer than `TK_LOCK_TIMEOUT` |
 
@@ -1916,46 +1951,120 @@ title: Command Reference
 description: Comprehensive reference for all core ticket (tk) CLI commands.
 ---
 
-The `tk` CLI provides commands for task lifecycle management, dependency tracking, and querying.
+The `tk` CLI covers the ticket lifecycle, dependency tracking, and querying. Every command accepts a full or partial ticket ID (`tk show 5c4` matches `nw-5c46a1`). Run `tk help` for the built-in summary and the list of installed plugins.
 
 ---
 
-## Core CRUD & Lifecycle
+## Repository
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `tk init [path]` | Initialize `.tickets` repository | `tk init` |
-| `tk create [title]` | Create a new ticket (returns ID) | `tk create "Fix login bug" -p 0 -t bug` |
-| `tk show <id>` | Display full ticket details | `tk show tic-c83r` |
-| `tk update <id>` | Update title, description, priority, tags | `tk update tic-c83r -p 1 --tags urgent` |
-| `tk start <id>` | Transition ticket to `in_progress` | `tk start tic-c83r` |
-| `tk close <id>` | Transition ticket to `closed` | `tk close tic-c83r` |
-| `tk reopen <id>` | Transition ticket back to `open` | `tk reopen tic-c83r` |
-| `tk edit <id>` | Open ticket markdown file in `$EDITOR` | `tk edit tic-c83r` |
+| `tk init [dir]` | Create `.tickets/` with a closed setup ticket and `.tickets/.gitignore`. Safe to re-run. | `tk init` |
+| `tk uninit [dir]` | Delete the `.tickets/` directory and every ticket in it. No confirmation. | `tk uninit` |
+
+`tk create` also initializes `.tickets/` (with the setup ticket) in the current directory when none is found.
 
 ---
 
-## Dependency Intelligence
+## Create, Show, Update
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `tk dep <id> <dep-id>` | Add dependency (`id` depends on `dep-id`) | `tk dep tic-2 tic-1` |
-| `tk undep <id> <dep-id>` | Remove dependency relationship | `tk undep tic-2 tic-1` |
-| `tk dep tree <id>` | Display recursive dependency tree | `tk dep tree tic-1` |
-| `tk dep cycle` | Detect dependency cycles across open tickets | `tk dep cycle` |
-| `tk ready` | List unblocked actionable tasks | `tk ready` |
-| `tk blocked` | List tasks waiting on unresolved dependencies | `tk blocked` |
+| `tk create [title] [options]` | Create a ticket and print its ID | `tk create "Fix login bug" -p 0 -t bug` |
+| `tk show <id>` | Print the ticket (uses `$TICKET_PAGER` or `$PAGER` on a terminal) | `tk show tic-c83r2a` |
+| `tk update <id> [options]` | Update fields in place | `tk update tic-c83r2a -p 1 --tags urgent` |
+| `tk edit <id>` | Open the ticket file in `$EDITOR` | `tk edit tic-c83r2a` |
+| `tk add-note <id> [text]` | Append a timestamped note; reads stdin when `text` is omitted | `echo "Done" \| tk add-note tic-1` |
+
+**`create` options**
+
+| Option | Meaning | Default |
+| :--- | :--- | :--- |
+| `-d`, `--description` | Description text | |
+| `--design` | Design notes | |
+| `--acceptance` | Acceptance criteria | |
+| `-t`, `--type` | `bug`, `feature`, `task`, `epic`, `chore` | `task` |
+| `-p`, `--priority` | `0` (highest) to `4` | `2` |
+| `-a`, `--assignee` | Assignee | `git config user.name` |
+| `--external-ref` | External reference, e.g. `gh-123`, `JIRA-456` | |
+| `--parent` | Parent ticket ID | |
+| `--tags` | Comma-separated tags | |
+
+**`update` options**: `--title`, `-d`/`--description`, `-p`/`--priority`, `-t`/`--type`, `-a`/`--assignee`, `--tags`, `--design`, `--acceptance`, `--parent`, `--external-ref`.
+
+Values are stored verbatim, including `/`, `&`, `\` and `|`. Frontmatter fields (assignee, tags, external ref, parent, and other single-line values) reject newlines with an error. See [SPEC §2.4](../SPEC.md).
 
 ---
 
-## Querying & Listing
+## Status and Claiming
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `tk ls` | List tickets (hides closed, limit 10) | `tk ls -s open -p 1` |
-| `tk query [jq]` | Output tickets as JSON, filterable with `jq` | `tk query '.[] | select(.priority==0)'` |
-| `tk find <term>` | Full-text search across all tickets | `tk find "authentication"` |
-| `tk add-note <id> [text]` | Append timestamped audit note | `tk add-note tic-1 "Tested successfully"` |
+| `tk start <id>` | Set status to `in_progress` | `tk start tic-c83r2a` |
+| `tk start <id> --claim [--assignee X]` | Set `in_progress` and the assignee in one locked step | `tk start tic-c83r2a --claim --assignee agent-2` |
+| `tk close <id>` | Set status to `closed` | `tk close tic-c83r2a` |
+| `tk reopen <id>` | Set status to `open` | `tk reopen tic-c83r2a` |
+| `tk status <id> <status>` | Set `open`, `in_progress`, or `closed` | `tk status tic-c83r2a open` |
+
+`--claim` defaults the assignee to `git config user.name`, else `$USER`. It fails with exit code `3` when the ticket is already `in_progress` for a different assignee; re-claiming your own ticket succeeds. Agents that share one identity must pass distinct `--assignee` values.
+
+Status writes and claims run under a per-ticket lock in `.tickets/.locks/`. If another `tk` process holds the lock for longer than `TK_LOCK_TIMEOUT` seconds (default `10`), the command exits `4`. See [SPEC §4.2](../SPEC.md).
+
+---
+
+## Dependencies and Links
+
+| Command | Description | Example |
+| :--- | :--- | :--- |
+| `tk dep <id> <dep-id>` | `id` depends on `dep-id` | `tk dep tic-2 tic-1` |
+| `tk undep <id> <dep-id>` | Remove a dependency | `tk undep tic-2 tic-1` |
+| `tk dep tree [--full] <id>` | Print the dependency tree; `--full` disables deduplication | `tk dep tree tic-1` |
+| `tk dep cycle` | Report dependency cycles among open tickets | `tk dep cycle` |
+| `tk link <id> <id> [id...]` | Link tickets symmetrically (no blocking) | `tk link tic-1 tic-2 tic-3` |
+| `tk unlink <id> <target-id>` | Remove a link | `tk unlink tic-1 tic-2` |
+
+---
+
+## Queues and Listing
+
+| Command | Description | Example |
+| :--- | :--- | :--- |
+| `tk ready [-a X] [-T X]` | Open or in-progress tickets whose dependencies are all closed | `tk ready -T backend` |
+| `tk blocked [-a X] [-T X]` | Open or in-progress tickets with unresolved dependencies | `tk blocked` |
+| `tk closed [--limit=N] [-a X] [-T X]` | Recently closed tickets, by file mtime (default 20) | `tk closed --limit=5` |
+| `tk ls`, `tk list [options]` | List tickets; hides closed, limit 10 | `tk ls -s open -p 1` |
+| `tk find <search-term>` | Search text across tickets | `tk find "authentication"` |
+| `tk query [jq-filter]` | Print tickets as JSON lines; the filter needs `jq` | `tk query '.priority == "0"'` |
+
+`-a` filters by assignee, `-T` by tag.
+
+**`ls` options**: `-s`/`--status` (`open`, `in_progress`, `closed`, `all`), `-a`/`--assignee`, `-t`/`--type`, `-p`/`--priority`, `-T`/`--tag`, `-n`/`--limit` (default 10), `--full` (no limit), `--all` (all statuses, no limit).
+
+---
+
+## Other
+
+| Command | Description |
+| :--- | :--- |
+| `tk agent-skill [--install] [--path]` | Print the agent skill, install it to `~/.agents/skills/tk/SKILL.md`, or print its installed path |
+| `tk version`, `--version`, `-v` | Print version and project information |
+| `tk help`, `--help`, `-h` | Print built-in commands and installed plugins |
+| `tk super <cmd> [args]` | Run a built-in command, bypassing any plugin with the same name |
+
+A plugin named `tk-<cmd>` or `ticket-<cmd>` takes precedence over a built-in `<cmd>`; see [Plugin Architecture](../plugins/architecture.md).
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+| :--- | :--- |
+| `0` | Success |
+| `1` | Error: usage, ticket not found, invalid or multi-line value, or a ticket file that cannot be written |
+| `3` | Claim lost: `tk start --claim` found the ticket `in_progress` for another assignee |
+| `4` | Lock timeout: another `tk` process held the ticket lock longer than `TK_LOCK_TIMEOUT` |
+
+A failed write prints `Error: cannot write ticket file '<path>'`, prints no ticket ID, and fires no hooks.
 </file>
 
 <file path="docs/core-cli/configuration.md">
@@ -1964,7 +2073,7 @@ title: Core CLI Configuration
 description: Environment variables, directory discovery, and default settings for ticket (tk).
 ---
 
-`ticket` (`tk`) is designed around a zero-database, offline-first architecture. It requires no configuration daemon or centralized database server. Configuration is managed through environment variables and Git repository state.
+`ticket` (`tk`) has no database, server, or config file. Behaviour is set through environment variables, and state lives in `.tickets/`.
 
 ---
 
@@ -1972,81 +2081,107 @@ description: Environment variables, directory discovery, and default settings fo
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `TICKETS_DIR` | Absolute path to the active `.tickets` directory. Overrides automatic discovery. | Auto-detected (scanned upwards from `$PWD` to Git root) |
-| `EDITOR` / `VISUAL` | Text editor invoked when editing tickets with `tk edit <id>`. | System default, fallback to `vim` |
-| `AGENTS_SKILLS_DIR` | Target installation directory when running `tk agent-skill --install`. | `$HOME/.agents/skills/tk` |
-| `TK_SCRIPT` | Path to the root `tk` executable. Automatically exported to plugins. | Auto-detected path to `tk` |
-| `NO_COLOR` | Disables ANSI color output when set to any non-empty value. | Unset (colors enabled) |
-| `TK_NO_HOOKS` | Skips post-write hooks (`.tickets/.hooks/post-write.d/`) for the command. See [SPEC §5.1](../SPEC.md). | Unset (hooks run) |
-| `TK_HOOKS_SYNC` | Runs post-write hooks inline instead of in the background. | Unset (background) |
+| `TICKETS_DIR` | Path to the `.tickets` directory. Overrides discovery. | Discovered upwards from `$PWD` |
+| `EDITOR`, `VISUAL` | Editor for `tk edit` (`EDITOR` wins over `VISUAL`). | `nano` |
+| `TICKET_PAGER`, `PAGER` | Pager for `tk show` when stdout is a terminal (`TICKET_PAGER` wins). | None (no pager) |
+| `TK_ID_HASH_LENGTH` | Length of the random part of new ticket IDs (4-32). | `6` |
+| `TK_LOCK_TIMEOUT` | Seconds to wait for a busy ticket lock before exiting `4`. | `10` |
+| `TK_LOCK_STALE_SECONDS` | Age after which a lock is treated as stale and removed. | `60` |
+| `TK_NO_HOOKS` | Skip post-write hooks for the command. See [SPEC §5.1](../SPEC.md). | Unset (hooks run) |
+| `TK_HOOKS_SYNC` | Run post-write hooks inline instead of in the background. | Unset (background) |
+| `AGENTS_SKILLS_DIR` | Target directory for `tk agent-skill --install`. | `$HOME/.agents/skills/tk` |
+| `TK_SCRIPT` | Path to the `tk` executable; exported to plugins and hooks. | Set by `tk` |
 
 ---
 
-## Directory Discovery Logic
+## Directory Discovery
 
-When you run any `tk` command:
-1. `tk` checks if `TICKETS_DIR` is set in your environment. If set and valid, it is used immediately.
-2. Otherwise, `tk` starts at the current working directory (`$PWD`) and scans upwards until it finds a directory named `.tickets/`.
-3. If no `.tickets/` directory is found, `tk` checks for `.git/` to determine the project root.
-4. If neither is found, `tk create` offers to automatically run `tk init` to bootstrap the task tracker.
+1. If `TICKETS_DIR` is set, `tk` uses it. Read commands fail if that directory does not exist.
+2. Otherwise `tk` walks up from `$PWD` to `/` and uses the first `.tickets/` directory it finds. Git is not consulted.
+3. If none is found, `tk create`, `tk init` and `tk uninit` work on `./.tickets`; `tk create` and `tk init` create it. Other commands exit `1` with `Error: no .tickets directory found`.
+
+`tk init` (also run by `tk create` when it initializes `.tickets/`) records the project in `~/.local/state/tk/projects.json`, which the Web UI uses for its project list.
 
 ---
 
-## File Layout & Storage Model
-
-All tasks are stored as plain text Markdown files with YAML frontmatter inside `.tickets/`:
+## File Layout
 
 ```
 my-project/
-├── .git/
 ├── .tickets/
-│   ├── tic-a1b2.md
-│   ├── tic-c3d4.md
-│   └── tic-e5f6.md
+│   ├── .gitignore            # .locks/ and .hooks/hooks.log (written by tk init)
+│   ├── .locks/               # Per-ticket lock dirs, self-ignoring (runtime only)
+│   ├── .hooks/
+│   │   ├── post-write.d/     # Executable post-write hooks
+│   │   └── hooks.log         # Hook output (runtime only)
+│   ├── myp-a1b2c3.md
+│   └── myp-d4e5f6.md
 ├── src/
 └── README.md
 ```
 
-### Ticket Schema
-Every ticket file (`.tickets/tic-<id>.md`) follows this canonical structure:
+Commit the ticket files; `.tickets/.gitignore` keeps locks and the hook log out of Git.
 
-```yaml
+### Ticket File
+
+IDs are `<prefix>-<hash>`: a prefix derived from the folder name (ASCII letters, digits and `.` only; `tk` if none remain) and a random lowercase alphanumeric hash, 6 characters by default. Older 4-character IDs remain valid.
+
+```markdown
 ---
-id: tic-a1b2
+id: myp-a1b2c3
 status: open
-deps: [tic-prev]
+deps: [myp-d4e5f6]
 links: []
 created: 2026-10-03T12:00:00Z
 type: task
 priority: 2
 assignee: developer
+external-ref: gh-42
+parent: myp-0e1f2a
 tags: [backend, api]
-external_ref: gh-issue-42
-parent: tic-epic1
 ---
 # Ticket Title
 
 Description text explaining requirements and context.
 
-## Design Notes
+## Design
+
 Architectural decisions, trade-offs, and technical notes.
 
 ## Acceptance Criteria
+
 - [ ] Feature implemented
 - [ ] Unit tests pass
 
 ## Notes
+
 **2026-10-03T12:30:00Z**
-Timestamped progress update or review audit trail.
+
+Timestamped progress update or review note.
 ```
+
+Values are written verbatim and YAML-quoted only when plain YAML would misread them. Frontmatter values must be a single line; a value containing a newline is rejected with exit code `1`. See [SPEC §2](../SPEC.md).
 
 ---
 
-## CLI Defaults & Filtering
+## Defaults
 
-- **Priority**: Defaults to `2` (range: `0` = urgent/critical, `1` = high, `2` = medium, `3` = low, `4` = backlog).
-- **Listing Limit**: `tk ls` defaults to 10 items to prevent terminal flooding. Use `--full` or `--all` for unlimited listings.
-- **Closed Tickets**: `tk ls` hides closed tickets by default. Use `-s all` or `tk closed` to inspect completed tasks.
+- **Priority**: `2` (range `0` = highest to `4` = lowest).
+- **Type**: `task`.
+- **Assignee**: `git config user.name` when `-a` is not given.
+- **Listing**: `tk ls` hides closed tickets and shows 10 items. Use `--full` (no limit), `--all` (all statuses, no limit), `-s all`, or `tk closed`.
+
+---
+
+## Optional Tools
+
+The core needs only Bash 3.2+ and standard Unix tools. These are used when present:
+
+| Tool | Used for |
+| :--- | :--- |
+| `jq` | `tk query <filter>`; without it, only unfiltered `tk query` works |
+| `rg` (ripgrep) | Faster `tk find`; falls back to `grep` |
+| `git` | Default assignee (`user.name`); sharing tickets |
 </file>
 
 <file path="docs/core-cli/dependencies.md">
@@ -2055,34 +2190,61 @@ title: Dependency Intelligence
 description: Understanding Directed Acyclic Graphs (DAG) and dependency tracking in ticket.
 ---
 
-`ticket` (`tk`) treats task dependencies as a **Directed Acyclic Graph (DAG)**. This ensures tasks are completed in the correct logical sequence without circular deadlocks.
+`ticket` (`tk`) treats task dependencies as a **Directed Acyclic Graph (DAG)**, so `tk ready` can compute the next actionable work deterministically.
 
 ---
 
 ## How Dependencies Work
 
-When task `B` depends on task `A`:
-1. `B` is considered **blocked** until `A` is closed.
-2. `tk ready` will only show `B` after `A` transitions to `closed`.
-3. Closing `A` automatically unblocks `B`.
+When ticket `B` depends on ticket `A` (`deps: [A]` in `B`'s frontmatter):
+
+1. `B` is **blocked** while `A` is `open` or `in_progress`.
+2. `tk ready` lists `B` only after `A` is `closed`; until then `tk blocked` lists it with its blockers.
+3. Closing `A` unblocks `B` with no further action.
+
+| Relation | Field | Blocks? | Command |
+| :--- | :--- | :--- | :--- |
+| Dependency | `deps` | Yes | `tk dep <id> <dep-id>` |
+| Link | `links` (symmetric) | No | `tk link <id> <id> [id...]` |
+| Parent/subtask | `parent` | No | `tk create --parent <id>`, `tk update <id> --parent <id>` |
 
 ### Adding Dependencies
+
 ```bash
-# tic-backend-api must finish before tic-frontend-ui can start
-tk dep tic-frontend-ui tic-backend-api
+# The API ticket must close before the UI ticket is ready
+tk dep web-ui3k9a api-7f2c1d
 ```
 
+Both IDs must exist; `tk dep` exits `1` if either is not found.
+
 ### Cycle Detection
-To prevent circular deadlocks (e.g., A depends on B, B depends on A), `tk` includes native cycle detection:
+
+`tk dep` does not reject a dependency that closes a loop. Run `tk dep cycle` to report cycles among open tickets; tickets in a cycle never become ready until one edge is removed with `tk undep`.
+
 ```bash
 tk dep cycle
+# Cycle 1: web-ui3k9a -> api-7f2c1d -> web-ui3k9a
 ```
 
 ### Viewing Dependency Trees
-Inspect recursive upstream and downstream relationships:
+
 ```bash
-tk dep tree tic-frontend-ui
+tk dep tree web-ui3k9a          # repeated subtrees are shown once
+tk dep tree --full web-ui3k9a   # disable deduplication
 ```
+
+---
+
+## Ready Queue for Agents
+
+Many agents can share one queue. Each takes a ready ticket and claims it atomically:
+
+```bash
+tk ready -T backend                              # pick a candidate
+tk start api-7f2c1d --claim --assignee agent-2   # exit 3 if someone else claimed it first
+```
+
+A claim that loses the race exits `3`; pick another ticket from `tk ready`. See [Command Reference](commands.md#status-and-claiming).
 </file>
 
 <file path="docs/getting-started/installation.md">
@@ -2091,7 +2253,7 @@ title: Installation
 description: How to install ticket (tk) and its modular plugins.
 ---
 
-`ticket` (`tk`) is designed with a zero-dependency POSIX Bash core and modular optional plugins. You can install only what you need.
+`ticket` (`tk`) has a single-file Bash core with no runtime dependencies. Plugins are optional; install only what you need.
 
 ## Quick Install
 
@@ -2105,34 +2267,46 @@ cd ticket
 ./install.sh --full
 ```
 
-Binaries are installed to `~/.local/bin/` (`tk`, `tk-webui`, plus optional plugin binaries). Ensure `~/.local/bin` is in your `$PATH`.
+Binaries are installed to `~/.local/bin/` (override with `BIN_DIR`). Ensure that directory is on your `$PATH`.
+
+---
+
+## Requirements
+
+**Core CLI**: Bash 3.2+ and standard Unix tools (`awk`, `sed`, `grep`, `find`, `mkdir`, `date`) on macOS or Linux. Python and Node are not used.
+
+| Optional tool | Used for |
+| :--- | :--- |
+| `jq` | `tk query <filter>` (unfiltered `tk query` works without it) |
+| `rg` (ripgrep) | Faster `tk find`; `grep` is used otherwise |
+| `git` | Sharing tickets; default assignee from `git config user.name` |
 
 ---
 
 ## Installation Flags
 
-The installer supports composable flags so you can install precisely the components you require:
+Flags accumulate, so any combination works (e.g. `./install.sh --core --github`):
 
-| Flag | Description | Mandatory Dependencies |
+| Flag | Installs | Requires |
 | :--- | :--- | :--- |
-| `--core` | Installs only the core `tk` POSIX Bash CLI | **Zero** (Pure Bash) |
-| `--webui` | Installs the interactive Kanban & DAG Web UI (`tk-webui`) | Python 3.9+, FastAPI |
-| `--skill` | Installs the AI agent skill (`tk-agent-skill`) | None |
-| `--github` | Installs the optional GitHub sync plugin (`tk-github`) | Python / Bash |
-| `--scion-taskforce` | Installs the autonomous SCION Task Force worker orchestrator (`tk-scion-taskforce`) | Python 3.9+, `scion` CLI |
-| `--full` | **(Default)** Installs Core CLI, Web UI, and Agent Skill | Python 3.9+ (for Web UI) |
-| `--all` | Installs everything, including optional plugins | Python 3.9+, `scion` CLI |
+| `--core`, `-c` | Core `tk` CLI | Bash 3.2+ |
+| `--webui`, `-w` | Web UI plugin (`tk webui`) in a local `.venv` | Python 3.9+ with `uv` or `pip` |
+| `--skill`, `-s` | Agent skill to `~/.agents/skills/tk/SKILL.md` | None |
+| `--github`, `-g` | GitHub import plugin (`tk github`) | `gh` (authenticated), `jq` |
+| `--scion-taskforce`, `-t` | SCION Task Force plugin (`tk scion-taskforce`) | Python 3.9+, `scion` CLI |
+| `--full`, `-f` | **(Default)** Core, Web UI and Agent Skill | Python 3.9+ (for the Web UI) |
+| `--all` | Everything above | All of the above |
 
 ### Examples
 
 ```bash
-# Install only the lightweight core CLI (no Python/Node required)
+# Core CLI only (no Python required)
 ./install.sh --core
 
-# Install Core CLI + GitHub sync plugin
+# Core CLI + GitHub import plugin
 ./install.sh --core --github
 
-# Install everything including optional plugins
+# Everything, including the GitHub and SCION Task Force plugins
 ./install.sh --all
 ```
 </file>
@@ -2156,56 +2330,73 @@ cd my-project
 tk init
 ```
 
-This creates a `.tickets/` directory where all tasks are stored as plain Markdown files with YAML frontmatter.
+This creates `.tickets/` with a closed setup ticket and a `.tickets/.gitignore` that keeps lock files and the hook log out of Git. Tickets are plain Markdown files with YAML frontmatter; commit them with your code. (`tk create` also initializes `.tickets/` if it is missing.)
 
-## Step 2: Create a Task
+## Step 2: Create Tasks
 
-Create your first task with priority and tags:
+Create tasks with priority and tags:
 
 ```bash
 tk create "Implement user authentication" \
   -d "Add JWT-based auth to FastAPI backend" \
   -p 1 \
   --tags backend,security
+# myp-a1b2c3
+
+tk create "Add login page" --tags frontend
+# myp-d4e5f6
 ```
 
-`tk` prints the generated task ID (e.g., `tic-abc1`).
+`tk` prints the generated ID: a prefix from the folder name plus a 6-character random hash. Commands accept partial IDs (`tk show a1b`).
 
-## Step 3: Check Actionable Work (`tk ready`)
+## Step 3: Add a Dependency
 
-Run `tk ready` to list unblocked tasks whose dependencies are fully satisfied:
+The login page needs the auth work first:
+
+```bash
+tk dep myp-d4e5f6 myp-a1b2c3
+```
+
+## Step 4: Check Actionable Work (`tk ready`)
+
+`tk ready` lists tickets whose dependencies are all closed:
 
 ```bash
 tk ready
 ```
 
-## Step 4: Claim & Work on the Task
+Only `myp-a1b2c3` is listed; `tk blocked` shows `myp-d4e5f6` waiting on it.
+
+## Step 5: Claim & Work on the Task
 
 Mark the task as in progress:
 
 ```bash
-tk start tic-abc1
+tk start myp-a1b2c3
 ```
 
-Add review notes or progress logs:
+When several agents or people share the queue, claim instead. The claim sets the assignee and status in one locked step and exits `3` if someone else already holds the ticket:
 
 ```bash
-tk add-note tic-abc1 "Completed token generation logic and unit tests."
+tk start myp-a1b2c3 --claim
 ```
 
-## Step 5: Close the Task & Unblock Dependents
-
-When finished, close the task:
+Add progress notes:
 
 ```bash
-tk close tic-abc1
+tk add-note myp-a1b2c3 "Completed token generation logic and unit tests."
 ```
 
-This automatically updates the status and unblocks any downstream dependent tasks.
+## Step 6: Close the Task & Unblock Dependents
 
-## Step 6: Launch the Interactive Web UI
+```bash
+tk close myp-a1b2c3
+tk ready    # myp-d4e5f6 is now ready
+```
 
-Launch the 4-lane Kanban board and DAG Mind Map:
+## Step 7: Launch the Web UI (Optional Plugin)
+
+If you installed the Web UI (`./install.sh --full` or `--webui`), open the Kanban board and DAG Mind Map:
 
 ```bash
 tk webui
@@ -2236,7 +2427,7 @@ description: Minimal, dependency-aware task tracker. Built to scale agentic work
 
 ```mermaid
 graph TD
-    A[".tickets/*.md<br/>(Plain Text & Git)"] --> B["Core POSIX CLI<br/>(tk ready, tk start, tk dep)"]
+    A[".tickets/*.md<br/>(Plain Text & Git)"] --> B["Core Bash CLI<br/>(tk ready, tk start, tk dep)"]
     B --> C["Interactive Web UI<br/>(Kanban & DAG Mind Map)"]
     B --> D["AI Agent Skill<br/>(Automated 5-Step Loop)"]
 
@@ -2252,17 +2443,18 @@ graph TD
 
 - **Plain Text Storage**: Tasks reside in `.tickets/*.md` files with YAML frontmatter, versioned directly in Git alongside the codebase.
 - **DAG Dependency Tracking**: Native support for parent-child hierarchies, blockers, cycle detection, and automated downstream unblocking.
-- **Fast POSIX Core**: Core CLI runs on portable POSIX Bash with zero mandatory runtime dependencies (no Python or Node required for base operations).
+- **Portable Bash Core**: One Bash 3.2+ script using standard Unix tools; no Python or Node. `jq` is optional (only for `tk query` filters).
+- **Safe for Concurrent Agents**: `tk start --claim` claims a ticket atomically under a per-ticket lock, exiting `3` if another agent got there first.
 - **AI Agent Integration**: Deterministic 5-step operational loop, reusable agent skill (`agent-skill/tk/SKILL.md`), and machine-readable context endpoints.
 
 ---
 
 ## Official Plugins
 
-Extend `ticket` with modular plugins discovered automatically via `$PATH`:
+Extend `ticket` with optional plugins discovered automatically via `$PATH`:
 
 - **[Web UI (`tk webui`)](plugins/webui.md)**: Interactive 4-lane Kanban board, DAG Mind Map graph, table view, and background daemon manager.
-- **[GitHub Sync (`tk github`)](plugins/github.md)**: Bi-directional synchronization between local markdown tickets and GitHub issues/pull requests.
+- **[GitHub Sync (`tk github`)](plugins/github.md)**: One-way import of GitHub issues and pull requests into local tickets.
 - **[SCION Task Force (`tk scion-taskforce`)](plugins/scion-taskforce.md)**: Event-driven multi-agent worker orchestration: a ticket save starts a SCION worker; humans review and close.
 
 Learn how to write custom plugins in pure Bash or Python in the [Plugin Architecture Guide](plugins/architecture.md).
@@ -2280,7 +2472,7 @@ cd ticket
 # Full Suite (CLI + Web UI + Agent Skill) — default
 ./install.sh --full
 
-# Core CLI Only (Pure Bash, zero Python dependencies)
+# Core CLI only (pure Bash, no Python)
 ./install.sh --core
 ```
 
