@@ -89,11 +89,33 @@ generate_id() {
     # Fallback to first 3 chars if single segment (prefix too short)
     [[ ${#prefix} -lt 2 ]] && prefix="${dir_name:0:3}"
 
-    # 4-char random lower case alphanumeric string
-    local hash
-    hash=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
+    # Random lowercase alphanumeric hash, 6 chars by default (TK_ID_HASH_LENGTH, 4-32).
+    # Lowercase only, so IDs stay distinct on case-insensitive filesystems (macOS, Windows).
+    # NOTE: was a fixed 4 chars (36^4 ~ 1.7M values); with ~1000 tickets created on
+    # parallel branches that gives ~25% odds of a collision at merge time. 36^6 ~ 2.2e9.
+    local len="${TK_ID_HASH_LENGTH:-6}"
+    [[ "$len" =~ ^[0-9]+$ && $len -ge 4 && $len -le 32 ]] || len=6
 
-    echo "${prefix}-${hash}"
+    # Retry if the ID already exists locally (guards same-checkout collisions).
+    local hash id _
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        hash=$(_random_alnum "$len")
+        id="${prefix}-${hash}"
+        [[ -n "${TICKETS_DIR:-}" && -e "$TICKETS_DIR/${id}.md" ]] || break
+    done
+
+    echo "$id"
+}
+
+# Print N random lowercase alphanumeric chars: /dev/urandom, with a $RANDOM fallback.
+_random_alnum() {
+    local len="$1" out=""
+    out=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom 2>/dev/null | head -c "$len" 2>/dev/null) || true
+    local chars="abcdefghijklmnopqrstuvwxyz0123456789"
+    while [[ ${#out} -lt $len ]]; do
+        out+="${chars:$(( RANDOM % 36 )):1}"
+    done
+    echo "${out:0:$len}"
 }
 
 # Ensure tickets directory exists
