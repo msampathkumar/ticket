@@ -156,9 +156,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Failed to load global projects', e);
   }
 
+  // Initial project priority (tic-qiet): ?dir= URL param, then the directory
+  // given on the command line (/api/config), then the last opened project, then '.'.
+  let serverInitialDir = null;
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const config = await res.json();
+      serverInitialDir = config.initial_dir || null;
+    }
+  } catch (e) {
+    console.error('Failed to load server config', e);
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   const dirParam = urlParams.get('dir');
-  const initialDir = dirParam || localStorage.getItem('tk_current_dir') || '.';
+  const initialDir = dirParam || serverInitialDir || localStorage.getItem('tk_current_dir') || '.';
 
   elements.dirInput.value = initialDir;
   await loadDirectory(initialDir);
