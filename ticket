@@ -131,28 +131,71 @@ ticket_path() {
     fi
 }
 
-# Extract YAML field value
+# Extract YAML field value (frontmatter only). Single-quoted scalars written by
+# _yaml_scalar are unquoted, so callers see the original value.
 yaml_field() {
     local file="$1"
     local field="$2"
-    sed -n '/^---$/,/^---$/p' "$file" | _grep "^${field}:" | sed "s/^${field}: *//"
+    local v
+    v=$(sed -n '/^---$/,/^---$/p' "$file" | _grep "^${field}:" | sed "s/^${field}: *//") || return
+    if [[ "$v" == "'"*"'" && ${#v} -ge 2 && "$v" != *$'\n'* ]]; then
+        v="${v:1:${#v}-2}"
+        local q="'"
+        v="${v//$q$q/$q}"
+    fi
+    printf '%s\n' "$v"
 }
 
-# Update YAML field
+# Fail if a single-line frontmatter value contains a newline or carriage return.
+_require_single_line() {
+    local field="$1" value="$2"
+    if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+        echo "Error: $field must be a single line (newlines are not allowed)" >&2
+        return 1
+    fi
+}
+
+# Quote a scalar only when plain YAML would parse it differently (or fail to parse):
+# leading indicator chars, ": " or " #" inside, a trailing ":", or edge whitespace.
+# Plain values are written unchanged, so existing files and readers are unaffected.
+_yaml_scalar() {
+    local v="$1" q="'" quote=0
+    case "$v" in
+        [\[\]\{\}\#\&\*\!\|\>\'\"%@\`,]*) quote=1 ;;
+        [-?:]|[-?:]" "*) quote=1 ;;
+        *": "*|*" #"*|*:|" "*|*" ") quote=1 ;;
+    esac
+    if [[ $quote -eq 1 ]]; then
+        v="$q${v//$q/$q$q}$q"
+    fi
+    printf '%s' "$v"
+}
+
+# Update YAML field (frontmatter only). The value is passed to awk via ENVIRON, so
+# '/', '&', '\' and '|' are stored verbatim. List fields (deps, links, tags) are written
+# as given; other values go through _yaml_scalar.
 update_yaml_field() {
     local file="$1"
     local field="$2"
     local value="$3"
 
-    if _grep -q "^${field}:" "$file"; then
-        _sed_i "$file" "s/^${field}:.*/${field}: ${value}/"
-    else
-        # Insert after first --- (beginning of frontmatter).
-        # NOTE: previously used sed's `0,/^---$/ {...}` which is a GNU extension; BSD sed (macOS)
-        # silently inserted nothing, so new fields (e.g. tags) were never added. awk is portable.
-        local tmp="${file}.tmp.$$"
-        awk -v line="${field}: ${value}" 'BEGIN{done=0} {print} !done && /^---$/ {print line; done=1}' "$file" > "$tmp" && mv "$tmp" "$file"
-    fi
+    _require_single_line "$field" "$value" || return 1
+    case "$field" in
+        deps|links|tags) ;;
+        *) value=$(_yaml_scalar "$value") ;;
+    esac
+
+    # NOTE: previously `sed s/^field:.*/field: value/` (broke on '/', '&', '\', and also
+    # rewrote matching lines in the body) plus an awk insert. One awk pass now does both.
+    local tmp="${file}.tmp.$$"
+    TK_YAML_LINE="${field}: ${value}" awk -v field="$field" '
+        BEGIN { line = ENVIRON["TK_YAML_LINE"]; fm = 0; done = 0 }
+        fm == 0 && /^---$/ { print; fm = 1; next }
+        fm == 1 && /^---$/ { if (!done) print line; done = 1; fm = 2; print; next }
+        fm == 1 && index($0, field ":") == 1 { if (!done) print line; done = 1; next }
+        { print }
+        END { if (!done && fm == 0) exit 0 }
+    ' "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
 # Remove YAML field
@@ -313,7 +356,7 @@ cmd_init() {
             echo "created: $now"
             echo "type: task"
             echo "priority: 2"
-            [[ -n "$assignee" ]] && echo "assignee: $assignee"
+            [[ -n "$assignee" ]] && echo "assignee: $(_yaml_scalar "$assignee")"
             echo "---"
             echo "# Setup ticket in $folder_name folder"
             echo ""
@@ -404,6 +447,9 @@ cmd_create() {
     fi
 
     title="${title:-Untitled}"
+    _require_single_line "assignee" "$assignee" || return 1
+    _require_single_line "external-ref" "$external_ref" || return 1
+    _require_single_line "tags" "$tags" || return 1
     local id
     id=$(generate_id)
     local file="$TICKETS_DIR/${id}.md"
@@ -419,8 +465,8 @@ cmd_create() {
         echo "created: $now"
         echo "type: $issue_type"
         echo "priority: $priority"
-        [[ -n "$assignee" ]] && echo "assignee: $assignee"
-        [[ -n "$external_ref" ]] && echo "external-ref: $external_ref"
+        [[ -n "$assignee" ]] && echo "assignee: $(_yaml_scalar "$assignee")"
+        [[ -n "$external_ref" ]] && echo "external-ref: $(_yaml_scalar "$external_ref")"
         [[ -n "$parent" ]] && echo "parent: $parent"
         if [[ -n "$tags" ]]; then
             echo "tags: [${tags//,/, }]"
