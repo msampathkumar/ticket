@@ -462,11 +462,21 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-14
+
 ### Added
-- Release assets: every GitHub release ships `tk`, `tk-core.zip` and `SHA256SUMS` for install without cloning (`make dist`, `scripts/build-dist.sh`; `release-assets.yml` backfills an existing tag). Documented in the agent skill, README and installation guide.
+- Release assets: every GitHub release ships `tk`, `tk-core.zip` and `SHA256SUMS` for install without cloning (`make dist`, `scripts/build-dist.sh`; `release-assets.yml` backfills an existing tag). Documented in the agent skill, README and installation guide (#49).
+- CI: the "Web UI CSS is fresh" job fails when `tk_webui/static/css/tailwind.css` is stale (`make webui-css`, `make webui-css-check`) (#47).
+
+### Changed
+- Core: the fallback agent skill embedded in `tk` includes the install-without-cloning section (#49).
+
+### Fixed
+- GitHub: re-sync replaces legacy label tags (e.g. `autorelease: pending`, `autorelease:pending`) with the sanitised tag and removes duplicates; user-added tags are kept (#46).
+- Web UI: regenerated `tailwind.css` to match the pinned build (#47).
 
 ### Removed
-- Packaging: AUR PKGBUILDs (`pkg/aur/`), `scripts/publish-aur.sh` and the release workflow AUR step; they pointed at upstream `wedow/ticket`.
+- Packaging: AUR PKGBUILDs (`pkg/aur/`), `scripts/publish-aur.sh` and the release workflow AUR step; they pointed at upstream `wedow/ticket` (#45).
 
 ## [0.5.0] - 2026-10-14
 
@@ -856,7 +866,7 @@ tk scion-taskforce skills list             # Installed tk-scion-* skills
 
 - **Plugin Name**: `tk-webui`
 - **Command**: `tk webui`
-- **Version**: `0.5.0`
+- **Version**: `0.5.1`
 - **Installation**: Included in Full Installation (`./install.sh --full` or `./install.sh --webui`)
 
 ---
@@ -909,7 +919,7 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `--host`: Host IP to bind (default: `127.0.0.1`). The value is added to the Host allowlist; `0.0.0.0` / `::` allow any Host (see 5.1).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
 - `--reload`: Reload on code change (development only).
-- `--version` / `-v`: Displays version and project details (`tk-webui 0.5.0`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.5.1`).
 
 ### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash
@@ -990,7 +1000,7 @@ Computed in `tk_cli.get_all_tickets`, matching core `cmd_ready` / `cmd_blocked`:
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
-- **Version**: `0.5.0`
+- **Version**: `0.5.1`
 - **Installation**: Optional (`./install.sh --github`)
 
 ---
@@ -1506,7 +1516,7 @@ Include a comment in the first 10 lines:
 ```bash
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban, DAG and review-notes Web UI
-# tk-plugin-version: 0.5.0
+# tk-plugin-version: 0.5.1
 ```
 
 **Compiled Binaries**:
@@ -1520,7 +1530,7 @@ tk-plugin: Interactive Kanban, DAG and review-notes Web UI
 All plugins should implement `--version` or `-v` flag to output their version:
 ```bash
 $ tk-webui --version
-tk-webui 0.5.0
+tk-webui 0.5.1
 ```
 
 ---
