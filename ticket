@@ -97,8 +97,8 @@ generate_id() {
     [[ "$len" =~ ^[0-9]+$ && $len -ge 4 && $len -le 32 ]] || len=6
 
     # Retry if the ID already exists locally (guards same-checkout collisions).
-    local hash id attempt
-    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    local hash id _
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
         hash=$(_random_alnum "$len")
         id="${prefix}-${hash}"
         [[ -n "${TICKETS_DIR:-}" && -e "$TICKETS_DIR/${id}.md" ]] || break
