@@ -43,7 +43,7 @@
 
   <!-- Top Navbar -->
   <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm sticky top-0 z-30">
-    <div class="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div class="w-full px-4 sm:px-6 lg:px-8 2xl:px-12 py-3 flex flex-wrap items-center justify-between gap-4">
       
       <!-- Brand & Project Selector -->
       <div class="flex items-center gap-4 flex-1 min-w-[320px]">
@@ -176,8 +176,8 @@
   </header>
 
   <!-- Subheader: Status & Stats Bar -->
-  <section id="statsBar" class="bg-white/60 dark:bg-slate-900/60 backdrop-blur border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 lg:px-8 py-2 text-xs">
-    <div class="max-w-[1700px] mx-auto flex flex-wrap items-center justify-between gap-3">
+  <section id="statsBar" class="bg-white/60 dark:bg-slate-900/60 backdrop-blur border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 lg:px-8 2xl:px-12 py-2 text-xs">
+    <div class="w-full flex flex-wrap items-center justify-between gap-3">
       
       <!-- Current repo info -->
       <div class="flex items-center gap-2 font-mono text-slate-500 dark:text-slate-400">
@@ -215,8 +215,8 @@
   </div>
 
   <!-- VIEW 1: Main Kanban Board Container -->
-  <main id="kanbanBoard" class="view-container flex-1 overflow-x-auto p-4 sm:p-6 lg:p-8">
-    <div class="max-w-[1700px] mx-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
+  <main id="kanbanBoard" class="view-container flex-1 overflow-x-auto p-4 sm:p-6 lg:p-8 2xl:px-12">
+    <div class="w-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
 
       <!-- Column 1: Ready / Open -->
       <div class="flex flex-col bg-slate-100/70 dark:bg-slate-900/40 rounded-2xl p-4 border border-slate-300/80 dark:border-slate-800/80">
@@ -286,7 +286,7 @@
   </main>
 
   <!-- VIEW 2: Table View Container -->
-  <section id="tableView" class="view-container hidden flex-1 max-w-[1700px] w-full mx-auto p-4 sm:p-6 lg:p-8">
+  <section id="tableView" class="view-container hidden flex-1 w-full p-4 sm:p-6 lg:p-8 2xl:px-12">
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
       <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
         <h3 class="font-bold text-base flex items-center gap-2">
@@ -317,7 +317,7 @@
   </section>
 
   <!-- VIEW 3: Interactive Tree / Dependency Graph Container (tic-d04l) -->
-  <section id="treeView" class="view-container hidden flex-1 max-w-[1700px] w-full mx-auto p-4 sm:p-6 lg:p-8">
+  <section id="treeView" class="view-container hidden flex-1 w-full p-4 sm:p-6 lg:p-8 2xl:px-12">
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 min-h-[700px] flex flex-col">
       <div class="flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>
@@ -409,7 +409,7 @@
   </section>
 
   <!-- VIEW 4: Timeline / Gantt View Container -->
-  <section id="timelineView" class="view-container hidden flex-1 max-w-[1700px] w-full mx-auto p-4 sm:p-6 lg:p-8">
+  <section id="timelineView" class="view-container hidden flex-1 w-full p-4 sm:p-6 lg:p-8 2xl:px-12">
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
       <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -420,7 +420,7 @@
           <p class="text-xs text-slate-400 mt-0.5">Chronological overview of tickets sorted by creation date</p>
         </div>
       </div>
-      <div id="timelineContainer" class="space-y-4 max-w-4xl mx-auto"></div>
+      <div id="timelineContainer" class="space-y-4 max-w-4xl 2xl:max-w-6xl mx-auto"></div>
     </div>
   </section>
 
