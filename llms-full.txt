@@ -247,7 +247,13 @@ curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk -
 chmod +x ~/.local/bin/tk
 ```
 
-Also available: [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) (`ticket`, `LICENSE`, `INSTALL.md`) and [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) for verification.
+Also available: [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) (`ticket`, `LICENSE`, `INSTALL.md`) and [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) for verification. To install from the zip:
+
+```bash
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip -o /tmp/tk-core.zip
+unzip -o /tmp/tk-core.zip -d /tmp/tk-core
+mkdir -p ~/.local/bin && cp /tmp/tk-core/ticket ~/.local/bin/tk && chmod +x ~/.local/bin/tk
+```
 
 ### Install Agent Skill via NPX
 
@@ -416,6 +422,7 @@ flowchart LR
    Run `tk show <id>` to inspect design notes, acceptance criteria, and child tickets. Decompose complex tasks using `tk create "<title>" --parent <id>` and `tk dep <child> <dependency>`.
 4. **Implement, Verify & Record Notes**:
    Execute the code changes, run tests (`make test`), and append review audit notes via `tk add-note <id> "..."`.
+   Once all code changes are done, update the user-facing docs to match: `docs/` pages, `agent-skill/tk/SKILL.md` (then `make skill-sync`), and `README.md`.
 5. **Close the Ticket**:
    Run `tk close <id>` to mark complete and automatically unblock downstream dependent tickets.
 
@@ -430,6 +437,7 @@ flowchart LR
   - Default `tk ls`: Hides closed tickets and defaults to 10 items (unlimited with `--full` or `--all`).
 - **Test-Driven Verification**: Validate changes against the BDD test suite using `make test` before finishing tasks. CI matrix runs automatically on Ubuntu across Python 3.11 & 3.13.
 - **Documentation Maintenance**: Recompile documentation and LLM context files using `make docs-build` when adding or modifying documentation. Preview locally using `make docs-dev`.
+- **Docs After Code**: After all code changes for a task or release are done, update `docs/`, `agent-skill/tk/SKILL.md` (run `make skill-sync` so the copy embedded in `ticket` matches), and `README.md` before closing the ticket or cutting a release. Users and agents with only the skill rely on it being current.
 - **Automated Linting & Quality**: Ensure code satisfies linting checks (`uvx ruff check plugins/scion-taskforce/ tk_webui/`).
 - **Git Hygiene**: Do not mutate Git history or push commits without explicit confirmation.
 - **No Upstream Contributions**: This project started as a fork of [`wedow/ticket`](https://github.com/wedow/ticket) (credited in the README) and has since taken an independent direction. Do not open pull requests, issues, or sync branches against `wedow/ticket`. All work targets `msampathkumar/ticket` (`master`).
@@ -461,6 +469,12 @@ When authoring or modifying documentation, commit messages, code comments, or pu
 # Changelog
 
 ## [Unreleased]
+
+## [0.5.2] - 2026-10-15
+
+### Changed
+- Docs: agent skill, installation guide and README give step-by-step install from `tk-core.zip`; the skill copy embedded in `tk` matches.
+- Docs: AGENTS.md workflow requires updating `docs/`, the agent skill (`make skill-sync`) and README after all code changes, before closing a ticket or cutting a release.
 
 ## [0.5.1] - 2026-10-14
 
@@ -667,6 +681,12 @@ curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk -
 tk version
 ```
 - Zip alternative (`ticket`, `LICENSE`, `INSTALL.md`): https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip
+  ```bash
+  curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip -o /tmp/tk-core.zip
+  unzip -o /tmp/tk-core.zip -d /tmp/tk-core
+  mkdir -p ~/.local/bin && cp /tmp/tk-core/ticket ~/.local/bin/tk && chmod +x ~/.local/bin/tk
+  tk version
+  ```
 - Release page: https://github.com/msampathkumar/ticket/releases/latest
 - Verify: download `SHA256SUMS` from the same release, then run `sha256sum -c --ignore-missing SHA256SUMS` (macOS: `shasum -a 256 -c --ignore-missing SHA256SUMS`) in the download directory.
 
@@ -866,7 +886,7 @@ tk scion-taskforce skills list             # Installed tk-scion-* skills
 
 - **Plugin Name**: `tk-webui`
 - **Command**: `tk webui`
-- **Version**: `0.5.1`
+- **Version**: `0.5.2`
 - **Installation**: Included in Full Installation (`./install.sh --full` or `./install.sh --webui`)
 
 ---
@@ -919,7 +939,7 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `--host`: Host IP to bind (default: `127.0.0.1`). The value is added to the Host allowlist; `0.0.0.0` / `::` allow any Host (see 5.1).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
 - `--reload`: Reload on code change (development only).
-- `--version` / `-v`: Displays version and project details (`tk-webui 0.5.1`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.5.2`).
 
 ### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash
@@ -1000,7 +1020,7 @@ Computed in `tk_cli.get_all_tickets`, matching core `cmd_ready` / `cmd_blocked`:
 
 - **Plugin Name**: `tk-github` / `ticket-github`
 - **Command**: `tk github`
-- **Version**: `0.5.1`
+- **Version**: `0.5.2`
 - **Installation**: Optional (`./install.sh --github`)
 
 ---
@@ -1516,7 +1536,7 @@ Include a comment in the first 10 lines:
 ```bash
 #!/usr/bin/env bash
 # tk-plugin: Interactive Kanban, DAG and review-notes Web UI
-# tk-plugin-version: 0.5.1
+# tk-plugin-version: 0.5.2
 ```
 
 **Compiled Binaries**:
@@ -1530,7 +1550,7 @@ tk-plugin: Interactive Kanban, DAG and review-notes Web UI
 All plugins should implement `--version` or `-v` flag to output their version:
 ```bash
 $ tk-webui --version
-tk-webui 0.5.1
+tk-webui 0.5.2
 ```
 
 ---
@@ -2377,6 +2397,15 @@ tk version
 | [`tk`](https://github.com/msampathkumar/ticket/releases/latest/download/tk) | The core CLI script |
 | [`tk-core.zip`](https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip) | `ticket`, `LICENSE`, `INSTALL.md` |
 | [`SHA256SUMS`](https://github.com/msampathkumar/ticket/releases/latest/download/SHA256SUMS) | Checksums for `tk` and `tk-core.zip` |
+
+To install from the zip instead:
+
+```bash
+curl -fsSL https://github.com/msampathkumar/ticket/releases/latest/download/tk-core.zip -o /tmp/tk-core.zip
+unzip -o /tmp/tk-core.zip -d /tmp/tk-core
+mkdir -p ~/.local/bin && cp /tmp/tk-core/ticket ~/.local/bin/tk && chmod +x ~/.local/bin/tk
+tk version
+```
 
 Verify downloads in the download directory with `sha256sum -c --ignore-missing SHA256SUMS` (macOS: `shasum -a 256 -c --ignore-missing SHA256SUMS`). Release assets contain the core only; use `./install.sh` for the Web UI and plugins.
 
