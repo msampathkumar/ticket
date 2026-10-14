@@ -27,6 +27,11 @@ def get_ticket_script(context):
     return str(Path(context.project_dir) / 'ticket')
 
 
+def _flow_items(inner):
+    """Split the inside of a YAML flow list ("a, b") into its elements."""
+    return [x.strip().strip('"\'') for x in inner.split(',') if x.strip()]
+
+
 def create_ticket(context, ticket_id, title, priority=2, parent=None):
     """Helper to create a ticket file."""
     tickets_dir = Path(context.test_dir) / '.tickets'
@@ -570,7 +575,8 @@ def step_ticket_has_dep(context, ticket_id, dep_id):
     deps_match = re.search(r'^deps:\s*\[([^\]]*)\]', content, re.MULTILINE)
     assert deps_match, f"deps field not found\nContent: {content}"
     deps = deps_match.group(1)
-    assert dep_id in deps, f"Dependency '{dep_id}' not in deps: [{deps}]"
+    # Exact element match (tic-4ld5): substring matching treated task-1 as in [task-12].
+    assert dep_id in _flow_items(deps), f"Dependency '{dep_id}' not in deps: [{deps}]"
 
 
 @then(r'ticket "(?P<ticket_id>[^"]+)" should not have "(?P<dep_id>[^"]+)" in deps')
@@ -582,7 +588,7 @@ def step_ticket_not_has_dep(context, ticket_id, dep_id):
     deps_match = re.search(r'^deps:\s*\[([^\]]*)\]', content, re.MULTILINE)
     assert deps_match, f"deps field not found\nContent: {content}"
     deps = deps_match.group(1)
-    assert dep_id not in deps, f"Dependency '{dep_id}' should not be in deps: [{deps}]"
+    assert dep_id not in _flow_items(deps), f"Dependency '{dep_id}' should not be in deps: [{deps}]"
 
 
 @then(r'ticket "(?P<ticket_id>[^"]+)" should have "(?P<link_id>[^"]+)" in links')
@@ -594,7 +600,8 @@ def step_ticket_has_link(context, ticket_id, link_id):
     links_match = re.search(r'^links:\s*\[([^\]]*)\]', content, re.MULTILINE)
     assert links_match, f"links field not found\nContent: {content}"
     links = links_match.group(1)
-    assert link_id in links, f"Link '{link_id}' not in links: [{links}]"
+    # Exact element match (tic-4ld5): substring matching treated task-1 as in [task-12].
+    assert link_id in _flow_items(links), f"Link '{link_id}' not in links: [{links}]"
 
 
 @then(r'ticket "(?P<ticket_id>[^"]+)" should not have "(?P<link_id>[^"]+)" in links')
@@ -606,7 +613,7 @@ def step_ticket_not_has_link(context, ticket_id, link_id):
     links_match = re.search(r'^links:\s*\[([^\]]*)\]', content, re.MULTILINE)
     assert links_match, f"links field not found\nContent: {content}"
     links = links_match.group(1)
-    assert link_id not in links, f"Link '{link_id}' should not be in links: [{links}]"
+    assert link_id not in _flow_items(links), f"Link '{link_id}' should not be in links: [{links}]"
 
 
 @then(r'ticket "(?P<ticket_id>[^"]+)" should contain "(?P<text>[^"]+)"')

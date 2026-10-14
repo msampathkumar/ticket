@@ -1174,6 +1174,35 @@ cmd_dep_cycle() {
     ' "$TICKETS_DIR"/*.md 2>/dev/null
 }
 
+# YAML flow-list helpers for deps/links ("[a, b]"). Exact element matching: the old
+# substring grep treated tic-1 as present in [tic-12], and the old sed removal turned
+# [tic-12] into [2] when removing tic-1 (tic-4ld5).
+_list_items() {
+    local v="${1:-}"
+    v="${v#[}"
+    v="${v%]}"
+    printf '%s\n' "$v" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; /^$/d'
+}
+
+# A loop, not `| grep -q`: with pipefail an early grep exit could fail the pipeline.
+_list_has() {
+    local item
+    while IFS= read -r item; do
+        [[ "$item" == "$2" ]] && return 0
+    done < <(_list_items "$1")
+    return 1
+}
+
+# Print the list without <item>, in the same "[a, b]" format.
+_list_remove() {
+    local out="" item
+    while IFS= read -r item; do
+        [[ "$item" == "$2" ]] && continue
+        out="${out:+$out, }$item"
+    done < <(_list_items "$1")
+    printf '[%s]\n' "$out"
+}
+
 # Print the shortest dependency path "<from> -> ... -> <to>" and return 0 if <to> is
 # reachable from <from> through deps; return 1 otherwise. Walks every ticket, closed ones
 # included: a cycle through a closed ticket comes back when that ticket is reopened.
@@ -1259,7 +1288,9 @@ cmd_dep() {
     current_deps=$(yaml_field "$file" "deps")
 
     # Add dep if not already present
-    if echo "$current_deps" | _grep -q "$dep_id"; then
+    # Replaced: substring match (tic-4ld5).
+    # if echo "$current_deps" | _grep -q "$dep_id"; then
+    if _list_has "$current_deps" "$dep_id"; then
         echo "Dependency already exists"
         return 0
     fi
@@ -1537,16 +1568,18 @@ cmd_undep() {
     local current_deps
     current_deps=$(yaml_field "$file" "deps")
 
-    if ! echo "$current_deps" | _grep -q "$dep_id"; then
+    # Replaced: substring match and sed removal (tic-4ld5).
+    # if ! echo "$current_deps" | _grep -q "$dep_id"; then
+    if ! _list_has "$current_deps" "$dep_id"; then
         echo "Dependency not found"
         return 1
     fi
 
     # Remove dep from array
     local new_deps
-    new_deps=$(echo "$current_deps" | sed "s/, *$dep_id//g; s/$dep_id, *//g; s/$dep_id//g")
-    # Clean up empty array case
-    [[ "$new_deps" == "[]" || "$new_deps" == "[, ]" || "$new_deps" == "[ ]" ]] && new_deps="[]"
+    # new_deps=$(echo "$current_deps" | sed "s/, *$dep_id//g; s/$dep_id, *//g; s/$dep_id//g")
+    # [[ "$new_deps" == "[]" || "$new_deps" == "[, ]" || "$new_deps" == "[ ]" ]] && new_deps="[]"
+    new_deps=$(_list_remove "$current_deps" "$dep_id")
 
     update_yaml_field "$file" "deps" "$new_deps"
     echo "Removed dependency: $(basename "$file" .md) -/-> $dep_id"
@@ -1648,7 +1681,9 @@ cmd_unlink() {
     local current_links
     current_links=$(yaml_field "$file" "links" || true)
 
-    if [[ -z "$current_links" ]] || ! echo "$current_links" | _grep -q "$target_id"; then
+    # Replaced: substring match (tic-4ld5).
+    # if [[ -z "$current_links" ]] || ! echo "$current_links" | _grep -q "$target_id"; then
+    if ! _list_has "$current_links" "$target_id"; then
         echo "Link not found"
         return 1
     fi
@@ -1658,10 +1693,13 @@ cmd_unlink() {
         local f="${pair%%:*}" tid="${pair#*:}"
         local links
         links=$(yaml_field "$f" "links" || true)
-        [[ -z "$links" ]] || ! echo "$links" | _grep -q "$tid" && continue
+        # Replaced: substring match and sed removal (tic-4ld5).
+        # [[ -z "$links" ]] || ! echo "$links" | _grep -q "$tid" && continue
+        _list_has "$links" "$tid" || continue
         local new_links
-        new_links=$(echo "$links" | sed "s/, *$tid//g; s/$tid, *//g; s/$tid//g")
-        [[ "$new_links" == "[]" || "$new_links" == "[, ]" || "$new_links" == "[ ]" ]] && new_links="[]"
+        # new_links=$(echo "$links" | sed "s/, *$tid//g; s/$tid, *//g; s/$tid//g")
+        # [[ "$new_links" == "[]" || "$new_links" == "[, ]" || "$new_links" == "[ ]" ]] && new_links="[]"
+        new_links=$(_list_remove "$links" "$tid")
         update_yaml_field "$f" "links" "$new_links"
     done
 

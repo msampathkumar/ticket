@@ -199,3 +199,32 @@ Feature: Ticket Dependencies
     And the dep tree output should have task-0010 before task-0015
     And the dep tree output should have task-0010 before task-0020
     And the dep tree output should have task-0015 before task-0020
+
+  Scenario: Duplicate check matches whole IDs, not substrings
+    Given a ticket exists with ID "task-1" and title "Short ID"
+    And a ticket exists with ID "task-12" and title "Longer ID"
+    And ticket "task-0001" depends on "task-12"
+    When I run "ticket dep task-0001 task-1"
+    Then the command should succeed
+    And the output should be "Added dependency: task-0001 -> task-1"
+    And ticket "task-0001" should have "task-1" in deps
+    And ticket "task-0001" should have "task-12" in deps
+
+  Scenario: Undep of an absent ID leaves a longer ID that contains it
+    Given a ticket exists with ID "task-1" and title "Short ID"
+    And a ticket exists with ID "task-12" and title "Longer ID"
+    And ticket "task-0001" depends on "task-12"
+    When I run "ticket undep task-0001 task-1"
+    Then the command should fail
+    And the output should be "Dependency not found"
+    And ticket "task-0001" should have "task-12" in deps
+
+  Scenario: Undep removes only the exact ID
+    Given a ticket exists with ID "task-1" and title "Short ID"
+    And a ticket exists with ID "task-12" and title "Longer ID"
+    And ticket "task-0001" depends on "task-12"
+    And ticket "task-0001" depends on "task-1"
+    When I run "ticket undep task-0001 task-1"
+    Then the command should succeed
+    And ticket "task-0001" should not have "task-1" in deps
+    And ticket "task-0001" should have "task-12" in deps
