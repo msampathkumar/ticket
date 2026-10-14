@@ -1348,3 +1348,36 @@ def step_file_line_count(context, rel_path, line, times):
 def step_output_not_id(context):
     assert not re.search(r'(?m)^[a-z0-9.]+-[a-z0-9]{4,}$', context.stdout), \
         f"Unexpected ticket ID in output: {context.stdout}"
+
+
+# ============================================================================
+# Embedded agent skill (installed copies of tk have no SKILL.md beside them)
+# ============================================================================
+
+@given(r'a copy of the ticket script outside the repository at "(?P<rel_path>[^"]+)"')
+def step_copy_ticket_outside(context, rel_path):
+    import shutil
+    dest = Path(context.test_dir) / rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(get_ticket_script(context), dest)
+
+
+def _assert_matches_repo_skill(actual, what):
+    expected = (Path(__file__).resolve().parents[2] / 'agent-skill' / 'tk' / 'SKILL.md').read_text()
+    if actual != expected:
+        import difflib
+        diff = ''.join(list(difflib.unified_diff(
+            expected.splitlines(True), actual.splitlines(True),
+            'agent-skill/tk/SKILL.md', what))[:40])
+        raise AssertionError(
+            f"{what} differs from agent-skill/tk/SKILL.md; run `make skill-sync`.\n{diff}")
+
+
+@then(r'the raw output should equal the repository agent skill')
+def step_output_equals_repo_skill(context):
+    _assert_matches_repo_skill(context.result.stdout, 'tk agent-skill output')
+
+
+@then(r'the file "(?P<rel_path>[^"]+)" should equal the repository agent skill')
+def step_file_equals_repo_skill(context, rel_path):
+    _assert_matches_repo_skill((Path(context.test_dir) / rel_path).read_text(), rel_path)
