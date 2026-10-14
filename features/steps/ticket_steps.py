@@ -1339,3 +1339,9 @@ def step_ticket_lock(context, ticket_id, kind):
 def step_file_line_count(context, rel_path, line, times):
     lines = (Path(context.test_dir) / rel_path).read_text().splitlines()
     assert lines.count(line) == int(times), f"{rel_path}: {lines}"
+
+
+@then(r'the output should not match a ticket ID pattern')
+def step_output_not_id(context):
+    assert not re.search(r'(?m)^[a-z0-9.]+-[a-z0-9]{4,}$', context.stdout), \
+        f"Unexpected ticket ID in output: {context.stdout}"
