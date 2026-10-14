@@ -12,7 +12,7 @@ The Web UI loads no third-party code from the network. Each library is a pinned,
 
 ## Tailwind
 
-`tailwindcss-play-3.4.17.min.js` is the Tailwind Play CDN runtime: it compiles utility classes in the browser, including classes built dynamically in `app.js`, and reads `tailwind.config` from `index.html`. It is not published to npm, so the hash is taken from the versioned CDN URL. A precompiled CSS build would be smaller and faster but needs a Node build step and a content scan that can miss dynamic class names.
+`tailwindcss-play-3.4.17.min.js` is the Tailwind Play CDN runtime: it compiles utility classes in the browser, including classes built dynamically in `js/*.js`, and reads `tailwind.config` from `index.html`. It is not published to npm, so the hash is taken from the versioned CDN URL. A precompiled CSS build would be smaller and faster but needs a Node build step and a content scan that can miss dynamic class names.
 
 ## Updating a library
 
