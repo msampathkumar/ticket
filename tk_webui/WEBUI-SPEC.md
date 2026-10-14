@@ -2,7 +2,7 @@
 
 - **Plugin Name**: `tk-webui`
 - **Command**: `tk webui`
-- **Version**: `0.4.0`
+- **Version**: `0.5.0`
 - **Installation**: Included in Full Installation (`./install.sh --full` or `./install.sh --webui`)
 
 ---
@@ -55,7 +55,7 @@ tk webui [directory] [--host HOST] [--port PORT] [--reload] [--version]
 - `--host`: Host IP to bind (default: `127.0.0.1`). The value is added to the Host allowlist; `0.0.0.0` / `::` allow any Host (see 5.1).
 - `--port`: Port number (default: `8475`, derived from ASCII values for **T** = 84, **K** = 75).
 - `--reload`: Reload on code change (development only).
-- `--version` / `-v`: Displays version and project details (`tk-webui 0.4.0`).
+- `--version` / `-v`: Displays version and project details (`tk-webui 0.5.0`).
 
 ### 3.2 Background Daemon Server (`tk webui server` & shortcuts)
 ```bash

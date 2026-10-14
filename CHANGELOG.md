@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-14
+
 ### Security
 - Web UI: stored XSS fixed; ticket fields are HTML-escaped and markdown is sanitised with DOMPurify (#3).
 - Web UI: permissive CORS removed; a Host-header allowlist blocks DNS rebinding and cross-origin writes get 403 (#4).
@@ -31,8 +33,10 @@
 - Core and plugins: the scion-taskforce and Web UI help descriptions drop the "orchestrator" and "PR review" claims; the GitHub plugin is called an import.
 - Web UI: layout uses the full viewport width on large screens (#18).
 - Web UI: `app.js` split into ES modules under `static/js/`, no behaviour change (#26).
+- Web UI: Tailwind is a prebuilt, committed stylesheet (~45 KB) instead of the in-browser Play runtime (~400 KB) (#40).
 - GitHub: documented as a one-way import with an untrusted-input warning; nothing is written to GitHub (#9).
 - Docs: SPEC, README, agent guides, agent skill, core CLI and Web UI pages updated for claims, IDs, scope and security model; all plugins documented as optional (#29, #30, #31, #32, #33).
+- Docs: AGENTS.md states this project no longer contributes upstream to wedow/ticket (#42).
 - Tests: every Behave scenario runs with a sandboxed `HOME` and tk_cli state dir (#28).
 - SCION Task Force: event-driven. The per-project save hook runs `on-save <id>`; `sync` catches up. Close stops the worker; removing `taskforce`, adding `no-taskforce` or deleting the ticket removes it.
 - SCION Task Force: only `init` links a folder to the Scion Hub; dispatch may start Podman and re-link a configured project.
@@ -54,7 +58,10 @@
 - Web UI: reads the `external-ref` key core writes, with the legacy `external_ref` as fallback (#21).
 - Web UI: version comes from one source (0.4.0, was 0.1.0) (#23).
 - Web UI: blocked/ready state matches `tk ready` / `tk blocked` (#24).
+- Core: `tk dep`, `undep` and `unlink` match IDs exactly; a short ID inside a longer one (`tic-1` vs `tic-12`) no longer gives wrong results or corrupts the list (#37).
+- Core: `tk agent-skill` from an installed copy printed a stale embedded skill; it now matches `agent-skill/tk/SKILL.md`, guarded by `make skill-check` and a test (#38).
 - Web UI: the Tree Graph fits and centres in the viewport on open and reset (#34).
+- Web UI: a ticket with an unusual frontmatter value (e.g. a tag YAML reads as a mapping) no longer breaks the whole board; unreadable tickets are skipped and logged (#43).
 - SCION Task Force: `tk reopen` on a reviewed ticket removes `waiting-for-review` (with a note) so a new worker starts; before, the tag blocked dispatch.
 - SCION Task Force: a note for a paused gemini-cli worker no longer stalls it. The worker template now ships `home/.gemini/tk-system-settings.json` (topic narration off, next-speaker check on), loaded through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` so Scion's own settings stay intact. Re-run `tk scion-taskforce init` in existing projects to add it.
 - SCION Task Force: a note for a paused worker resumes it first and sends the note once it runs (plus 8 s to settle). In live tests the resumed worker then acted in about 20 s instead of 2.5 min.
