@@ -1668,6 +1668,7 @@ Status writes (`start`, `close`, `reopen`, `status`) and claims run under a per-
 - **Stale locks**: a lock is stale when its owner pid no longer runs on the same host, or it is older than `TK_LOCK_STALE_SECONDS` (default `60`). A waiter renames a stale lock aside (only one waiter wins the rename) and deletes it. Locks from crashed processes on other hosts (shared network filesystems) expire by age only. To clear one manually: `rm -rf .tickets/.locks/<id>.lock`.
 - **Claim rule**: `--claim` succeeds if the ticket is not `in_progress`, has no assignee, or is already assigned to the claimant (re-claiming is idempotent). Agents sharing one identity must pass distinct `--assignee` values.
 - **Scope**: locks coordinate `tk` processes sharing one `.tickets/` directory. Claims across separate Git clones are reconciled through Git, not by this lock.
+- **Git**: lock files never belong in Git. `tk init` adds `.locks/` and `.hooks/hooks.log` to `.tickets/.gitignore` (appending only missing lines), and the first lock writes a self-ignoring `.tickets/.locks/.gitignore` (`*`), which also covers repositories initialized earlier. Re-running `tk init` in an existing repository is safe.
 - Plain `tk start <id>` is unchanged: it sets `in_progress` without checking or changing the assignee.
 
 ---
