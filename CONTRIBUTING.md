@@ -43,6 +43,7 @@ make test
 1. **Fork and Branch**: Create a feature branch with a descriptive name (`feat/my-feature` or `fix/issue-description`).
 2. **Follow Code Standards**:
    - Keep Bash scripts portable to Bash 3.2 and `shellcheck -S warning` clean (as in CI).
+   - After editing `agent-skill/tk/SKILL.md`, run `make skill-sync` (CI fails if the embedded copy in `ticket` drifts).
    - Use Python type hints and clean formatting (`ruff check`) for `tk_webui/`.
 3. **Verify Tests**: Ensure all BDD test scenarios pass before submitting:
    ```bash
